@@ -160,9 +160,7 @@ code, .code { background: var(--panel2); padding: 3px 8px; border-radius: 6px; f
   animation: popin .4s cubic-bezier(.2, 1.4, .4, 1); box-shadow: 0 20px 60px rgba(0, 0, 0, .5);
 }
 .modal-box h2 { margin: 0 0 6px; text-align: center; font-size: 26px; }
-.modal-box .sub { text-align: center; color: var(--muted); margin: 0 0 14px; }
-.result-summary { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-bottom: 14px; min-height: 34px; }
-.result-summary .chip { animation: popin .4s cubic-bezier(.2, 1.4, .4, 1) both; animation-delay: var(--d, 0ms); }
+.modal-box .sub { text-align: center; color: var(--muted); margin: 0 0 18px; }
 .result-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
 .r-card { perspective: 1000px; min-height: 200px; }
 .flip-inner {

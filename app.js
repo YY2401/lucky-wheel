@@ -271,12 +271,9 @@
       if (d.prizes) { config.prizes = d.prizes.map(normalizePrize); saveLS(LS.overlayConfig, config); wheel.setPrizes(config.prizes, config.segmentMode); }
       Sfx.win(); confetti.burst(d.results.length > 1 ? 260 : 160);
       if (window.WheelBG) { WheelBG.setSpinning(false); WheelBG.burst(); }
-      const counts = new Map(); d.results.forEach((r) => counts.set(r.name, (counts.get(r.name) || 0) + 1));
       $('#ovResultCard').classList.toggle('single', d.results.length === 1);
       $('#ovTitle').textContent = d.results.length > 1 ? `${d.batchType}結果` : '恭喜獲得';
       $('#ovPlayer').textContent = d.player ? d.player : '';
-      $('#ovSummary').innerHTML = d.results.length > 1 ? [...counts].map(([n, c]) => `<span class="chip">${esc(n)} × ${c}</span>`).join('') : '';
-      $('#ovSummary').style.setProperty('--d', `${flipTotal(d.results.length, flip)}ms`);
       $('#ovGrid').innerHTML = resultCards(d.results, d.results.length > 1, flip);
       $('#ovResultLayer').classList.remove('out');
       $('#ovLive').innerHTML = '';
@@ -584,12 +581,9 @@
     if (window.WheelBG) WheelBG.burst();
   }
   function showResult(res) {
-    const counts = new Map(); res.results.forEach((r) => counts.set(r.name, (counts.get(r.name) || 0) + 1));
     $('#resultTitle').textContent = res.results.length > 1 ? `${res.batchType}結果` : '恭喜獲得';
     $('#resultSub').textContent = [res.player && `抽獎者：${res.player}`, res.exhausted && '（部分獎項已抽完，實際抽數少於設定）'].filter(Boolean).join('　');
-    $('#resultSummary').innerHTML = res.results.length > 1 ? [...counts].map(([n, c]) => `<span class="chip">${esc(n)} × ${c}</span>`).join('') : '';
     const flip = isFlip(res);
-    $('#resultSummary').style.setProperty('--d', `${flipTotal(res.results.length, flip)}ms`);
     $('#resultGrid').innerHTML = resultCards(res.results, true, flip);
     $('.modal-box', $('#resultModal')).classList.toggle('single', res.results.length === 1);
     if (flip) scheduleFlipSounds(res.results.length);
