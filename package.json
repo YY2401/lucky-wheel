@@ -1,0 +1,14 @@
+{
+  "name": "lucky-wheel",
+  "version": "1.0.0",
+  "private": true,
+  "description": "網頁幸運轉盤：動態機率、獎項庫存、連抽、OBS 覆蓋層、Excel 紀錄",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "exceljs": "^4.4.0",
+    "express": "^4.19.2"
+  }
+}

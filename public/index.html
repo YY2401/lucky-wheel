@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>幸運轉盤控制台</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar">
+  <h1 id="title">幸運轉盤</h1>
+  <div class="topbar-right">
+    <span class="status" id="sseStatus"><i></i>連線中…</span>
+    <button class="btn ghost" id="copyOverlay">複製 OBS 覆蓋層網址</button>
+    <a class="btn ghost" href="/overlay.html" target="_blank">預覽覆蓋層 ↗</a>
+  </div>
+</header>
+
+<main class="layout">
+  <section class="stage">
+    <div class="wheel-wrap"><canvas id="wheel"></canvas></div>
+    <div class="controls">
+      <input id="player" placeholder="抽獎者 / 備註（會一起寫進 Excel）" maxlength="60">
+      <div class="spin-buttons">
+        <button class="btn primary spin-btn" data-count="1">單抽</button>
+        <button class="btn spin-btn" data-count="3">三連抽</button>
+        <button class="btn spin-btn" data-count="5">五連抽</button>
+        <button class="btn spin-btn" data-count="10">十連抽</button>
+        <div class="custom">
+          <input type="number" id="customCount" min="1" max="100" value="20">
+          <button class="btn spin-btn" id="customSpin">連抽</button>
+        </div>
+      </div>
+      <label class="check"><input type="checkbox" id="fastMode"> 連抽快速模式（只轉一次，直接顯示全部結果）</label>
+      <button class="btn warn hidden" id="skipBtn">⏩ 跳過動畫</button>
+    </div>
+    <div class="live-results" id="liveResults"></div>
+  </section>
+
+  <aside class="panel">
+    <nav class="tabs">
+      <button data-tab="prizes" class="active">獎項設定</button>
+      <button data-tab="settings">設定 / OBS</button>
+      <button data-tab="records">抽獎紀錄</button>
+    </nav>
+
+    <div class="tab active" id="tab-prizes">
+      <div class="prob-bar" id="probBar"></div>
+      <div class="table-scroll">
+        <table class="prize-table">
+          <thead><tr><th>圖片</th><th>名稱</th><th>權重</th><th>機率</th><th>數量</th><th>剩餘</th><th>顏色</th><th></th></tr></thead>
+          <tbody id="prizeRows"></tbody>
+        </table>
+      </div>
+      <div class="row-actions">
+        <button class="btn" id="addPrize">＋ 新增獎項</button>
+        <button class="btn" id="resetStock">↺ 重置庫存</button>
+        <span class="spacer"></span>
+        <span id="dirtyHint"></span>
+        <button class="btn primary" id="savePrizes">儲存設定</button>
+      </div>
+      <p class="hint">
+        機率 ＝ 該獎項權重 ÷ 所有「還有庫存」獎項的權重總和。抽完的獎項會自動退出抽獎池，其餘獎項的機率會動態重新分配。<br>
+        數量勾選「無限」代表不限量；「剩餘」可手動修改。抽獎前會自動儲存未存的變更。
+      </p>
+    </div>
+
+    <div class="tab" id="tab-settings">
+      <div class="form">
+        <label>標題 <input id="s-title"></label>
+        <label>扇區大小
+          <select id="s-segmentMode">
+            <option value="weight">依機率比例（抽完的獎項會從轉盤消失）</option>
+            <option value="equal">平均等分（抽完的獎項變灰）</option>
+          </select>
+        </label>
+        <label>單抽轉動時間（毫秒）<input type="number" id="s-spinDuration" min="500" step="100"></label>
+        <label>連抽每一抽轉動時間（毫秒）<input type="number" id="s-multiSpinDuration" min="300" step="100"></label>
+        <label>轉動圈數 <input type="number" id="s-turns" min="1" max="20"></label>
+        <label>覆蓋層結果顯示秒數 <input type="number" id="s-overlayResultSeconds" min="1" max="120"></label>
+        <label class="check"><input type="checkbox" id="s-sound"> 音效（轉動滴答聲、中獎音）</label>
+        <label>Excel 檔案路徑 <input id="s-excelPath">
+          <small>相對路徑以專案資料夾為基準；也可填絕對路徑，例如 <code>/Users/你的名字/Desktop/抽獎紀錄.xlsx</code>。每次抽獎都會即時附加一列。</small>
+        </label>
+        <div><button class="btn primary" id="saveSettings">儲存設定</button></div>
+
+        <h3>OBS 設定步驟</h3>
+        <ol>
+          <li>OBS → 來源 → ＋ → <b>瀏覽器</b></li>
+          <li>網址填入：<span class="code" id="overlayUrl"></span></li>
+          <li>寬 / 高建議 1280 × 720 以上（轉盤大小可用網址參數 <code>?size=600</code> 調整）</li>
+          <li>背景已是透明，直接疊在畫面上即可；在這個控制台按抽獎，OBS 畫面會同步轉動並顯示結果</li>
+        </ol>
+        <p class="hint">
+          網址參數：<code>size</code> 轉盤像素、<code>mode=spin</code> 只在抽獎時顯示轉盤（平常隱藏）、<code>hide</code> 結果顯示秒數、<code>sound=0</code> 關閉音效。<br>
+          例：<code>/overlay.html?size=600&mode=spin&hide=10</code>
+        </p>
+        <h3>外部觸發（Stream Deck / 聊天機器人）</h3>
+        <p class="hint">開啟網址即抽獎：<span class="code" id="apiUrl"></span></p>
+      </div>
+    </div>
+
+    <div class="tab" id="tab-records">
+      <div class="row-actions" style="margin-top:0">
+        <button class="btn" id="refreshRecords">↻ 重新整理</button>
+        <button class="btn" id="exportExcel">📗 依紀錄重建 Excel</button>
+        <span class="spacer"></span>
+        <button class="btn danger" id="clearRecords">清除紀錄</button>
+      </div>
+      <p class="excel-status" id="excelInfo"></p>
+      <div class="table-scroll">
+        <table class="records-table">
+          <thead><tr><th>時間</th><th>抽獎者</th><th>類型</th><th>#</th><th>獎項</th><th>剩餘</th><th>機率</th></tr></thead>
+          <tbody id="recordRows"></tbody>
+        </table>
+      </div>
+    </div>
+  </aside>
+</main>
+
+<div class="modal hidden" id="resultModal">
+  <div class="modal-box">
+    <h2 id="resultTitle">🎉 抽獎結果</h2>
+    <p class="sub" id="resultSub"></p>
+    <div class="result-summary" id="resultSummary"></div>
+    <div class="result-grid" id="resultGrid"></div>
+    <p class="excel-status" id="excelStatus"></p>
+    <div class="modal-actions"><button class="btn primary" id="closeResult">關閉</button></div>
+  </div>
+</div>
+<canvas id="confetti"></canvas>
+<div id="toast"></div>
+
+<script src="wheel.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
