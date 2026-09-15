@@ -45,11 +45,10 @@ input[type=color] { width: 38px; height: 32px; border: 1px solid var(--line); bo
 .status.ok i { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
 .status.bad i { background: var(--bad); }
 
-.layout { display: grid; grid-template-columns: minmax(340px, 1fr) minmax(420px, 640px); gap: 22px; padding: 22px; max-width: 1500px; margin: 0 auto; }
-@media (max-width: 1000px) { .layout { grid-template-columns: 1fr; } }
+.layout { display: flex; justify-content: center; padding: 22px; }
 
 .stage { display: flex; flex-direction: column; align-items: center; gap: 16px; }
-.wheel-wrap { width: min(100%, 560px); aspect-ratio: 1; position: relative; }
+.wheel-wrap { width: min(100%, 620px, calc(100vh - 260px)); aspect-ratio: 1; position: relative; }
 .wheel-wrap canvas { width: 100%; height: 100%; display: block; }
 .controls { display: flex; flex-direction: column; gap: 10px; width: min(100%, 560px); }
 .controls input#player { width: 100%; }
@@ -68,6 +67,10 @@ input[type=color] { width: 38px; height: 32px; border: 1px solid var(--line); bo
 @keyframes popin { from { transform: scale(.3); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
 .panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; min-width: 0; }
+.modal-box.wide { width: min(960px, 100%); padding: 0; position: relative; }
+.modal-box.wide .tabs { padding-right: 48px; }
+.modal-close { position: absolute; top: 8px; right: 10px; background: transparent; border: 0; color: var(--muted); font-size: 18px; cursor: pointer; padding: 6px 8px; border-radius: 8px; }
+.modal-close:hover { color: var(--text); background: var(--panel2); }
 .tabs { display: flex; border-bottom: 1px solid var(--line); }
 .tabs button { flex: 1; background: transparent; border: 0; padding: 12px; cursor: pointer; color: var(--muted); font-weight: 600; border-bottom: 2px solid transparent; }
 .tabs button.active { color: var(--accent); border-bottom-color: var(--accent); }

@@ -132,12 +132,14 @@
         if (seg.soldOut) ctx.globalAlpha = 0.55;
         const img = this.images.get(seg.prize.id);
         const chord = 2 * R * 0.7 * Math.sin(Math.min(seg.span, Math.PI) / 2);
+        const mid = seg.start + seg.span / 2;
+        const screenAngle = norm(mid + this.rotation); // 扇區目前在畫面上的方向
         let textEnd = R * 0.92;
         if (img) {
           const imgSize = Math.max(8, Math.min(R * 0.3, chord * 0.85));
           ctx.save();
           ctx.translate(R * 0.72, 0);
-          ctx.rotate(Math.PI / 2);
+          ctx.rotate(-(mid + this.rotation)); // 反向旋轉，圖片永遠正立
           ctx.drawImage(img, -imgSize / 2, -imgSize / 2, imgSize, imgSize);
           ctx.restore();
           textEnd = R * 0.72 - imgSize / 2 - 6 * k;
@@ -146,12 +148,17 @@
         const textMax = Math.max(10, textEnd - textStart);
         const fs = Math.max(9, Math.min(S * 0.036, chord * 0.45));
         ctx.font = `bold ${fs}px "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif`;
-        ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+        ctx.textBaseline = 'middle';
         ctx.lineJoin = 'round'; ctx.lineWidth = 3 * k; ctx.strokeStyle = 'rgba(0,0,0,0.45)';
         const label = seg.soldOut ? `${seg.prize.name}（已抽完）` : seg.prize.name;
-        ctx.strokeText(label, textStart, 0, textMax);
+        // 左半邊的扇區把文字翻 180°，改成由外往內讀，這樣任何角度都不會上下顛倒
+        const flip = screenAngle > Math.PI / 2 && screenAngle < Math.PI * 1.5;
+        let tx = textStart;
+        if (flip) { ctx.rotate(Math.PI); ctx.textAlign = 'right'; tx = -textStart; }
+        else ctx.textAlign = 'left';
+        ctx.strokeText(label, tx, 0, textMax);
         ctx.fillStyle = '#fff';
-        ctx.fillText(label, textStart, 0, textMax);
+        ctx.fillText(label, tx, 0, textMax);
         ctx.restore();
       });
       ctx.restore();

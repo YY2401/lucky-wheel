@@ -452,11 +452,16 @@
     catch { toast('匯入失敗：不是有效的設定檔'); }
     e.target.value = '';
   });
-  $$('.tabs button').forEach((b) => b.addEventListener('click', () => {
-    $$('.tabs button').forEach((x) => x.classList.toggle('active', x === b));
-    $$('.tab').forEach((t) => t.classList.toggle('active', t.id === `tab-${b.dataset.tab}`));
-    if (b.dataset.tab === 'records') renderRecords();
-  }));
+  function showTab(name) {
+    $$('.tabs button').forEach((x) => x.classList.toggle('active', x.dataset.tab === name));
+    $$('.tab').forEach((t) => t.classList.toggle('active', t.id === `tab-${name}`));
+    if (name === 'records') renderRecords();
+  }
+  $$('.tabs button').forEach((b) => b.addEventListener('click', () => showTab(b.dataset.tab)));
+  $$('.open-panel').forEach((b) => b.addEventListener('click', () => { showTab(b.dataset.tab); $('#panelModal').classList.remove('hidden'); }));
+  $('#closePanel').addEventListener('click', () => $('#panelModal').classList.add('hidden'));
+  $('#panelModal').addEventListener('click', (e) => { if (e.target.id === 'panelModal') e.target.classList.add('hidden'); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { $('#panelModal').classList.add('hidden'); $('#resultModal').classList.add('hidden'); } });
 
   // ---------- 紀錄 / Excel ----------
   function renderRecords() {
