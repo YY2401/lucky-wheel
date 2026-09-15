@@ -54,6 +54,15 @@ OBS → 檢視 → 面板 → 自訂瀏覽器面板，把控制台網址加成�
 - Firefox / Safari 不支援直接寫入，可用「下載 Excel」。
 - 若 Excel 檔正被 Excel 程式開啟（Windows 會鎖檔）導致寫入失敗，紀錄仍在瀏覽器裡，關閉檔案後按「立即寫入」即可。
 
+## 部署到 Cloudflare Pages（免費、可從 private repo 部署）
+
+```bash
+npx wrangler@latest login   # 第一次：開瀏覽器授權 Cloudflare 帳號
+npm run deploy              # 之後每次更新只要這行
+```
+
+部署後網址形如 `https://lucky-wheel.pages.dev/`。
+
 ## 自行架設
 
 純靜態檔案，任何靜態空間都能放（GitHub Pages、Netlify、Cloudflare Pages…），或直接用本機靜態伺服器：
