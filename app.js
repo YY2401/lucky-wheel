@@ -241,7 +241,6 @@
     function applyConfig(c) {
       config = normalizeConfig(c);
       saveLS(LS.overlayConfig, config);
-      document.title = `${config.title}｜OBS`;
       Sfx.enabled = soundParam === '0' ? false : !!config.sound;
       wheel.setPrizes(config.prizes, config.segmentMode);
     }
@@ -320,7 +319,6 @@
   }
   function renderAll() {
     const c = state.config;
-    document.title = '幸運轉盤｜控制台';
     renderPrizeRows(); renderSettings(); updateWheel();
   }
   function updateWheel() {
