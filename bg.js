@@ -4,7 +4,11 @@
   const canvas = document.getElementById('bg');
   if (!canvas) return;
   const OVERLAY = document.body.classList.contains('overlay');
-  if (OVERLAY && new URLSearchParams(location.search).get('bg') === '0') return;
+  const params = new URLSearchParams(location.search);
+  if (OVERLAY && params.get('bg') === '0') return;
+  let enabled = true;
+  try { const c = JSON.parse(localStorage.getItem(OVERLAY ? 'lw.overlayConfig' : 'lw.config') || '{}'); if (c.bg3d === false) enabled = false; } catch { /* ignore */ }
+  canvas.style.display = enabled ? '' : 'none';
   const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'low-power' });
@@ -86,7 +90,7 @@
   document.addEventListener('visibilitychange', () => { running = !document.hidden; clock.getDelta(); });
   function tick() {
     requestAnimationFrame(tick);
-    if (!running) return;
+    if (!running || !enabled) return;
     const dt = Math.min(clock.getDelta(), 0.05);
     const t = clock.elapsedTime;
     const e = state.energy; const sp = prefersReduced ? 0.15 : 1 + e * 5;
@@ -114,6 +118,7 @@
     else Object.keys(props).forEach((k) => { target[k] = Array.isArray(props[k]) ? props[k][props[k].length - 1] : props[k]; });
   };
   window.WheelBG = {
+    setEnabled(v) { enabled = v !== false; canvas.style.display = enabled ? '' : 'none'; if (enabled) clock.getDelta(); },
     setSpinning(v) { tween(state, { energy: v ? 1 : 0 }, { duration: v ? 700 : 1600, easing: 'easeOutQuad' }); },
     burst() {
       tween(state, { energy: [2.2, 0] }, { duration: 2200, easing: 'easeOutExpo' });

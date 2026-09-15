@@ -244,3 +244,12 @@ body.overlay .chip { background: rgba(20, 20, 40, .85); font-size: 16px; padding
 .switch input:checked + .track { background: linear-gradient(135deg, #ffd166, #ff9f43); }
 .switch input:checked + .track::after { transform: translateX(22px); }
 .switch input:focus-visible + .track { outline: 2px solid rgba(255, 209, 102, .6); outline-offset: 2px; }
+
+/* 覆蓋層同步狀態點 */
+.ov-status { position: fixed; right: 12px; bottom: 12px; width: 12px; height: 12px; border-radius: 50%; background: #666; z-index: 5; box-shadow: 0 0 0 2px rgba(0, 0, 0, .35); transition: transform .2s; }
+.ov-status.ok { background: var(--ok); box-shadow: 0 0 8px var(--ok), 0 0 0 2px rgba(0, 0, 0, .35); }
+.ov-status.wait { background: var(--accent); }
+.ov-status.bad { background: var(--bad); box-shadow: 0 0 8px var(--bad), 0 0 0 2px rgba(0, 0, 0, .35); }
+.ov-status.flash { transform: scale(2.2); background: #fff; box-shadow: 0 0 16px #fff; }
+.modal-actions .btn.ghost { color: var(--muted); }
+.form .switch { display: inline-flex; }

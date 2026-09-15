@@ -20,14 +20,19 @@
   }
 
   // 依模式把獎項換算成扇區（角度從 0 開始順時針排列）
-  function buildSegments(prizes, mode) {
+  function buildSegments(prizes, mode, minSlice = 0) {
     const list = prizes.filter((p) => (mode === 'equal' ? true : p.weight > 0 && p.remaining !== 0));
     const weights = list.map((p) => (mode === 'equal' ? 1 : Number(p.weight) || 0));
     const total = weights.reduce((s, w) => s + w, 0);
     if (!list.length || total <= 0) return [];
+    let shares = weights.map((w) => w / total);
+    if (mode === 'weight' && minSlice > 0) {
+      // 只影響「畫面上」的扇區寬度，抽獎機率不變；避免 1% 的大獎細到看不見
+      for (let k = 0; k < 3; k++) { shares = shares.map((v) => Math.max(v, minSlice)); const t = shares.reduce((x, y) => x + y, 0); shares = shares.map((v) => v / t); }
+    }
     let a = 0;
     return list.map((p, i) => {
-      const span = (weights[i] / total) * TAU;
+      const span = shares[i] * TAU;
       const seg = { prize: p, start: a, end: a + span, span, index: i, soldOut: p.remaining === 0 || !(p.weight > 0) };
       a += span;
       return seg;
@@ -63,10 +68,11 @@
       this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
 
-    async setPrizes(prizes, mode = 'weight') {
+    async setPrizes(prizes, mode = 'weight', minSlice = 0) {
       this.prizes = prizes;
       this.mode = mode;
-      this.segments = buildSegments(prizes, mode);
+      this.minSlice = minSlice;
+      this.segments = buildSegments(prizes, mode, minSlice);
       if (this.highlight) this.highlight = this.segments.find((s) => s.prize.id === this.highlight.prize.id) || null;
       this.draw();
       await Promise.all(prizes.map(async (p) => {
@@ -147,6 +153,7 @@
         const textStart = R * 0.17;
         const textMax = Math.max(10, textEnd - textStart);
         const fs = Math.max(9, Math.min(S * 0.036, chord * 0.45));
+        if (chord * 0.45 < 7) { ctx.restore(); return; } // 扇區太細，文字畫了也看不清
         ctx.font = `bold ${fs}px "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif`;
         ctx.textBaseline = 'middle';
         ctx.lineJoin = 'round'; ctx.lineWidth = 3 * k; ctx.strokeStyle = 'rgba(0,0,0,0.45)';

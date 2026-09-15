@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Lucky Wheel</title>
-<link rel="stylesheet" href="style.css?v=15">
+<link rel="stylesheet" href="style.css?v=16">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.1/mqtt.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
@@ -97,12 +97,19 @@
         <label>連抽每一抽轉動時間（毫秒）<input type="number" id="s-multiSpinDuration" min="300" step="100"></label>
         <label>轉動圈數 <input type="number" id="s-turns" min="1" max="20"></label>
         <label>覆蓋層結果顯示秒數 <input type="number" id="s-overlayResultSeconds" min="1" max="120"></label>
+        <label>最小扇區寬度（%）<input type="number" id="s-minSlice" min="0" max="20" step="0.5"></label>
         <label>連抽方式
           <select id="s-multiMode">
             <option value="flip">轉盤轉一次，結果以翻牌逐張揭曉（推薦）</option>
             <option value="each">每一抽都轉一次轉盤，結果直接顯示</option>
           </select>
         </label>
+        <h3>畫面</h3>
+        <div class="switch-row">
+          <label class="switch"><input type="checkbox" id="s-bg3d"><span class="track"></span><span class="switch-label">3D 動態背景（效能不足時可關閉；同時套用到覆蓋層）</span></label>
+        </div>
+        <p class="hint">「最小扇區寬度」只影響轉盤畫面，讓 1% 的大獎也看得到，抽獎機率不受影響；設 0 則完全依機率比例。</p>
+
         <h3>音效</h3>
         <div class="switch-row">
           <label class="switch"><input type="checkbox" id="s-sound"><span class="track"></span><span class="switch-label">開啟音效（轉盤滴答聲、翻牌聲、中獎音）</span></label>
@@ -125,6 +132,7 @@
             <div class="row-actions" style="margin:6px 0 0"><button class="btn" id="copyOverlay" type="button">複製覆蓋層網址</button><a class="btn ghost" id="openOverlay" href="?overlay=1" target="_blank">預覽覆蓋層 ↗</a></div></li>
           <li>寬 / 高建議 1280 × 720 以上，背景已是透明</li>
           <li>在這個控制台按抽獎，OBS 畫面會同步轉動並顯示結果</li>
+          <li>按 <button class="btn" id="testSync" type="button" style="padding:6px 12px">測試同步</button> 確認覆蓋層有收到訊號（覆蓋層右下角有連線狀態小圓點，可用 <code>status=0</code> 隱藏）</li>
         </ol>
         <p class="hint">
           覆蓋層網址參數：<code>size</code> 轉盤像素、<code>mode=spin</code> 只在抽獎時顯示轉盤、<code>hide</code> 結果顯示秒數、<code>sound=0</code> 關閉音效。<br>
@@ -146,8 +154,9 @@
       <p class="hint" id="excelHint">綁定後每次抽獎都會自動把完整紀錄寫進該檔案（工作表「抽獎紀錄」，其他工作表保留）。重新整理網頁後第一次抽獎時，瀏覽器會再問一次是否允許寫入。</p>
       <hr style="border:0;border-top:1px solid var(--line);margin:14px 0">
       <div class="row-actions" style="margin-top:0">
+        <input id="recordSearch" placeholder="搜尋紀錄：抽獎者、獎項、類型、日期、批次ID…" style="flex:1;min-width:220px">
         <span class="excel-status" id="recordCount"></span>
-        <span class="spacer"></span>
+        <button class="btn" id="undoLast">撤銷上一批</button>
         <button class="btn danger" id="clearRecords">清除紀錄</button>
       </div>
       <div class="table-scroll">
@@ -167,7 +176,7 @@
     <p class="sub" id="resultSub"></p>
     <div class="result-grid" id="resultGrid"></div>
     <p class="excel-status" id="excelStatus"></p>
-    <div class="modal-actions"><button class="btn primary" id="closeResult">關閉</button></div>
+    <div class="modal-actions"><button class="btn ghost" id="undoThis">撤銷這次抽獎</button><button class="btn primary" id="closeResult">關閉</button></div>
   </div>
 </div>
 
@@ -184,11 +193,12 @@
   </div>
 </div>
 
+<div class="ov-status overlay-only hidden" id="ovStatus" title="同步狀態"></div>
 <canvas id="confetti"></canvas>
 <div id="toast"></div>
 
-<script src="wheel.js?v=15"></script>
-<script src="app.js?v=15"></script>
-<script src="bg.js?v=15"></script>
+<script src="wheel.js?v=16"></script>
+<script src="app.js?v=16"></script>
+<script src="bg.js?v=16"></script>
 </body>
 </html>

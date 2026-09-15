@@ -19,7 +19,7 @@
 
   const DEFAULT_CONFIG = {
     title: '幸運轉盤', segmentMode: 'weight', spinDuration: 5000, multiSpinDuration: 1500, turns: 6, sound: true,
-    overlayResultSeconds: 8, multiMode: 'flip', room: '', sync: false, broker: 'wss://broker.emqx.io:8084/mqtt',
+    overlayResultSeconds: 8, multiMode: 'flip', minSlice: 4, bg3d: true, room: '', sync: false, broker: 'wss://broker.emqx.io:8084/mqtt',
     prizes: [
       { id: 'p1', name: '特獎 iPad', weight: 1, quantity: 1, remaining: 1, image: '', color: '#ff6b6b' },
       { id: 'p2', name: '頭獎 藍牙耳機', weight: 5, quantity: 3, remaining: 3, image: '', color: '#ffd93d' },
@@ -58,6 +58,8 @@
     cfg.sync = cfg.sync === true;
     cfg.overlayResultSeconds = Math.min(120, Math.max(1, Number(cfg.overlayResultSeconds) || 8));
     cfg.multiMode = cfg.multiMode === 'each' ? 'each' : 'flip';
+    cfg.minSlice = Math.min(20, Math.max(0, Number(cfg.minSlice) || 0));
+    cfg.bg3d = cfg.bg3d !== false;
     cfg.room = String(cfg.room || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 24) || randId();
     cfg.broker = /^wss?:\/\//.test(cfg.broker || '') ? cfg.broker : DEFAULT_CONFIG.broker;
     cfg.prizes = Array.isArray(cfg.prizes) ? cfg.prizes.map(normalizePrize) : [];
@@ -121,6 +123,8 @@
       this.handlers.forEach((h) => h(msg));
     },
     _status() {
+      const dot = $('#ovStatus');
+      if (dot) { dot.className = `ov-status ${this.state === 'online' || this.state === 'local' ? 'ok' : this.state === 'connecting' ? 'wait' : 'bad'}`; dot.title = { local: '同瀏覽器同步', online: '跨瀏覽器同步中', connecting: '連線中', offline: '中繼離線', off: '關閉' }[this.state]; }
       const el = $('#syncStatus'); if (!el) return;
       const map = { off: ['', '同步：關閉'], local: ['ok', `頻道 ${this.room}（同瀏覽器）`], connecting: ['', `頻道 ${this.room}：連線中…`], online: ['ok', `頻道 ${this.room}：跨瀏覽器同步中`], offline: ['bad', `頻道 ${this.room}：中繼離線，重連中…`] };
       el.className = `status ${map[this.state][0]}`; el.lastChild.textContent = map[this.state][1];
@@ -242,8 +246,10 @@
       config = normalizeConfig(c);
       saveLS(LS.overlayConfig, config);
       Sfx.enabled = soundParam === '0' ? false : !!config.sound;
-      wheel.setPrizes(config.prizes, config.segmentMode);
+      wheel.setPrizes(config.prizes, config.segmentMode, config.minSlice / 100);
+      if (window.WheelBG && params.get('bg') !== '0') WheelBG.setEnabled(config.bg3d);
     }
+    if (params.get('status') !== '0') $('#ovStatus').classList.remove('hidden');
     applyConfig(config);
     function addLive(r) {
       const chip = document.createElement('span');
@@ -267,7 +273,7 @@
           if (d.results.length > 1) { addLive(r); Sfx.pop(); await wait(350); }
         }
       }
-      if (d.prizes) { config.prizes = d.prizes.map(normalizePrize); saveLS(LS.overlayConfig, config); wheel.setPrizes(config.prizes, config.segmentMode); }
+      if (d.prizes) { config.prizes = d.prizes.map(normalizePrize); saveLS(LS.overlayConfig, config); wheel.setPrizes(config.prizes, config.segmentMode, config.minSlice / 100); }
       Sfx.win(); confetti.burst(d.results.length > 1 ? 260 : 160);
       if (window.WheelBG) { WheelBG.setSpinning(false); WheelBG.burst(); }
       $('#ovResultCard').classList.toggle('single', d.results.length === 1);
@@ -286,6 +292,7 @@
     Sync.on((msg) => {
       if (msg.type === 'config') applyConfig(msg.config);
       else if (msg.type === 'spin') { queue.push(msg); pump(); }
+      else if (msg.type === 'ping') { Sync.send({ type: 'pong' }); const d = $('#ovStatus'); d.classList.add('flash'); setTimeout(() => d.classList.remove('flash'), 1200); }
     });
     Sync.start(room, { sync: params.get('sync') !== '0', broker: params.get('broker') || config.broker });
     // 向控制台要最新設定（跨瀏覽器時需要）
@@ -322,8 +329,9 @@
     renderPrizeRows(); renderSettings(); updateWheel();
   }
   function updateWheel() {
-    wheel.setPrizes(state.config.prizes, state.config.segmentMode);
+    wheel.setPrizes(state.config.prizes, state.config.segmentMode, state.config.minSlice / 100);
     renderProbBar(); refreshComputed();
+    if (window.WheelBG) WheelBG.setEnabled(state.config.bg3d);
     Sfx.enabled = !!state.config.sound;
   }
 
@@ -428,11 +436,12 @@
   }
 
   // ---------- 設定頁 ----------
-  const SETTING_KEYS = ['segmentMode', 'spinDuration', 'multiSpinDuration', 'turns', 'overlayResultSeconds', 'multiMode', 'room', 'broker'];
+  const SETTING_KEYS = ['segmentMode', 'spinDuration', 'multiSpinDuration', 'turns', 'overlayResultSeconds', 'multiMode', 'minSlice', 'room', 'broker'];
   function renderSettings() {
     const c = state.config;
     SETTING_KEYS.forEach((k) => { $(`#s-${k}`).value = c[k]; });
     $('#s-sound').checked = !!c.sound;
+    $('#s-bg3d').checked = !!c.bg3d;
     $('#s-sync').checked = !!c.sync;
     $('#overlayUrl').textContent = overlayUrl();
     $('#openOverlay').href = overlayUrl();
@@ -441,12 +450,16 @@
     const c = state.config;
     const before = `${c.room}|${c.sync}|${c.broker}`;
     SETTING_KEYS.forEach((k) => { c[k] = $(`#s-${k}`).value; });
-    c.sound = $('#s-sound').checked; c.sync = $('#s-sync').checked;
+    c.sound = $('#s-sound').checked; c.sync = $('#s-sync').checked; c.bg3d = $('#s-bg3d').checked;
     if (!saveConfig()) return;
     const c2 = state.config; // saveConfig 會重新 normalize
     if (before !== `${c2.room}|${c2.sync}|${c2.broker}`) Sync.start(c2.room, c2);
   });
   $('#newRoom').addEventListener('click', () => { $('#s-room').value = randId(); });
+  $('#testSync').addEventListener('click', () => {
+    state.pongs = 0; Sync.send({ type: 'ping' }); toast('已送出測試訊號，等待覆蓋層回應…', 3000);
+    setTimeout(() => toast(state.pongs ? `覆蓋層已回應（${state.pongs} 個）` : '3 秒內沒有覆蓋層回應：請確認 OBS 的網址含相同頻道代碼、且「跨瀏覽器同步」已開啟並儲存', 6000), 3000);
+  });
   $('#testSound').addEventListener('click', () => { const on = $('#s-sound').checked; if (!on) { toast('音效目前是關閉的，先打開再試聽'); return; } const was = Sfx.enabled; Sfx.enabled = true; Sfx.tick(); setTimeout(() => Sfx.pop(), 200); setTimeout(() => { Sfx.win(); Sfx.enabled = was || on; }, 500); });
   $('#savePrizes').addEventListener('click', () => saveConfig());
   $('#addPrize').addEventListener('click', () => {
@@ -488,8 +501,13 @@
 
   // ---------- 紀錄 / Excel ----------
   function renderRecords() {
-    $('#recordCount').textContent = `共 ${state.records.length} 筆`;
-    $('#recordRows').innerHTML = state.records.slice(-300).reverse().map((r) => `<tr>
+    const q = ($('#recordSearch').value || '').trim().toLowerCase();
+    const terms = q ? q.split(/\s+/) : [];
+    const list = terms.length
+      ? state.records.filter((r) => { const hay = `${r.time} ${r.player} ${r.type} ${r.prize} ${r.batchId}`.toLowerCase(); return terms.every((t) => hay.includes(t)); })
+      : state.records;
+    $('#recordCount').textContent = terms.length ? `符合 ${list.length} / ${state.records.length} 筆` : `共 ${state.records.length} 筆`;
+    $('#recordRows').innerHTML = list.slice(-500).reverse().map((r) => `<tr>
       <td>${esc(r.time)}</td><td>${esc(r.player)}</td><td>${esc(r.type)}</td><td>${r.index}</td>
       <td>${esc(r.prize)}</td><td>${r.remaining === -1 ? '∞' : r.remaining}</td><td>${r.probability}%</td></tr>`).join('');
   }
@@ -499,6 +517,21 @@
   $('#excelWrite').addEventListener('click', excelAction(() => Excel.writeAll()));
   $('#excelForget').addEventListener('click', () => Excel.forget());
   $('#excelDownload').addEventListener('click', () => Excel.download());
+  $('#recordSearch').addEventListener('input', renderRecords);
+  function undoLastBatch() {
+    if (!state.records.length) { toast('沒有可撤銷的紀錄'); return false; }
+    const bid = state.records[state.records.length - 1].batchId;
+    const batch = state.records.filter((r) => r.batchId === bid);
+    if (!confirm(`撤銷上一批抽獎？\n${batch[0].time}　${batch[0].type}　${batch.length} 筆${batch[0].player ? `　抽獎者：${batch[0].player}` : ''}\n\n庫存會加回，紀錄與 Excel 內的這幾筆會一併移除。`)) return false;
+    batch.forEach((r) => { const p = state.config.prizes.find((x) => x.id === r.prizeId); if (p && p.quantity !== -1) p.remaining = Math.min(p.quantity, p.remaining + 1); });
+    state.records = state.records.filter((r) => r.batchId !== bid);
+    saveLS(LS.records, state.records);
+    saveConfig(true); renderRecords();
+    Excel.writeAll().then((r) => { if (r.ok) toast(`已撤銷並更新 Excel（${r.name}）`); else toast('已撤銷'); }).catch((e) => toast(`已撤銷，但 Excel 更新失敗：${e.message}`, 6000));
+    return true;
+  }
+  $('#undoLast').addEventListener('click', undoLastBatch);
+  $('#undoThis').addEventListener('click', () => { if (undoLastBatch()) $('#resultModal').classList.add('hidden'); });
   $('#clearRecords').addEventListener('click', () => {
     if (!confirm('清除瀏覽器裡的所有抽獎紀錄？（已綁定的 Excel 檔不會被改動，直到下次寫入）')) return;
     state.records = []; saveLS(LS.records, state.records); renderRecords();
@@ -608,7 +641,10 @@
     anime({ targets: '.wheel-wrap', scale: [0.6, 1], opacity: [0, 1], rotate: [-40, 0], duration: 1100, easing: 'easeOutElastic(1, .6)' });
     anime({ targets: '.controls, .topbar', translateY: [24, 0], opacity: [0, 1], delay: anime.stagger(120, { start: 200 }), duration: 700, easing: 'easeOutCubic' });
   }
-  Sync.on((msg) => { if (msg.type === 'hello') Sync.send({ type: 'config', config: state.config }); });
+  Sync.on((msg) => {
+    if (msg.type === 'hello') Sync.send({ type: 'config', config: state.config });
+    else if (msg.type === 'pong') state.pongs = (state.pongs || 0) + 1;
+  });
   Sync.start(state.config.room, state.config);
   window.addEventListener('beforeunload', (e) => { if (state.dirty) { e.preventDefault(); e.returnValue = ''; } });
 })();
