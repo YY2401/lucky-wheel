@@ -1,7 +1,2 @@
-node_modules/
-data/config.json
-data/records.json
-data/*.xlsx
-public/uploads/*
-!public/uploads/.gitkeep
 .DS_Store
+node_modules/
