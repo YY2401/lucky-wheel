@@ -484,6 +484,7 @@
   // ---------- 抽獎 ----------
   function setSpinning(v) {
     state.spinning = v;
+    if (window.WheelBG) WheelBG.setSpinning(v);
     $$('.spin-btn').forEach((b) => { b.disabled = v; });
     $('#skipBtn').classList.toggle('hidden', !v);
   }
@@ -552,6 +553,7 @@
     }
     updateWheel(); renderPrizeRows();
     Sfx.win(); confetti.burst(res.results.length > 1 ? 260 : 160);
+    if (window.WheelBG) WheelBG.burst();
   }
   function showResult(res) {
     const counts = new Map(); res.results.forEach((r) => counts.set(r.name, (counts.get(r.name) || 0) + 1));
@@ -568,6 +570,10 @@
     ex.textContent = e.ok ? `已寫入 Excel：${e.name}` : e.skipped ? '（未綁定 Excel 檔案；可在「紀錄 / Excel」綁定或下載）' : `Excel 寫入失敗：${e.error}（紀錄仍保存在瀏覽器，可稍後「立即寫入」或下載）`;
     ex.classList.toggle('bad', !e.ok && !e.skipped);
     $('#resultModal').classList.remove('hidden');
+    if (window.anime) {
+      anime({ targets: '#resultGrid .r-card', translateY: [40, 0], opacity: [0, 1], scale: [0.7, 1], delay: anime.stagger(60, { start: 120 }), duration: 700, easing: 'easeOutElastic(1, .7)' });
+      anime({ targets: '#resultTitle', scale: [0.6, 1], opacity: [0, 1], duration: 600, easing: 'easeOutBack' });
+    }
   }
   $('#closeResult').addEventListener('click', () => $('#resultModal').classList.add('hidden'));
   $('#resultModal').addEventListener('click', (e) => { if (e.target.id === 'resultModal') e.target.classList.add('hidden'); });
@@ -578,6 +584,10 @@
   saveLS(LS.config, state.config);
   renderAll(); markDirty(false);
   Excel.init();
+  if (window.anime) {
+    anime({ targets: '.wheel-wrap', scale: [0.6, 1], opacity: [0, 1], rotate: [-40, 0], duration: 1100, easing: 'easeOutElastic(1, .6)' });
+    anime({ targets: '.controls, .topbar', translateY: [24, 0], opacity: [0, 1], delay: anime.stagger(120, { start: 200 }), duration: 700, easing: 'easeOutCubic' });
+  }
   Sync.on((msg) => { if (msg.type === 'hello') Sync.send({ type: 'config', config: state.config }); });
   Sync.start(state.config.room, state.config);
   window.addEventListener('beforeunload', (e) => { if (state.dirty) { e.preventDefault(); e.returnValue = ''; } });

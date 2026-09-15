@@ -72,7 +72,8 @@ python3 -m http.server 3000
 index.html   控制台 + OBS 覆蓋層（?overlay=1）
 app.js       抽獎邏輯、設定 / 紀錄儲存、同步頻道、Excel 寫入
 wheel.js     轉盤引擎（繪製、動畫、音效、彩帶）
+bg.js        Three.js 3D 動態背景（僅控制台，覆蓋層維持透明）
 style.css
 ```
 
-外部套件（CDN）：[SheetJS](https://sheetjs.com/) 產生 Excel、[MQTT.js](https://github.com/mqttjs/MQTT.js) 跨瀏覽器同步。
+外部套件（CDN）：[SheetJS](https://sheetjs.com/) 產生 Excel、[MQTT.js](https://github.com/mqttjs/MQTT.js) 跨瀏覽器同步、[Three.js](https://threejs.org/) 3D 動態背景、[anime.js](https://animejs.com/) 介面動畫。

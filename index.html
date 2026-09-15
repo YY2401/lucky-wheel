@@ -4,11 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>幸運轉盤</title>
-<link rel="stylesheet" href="style.css?v=7">
+<link rel="stylesheet" href="style.css?v=8">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.1/mqtt.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.2/anime.min.js"></script>
 </head>
 <body>
+<canvas id="bg" class="control-only"></canvas>
 <!-- ===== 控制台 ===== -->
 <header class="topbar control-only">
   <h1 id="title">幸運轉盤</h1>
@@ -175,7 +178,8 @@
 <canvas id="confetti"></canvas>
 <div id="toast"></div>
 
-<script src="wheel.js?v=7"></script>
-<script src="app.js?v=7"></script>
+<script src="wheel.js?v=8"></script>
+<script src="app.js?v=8"></script>
+<script src="bg.js?v=8"></script>
 </body>
 </html>

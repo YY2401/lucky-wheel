@@ -1,0 +1,120 @@
+/* Three.js 動態背景：粒子星雲 + 漂浮幾何體 + 光暈；抽獎時加速、中獎時爆發 */
+(function () {
+  if (!window.THREE || document.body.classList.contains('overlay')) return;
+  const canvas = document.getElementById('bg');
+  if (!canvas) return;
+  const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'low-power' });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+  const scene = new THREE.Scene();
+  scene.fog = new THREE.FogExp2(0x0d0d1a, 0.03);
+  const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 120);
+  camera.position.set(0, 0, 20);
+  const PAL = [0xffd166, 0xc77dff, 0xff6b6b, 0x4d96ff, 0xff8fab, 0x48cae4, 0xffb703];
+  const state = { energy: 0 };
+  const mouse = { x: 0, y: 0 };
+
+  // 圓點貼圖（給粒子與光暈）
+  function radialTexture(size, inner, outer) {
+    const c = document.createElement('canvas'); c.width = c.height = size;
+    const g = c.getContext('2d');
+    const grad = g.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+    grad.addColorStop(0, inner); grad.addColorStop(1, outer);
+    g.fillStyle = grad; g.fillRect(0, 0, size, size);
+    const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; return tex;
+  }
+  const dot = radialTexture(64, 'rgba(255,255,255,1)', 'rgba(255,255,255,0)');
+
+  // 粒子星雲
+  const N = 2200;
+  const pos = new Float32Array(N * 3); const col = new Float32Array(N * 3);
+  const tmp = new THREE.Color();
+  for (let i = 0; i < N; i++) {
+    const r = 6 + Math.cbrt(Math.random()) * 30;
+    const th = Math.random() * Math.PI * 2; const ph = Math.acos(2 * Math.random() - 1);
+    pos[i * 3] = r * Math.sin(ph) * Math.cos(th);
+    pos[i * 3 + 1] = r * Math.sin(ph) * Math.sin(th) * 0.6;
+    pos[i * 3 + 2] = r * Math.cos(ph) - 8;
+    tmp.setHex(PAL[Math.floor(Math.random() * PAL.length)]).offsetHSL(0, 0, (Math.random() - 0.5) * 0.2);
+    col[i * 3] = tmp.r; col[i * 3 + 1] = tmp.g; col[i * 3 + 2] = tmp.b;
+  }
+  const pGeo = new THREE.BufferGeometry();
+  pGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  pGeo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  const pMat = new THREE.PointsMaterial({ size: 0.26, vertexColors: true, map: dot, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false });
+  const points = new THREE.Points(pGeo, pMat);
+  scene.add(points);
+
+  // 光暈球（營造色彩與景深）
+  const orbs = [];
+  [[0xc77dff, -12, 5, -14, 26], [0xffd166, 12, -4, -12, 22], [0x4d96ff, 4, 8, -18, 20], [0xff6b6b, -6, -9, -16, 18]].forEach(([c, x, y, z, s], i) => {
+    const color = `#${c.toString(16).padStart(6, '0')}`;
+    const tex = radialTexture(256, color, 'rgba(0,0,0,0)');
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false }));
+    sp.position.set(x, y, z); sp.scale.set(s, s, 1);
+    scene.add(sp);
+    orbs.push({ sp, bx: x, by: y, speed: 0.12 + i * 0.04, phase: i * 1.7 });
+  });
+
+  // 漂浮幾何體
+  const geos = [new THREE.IcosahedronGeometry(1, 0), new THREE.OctahedronGeometry(1, 0), new THREE.TorusGeometry(1, 0.32, 8, 28), new THREE.TetrahedronGeometry(1, 0), new THREE.DodecahedronGeometry(1, 0)];
+  const shapes = [];
+  for (let i = 0; i < 18; i++) {
+    const geo = geos[i % geos.length];
+    const color = PAL[i % PAL.length];
+    const wire = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color, wireframe: true, transparent: true, opacity: 0.4 }));
+    const fill = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.05, blending: THREE.AdditiveBlending, depthWrite: false }));
+    const g = new THREE.Group(); g.add(wire); g.add(fill);
+    const a = Math.random() * Math.PI * 2; const r = 7 + Math.random() * 12;
+    g.position.set(Math.cos(a) * r, (Math.random() - 0.5) * 12, -2 - Math.random() * 14);
+    const s = 0.5 + Math.random() * 1.6; g.scale.set(s, s, s);
+    g.rotation.set(Math.random() * 3, Math.random() * 3, 0);
+    scene.add(g);
+    shapes.push({ g, rx: (Math.random() - 0.5) * 0.5, ry: (Math.random() - 0.5) * 0.6, bob: 0.3 + Math.random() * 0.5, phase: Math.random() * 6, baseY: g.position.y });
+  }
+
+  window.addEventListener('pointermove', (e) => { mouse.x = (e.clientX / window.innerWidth) * 2 - 1; mouse.y = -((e.clientY / window.innerHeight) * 2 - 1); }, { passive: true });
+  function resize() { renderer.setSize(window.innerWidth, window.innerHeight, false); camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); }
+  window.addEventListener('resize', resize); resize();
+
+  const clock = new THREE.Clock();
+  let running = !document.hidden;
+  document.addEventListener('visibilitychange', () => { running = !document.hidden; clock.getDelta(); });
+  function tick() {
+    requestAnimationFrame(tick);
+    if (!running) return;
+    const dt = Math.min(clock.getDelta(), 0.05);
+    const t = clock.elapsedTime;
+    const e = state.energy; const sp = prefersReduced ? 0.15 : 1 + e * 5;
+    points.rotation.y += dt * 0.04 * sp;
+    points.rotation.z = Math.sin(t * 0.07) * 0.08;
+    pMat.size = 0.26 + e * 0.14; pMat.opacity = Math.min(1, 0.9 + e * 0.1);
+    shapes.forEach((s) => {
+      s.g.rotation.x += s.rx * dt * sp; s.g.rotation.y += s.ry * dt * sp;
+      s.g.position.y = s.baseY + Math.sin(t * s.bob + s.phase) * 0.8;
+    });
+    orbs.forEach((o) => {
+      o.sp.position.x = o.bx + Math.sin(t * o.speed + o.phase) * 3;
+      o.sp.position.y = o.by + Math.cos(t * o.speed * 0.8 + o.phase) * 2;
+      o.sp.material.opacity = 0.55 + e * 0.3;
+    });
+    camera.position.x += (mouse.x * 1.6 - camera.position.x) * 0.04;
+    camera.position.y += (mouse.y * 1.0 - camera.position.y) * 0.04;
+    camera.lookAt(0, 0, -6);
+    renderer.render(scene, camera);
+  }
+  tick();
+
+  const tween = (target, props, opts) => {
+    if (window.anime) { anime.remove(target); anime({ targets: target, ...props, ...opts }); }
+    else Object.keys(props).forEach((k) => { target[k] = Array.isArray(props[k]) ? props[k][props[k].length - 1] : props[k]; });
+  };
+  window.WheelBG = {
+    setSpinning(v) { tween(state, { energy: v ? 1 : 0 }, { duration: v ? 700 : 1600, easing: 'easeOutQuad' }); },
+    burst() {
+      tween(state, { energy: [2.2, 0] }, { duration: 2200, easing: 'easeOutExpo' });
+      tween(points.scale, { x: [1, 1.18, 1], y: [1, 1.18, 1], z: [1, 1.18, 1] }, { duration: 1200, easing: 'easeOutCubic' });
+    },
+  };
+})();
