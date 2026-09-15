@@ -1,7 +1,9 @@
 # 🎡 Lucky Wheel — 直播用網頁幸運轉盤（純靜態，免安裝）
 
 動態機率 × 獎項庫存 × 連抽 × OBS 透明覆蓋層 × 直接寫入 Excel。
-純前端網頁，放在 GitHub Pages 上，打開網址就能用；設定與紀錄存在你的瀏覽器裡。
+純前端網頁，打開網址就能用；設定與紀錄存在你的瀏覽器裡。
+
+**👉 線上使用：<https://yy2401.github.io/lucky-wheel/>**
 
 ## 功能
 
@@ -53,15 +55,6 @@ OBS → 檢視 → 面板 → 自訂瀏覽器面板，把控制台網址加成�
 - 欄位：時間、批次ID、抽獎類型、第幾抽、抽獎者/備註、獎項、獎項ID、剩餘數量、當時機率(%)。
 - Firefox / Safari 不支援直接寫入，可用「下載 Excel」。
 - 若 Excel 檔正被 Excel 程式開啟（Windows 會鎖檔）導致寫入失敗，紀錄仍在瀏覽器裡，關閉檔案後按「立即寫入」即可。
-
-## 部署到 Cloudflare Pages（免費、可從 private repo 部署）
-
-```bash
-npx wrangler@latest login   # 第一次：開瀏覽器授權 Cloudflare 帳號
-npm run deploy              # 之後每次更新只要這行
-```
-
-部署後網址形如 `https://lucky-wheel.pages.dev/`。
 
 ## 自行架設
 

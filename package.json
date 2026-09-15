@@ -2,10 +2,8 @@
   "name": "lucky-wheel",
   "version": "2.0.0",
   "private": true,
-  "description": "直播用網頁幸運轉盤（純靜態）",
+  "description": "直播用網頁幸運轉盤（純靜態，GitHub Pages）",
   "scripts": {
-    "start": "python3 -m http.server 3000",
-    "build": "rm -rf dist && mkdir dist && cp index.html app.js wheel.js style.css dist/",
-    "deploy": "npm run build && npx wrangler@latest pages deploy dist --project-name lucky-wheel --branch main --commit-dirty=true"
+    "start": "python3 -m http.server 3000"
   }
 }
