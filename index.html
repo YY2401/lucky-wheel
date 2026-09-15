@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Lucky Wheel</title>
-<link rel="stylesheet" href="style.css?v=14">
+<link rel="stylesheet" href="style.css?v=15">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.1/mqtt.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
@@ -103,7 +103,12 @@
             <option value="each">每一抽都轉一次轉盤，結果直接顯示</option>
           </select>
         </label>
-        <label class="check"><input type="checkbox" id="s-sound"> 音效（轉動滴答聲、中獎音）</label>
+        <h3>音效</h3>
+        <div class="switch-row">
+          <label class="switch"><input type="checkbox" id="s-sound"><span class="track"></span><span class="switch-label">開啟音效（轉盤滴答聲、翻牌聲、中獎音）</span></label>
+          <button class="btn" id="testSound" type="button">試聽</button>
+        </div>
+        <p class="hint">此開關同時套用到控制台與 OBS 覆蓋層；覆蓋層也可用網址參數 <code>sound=0</code> 單獨關閉。</p>
 
         <h3>OBS 同步</h3>
         <label>頻道代碼（控制台與覆蓋層要相同）
@@ -182,8 +187,8 @@
 <canvas id="confetti"></canvas>
 <div id="toast"></div>
 
-<script src="wheel.js?v=14"></script>
-<script src="app.js?v=14"></script>
-<script src="bg.js?v=14"></script>
+<script src="wheel.js?v=15"></script>
+<script src="app.js?v=15"></script>
+<script src="bg.js?v=15"></script>
 </body>
 </html>

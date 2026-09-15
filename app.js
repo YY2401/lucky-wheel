@@ -447,6 +447,7 @@
     if (before !== `${c2.room}|${c2.sync}|${c2.broker}`) Sync.start(c2.room, c2);
   });
   $('#newRoom').addEventListener('click', () => { $('#s-room').value = randId(); });
+  $('#testSound').addEventListener('click', () => { const on = $('#s-sound').checked; if (!on) { toast('音效目前是關閉的，先打開再試聽'); return; } const was = Sfx.enabled; Sfx.enabled = true; Sfx.tick(); setTimeout(() => Sfx.pop(), 200); setTimeout(() => { Sfx.win(); Sfx.enabled = was || on; }, 500); });
   $('#savePrizes').addEventListener('click', () => saveConfig());
   $('#addPrize').addEventListener('click', () => {
     const n = state.config.prizes.length;
