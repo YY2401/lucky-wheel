@@ -243,12 +243,12 @@
       Sfx.win(); confetti.burst(d.results.length > 1 ? 260 : 160);
       const counts = new Map(); d.results.forEach((r) => counts.set(r.name, (counts.get(r.name) || 0) + 1));
       $('#ovResultCard').classList.toggle('single', d.results.length === 1);
-      $('#ovTitle').textContent = d.results.length > 1 ? `🎉 ${d.batchType}結果` : '🎉 恭喜獲得';
-      $('#ovPlayer').textContent = d.player ? `🎯 ${d.player}` : '';
+      $('#ovTitle').textContent = d.results.length > 1 ? `${d.batchType}結果` : '恭喜獲得';
+      $('#ovPlayer').textContent = d.player ? d.player : '';
       $('#ovSummary').innerHTML = d.results.length > 1 ? [...counts].map(([n, c]) => `<span class="chip">${esc(n)} × ${c}</span>`).join('') : '';
       $('#ovGrid').innerHTML = d.results.map((r, i) => `
         <div class="r-card" style="--c:${esc(r.color || '#888')};animation-delay:${i * 40}ms">
-          <div class="r-img">${r.image ? `<img src="${esc(r.image)}" alt="">` : '🎁'}</div>
+          <div class="r-img">${r.image ? `<img src="${esc(r.image)}" alt="">` : '<span class="r-dot"></span>'}</div>
           <div class="r-name">${esc(r.name)}</div>
           ${d.results.length > 1 ? `<div class="r-idx">第 ${r.index} 抽</div>` : ''}
         </div>`).join('');
@@ -313,7 +313,7 @@
       const tr = document.createElement('tr'); tr.dataset.id = p.id;
       tr.innerHTML = `
         <td><div style="display:flex;gap:6px;align-items:center">
-          <div class="thumb" title="點擊上傳圖片">${p.image ? `<img src="${esc(p.image)}" alt="">` : '📷'}</div>
+          <div class="thumb" title="點擊上傳圖片">${p.image ? `<img src="${esc(p.image)}" alt="">` : '<span class="thumb-empty">上傳</span>'}</div>
           <div class="thumb-actions"><button class="f-url">網址</button><button class="f-clearimg">清除</button></div>
           <input type="file" accept="image/*" class="f-file" hidden>
         </div></td>
@@ -555,17 +555,17 @@
   }
   function showResult(res) {
     const counts = new Map(); res.results.forEach((r) => counts.set(r.name, (counts.get(r.name) || 0) + 1));
-    $('#resultTitle').textContent = res.results.length > 1 ? `🎉 ${res.batchType}結果` : '🎉 恭喜獲得';
+    $('#resultTitle').textContent = res.results.length > 1 ? `${res.batchType}結果` : '恭喜獲得';
     $('#resultSub').textContent = [res.player && `抽獎者：${res.player}`, res.exhausted && '（部分獎項已抽完，實際抽數少於設定）'].filter(Boolean).join('　');
     $('#resultSummary').innerHTML = res.results.length > 1 ? [...counts].map(([n, c]) => `<span class="chip">${esc(n)} × ${c}</span>`).join('') : '';
     $('#resultGrid').innerHTML = res.results.map((r, i) => `
       <div class="r-card" style="--c:${esc(r.color || '#888')};animation-delay:${i * 40}ms">
-        <div class="r-img">${r.image ? `<img src="${esc(r.image)}" alt="">` : '🎁'}</div>
+        <div class="r-img">${r.image ? `<img src="${esc(r.image)}" alt="">` : '<span class="r-dot"></span>'}</div>
         <div class="r-name">${esc(r.name)}</div>
         <div class="r-idx">第 ${r.index} 抽</div>
       </div>`).join('');
     const ex = $('#excelStatus'); const e = res.excel || {};
-    ex.textContent = e.ok ? `✔ 已寫入 Excel：${e.name}` : e.skipped ? '（未綁定 Excel 檔案；可在「紀錄 / Excel」綁定或下載）' : `✖ Excel 寫入失敗：${e.error}（紀錄仍保存在瀏覽器，可稍後「立即寫入」或下載）`;
+    ex.textContent = e.ok ? `已寫入 Excel：${e.name}` : e.skipped ? '（未綁定 Excel 檔案；可在「紀錄 / Excel」綁定或下載）' : `Excel 寫入失敗：${e.error}（紀錄仍保存在瀏覽器，可稍後「立即寫入」或下載）`;
     ex.classList.toggle('bad', !e.ok && !e.skipped);
     $('#resultModal').classList.remove('hidden');
   }

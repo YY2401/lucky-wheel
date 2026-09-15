@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>幸運轉盤</title>
-<link rel="stylesheet" href="style.css?v=4">
+<link rel="stylesheet" href="style.css?v=5">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.1/mqtt.min.js"></script>
 </head>
@@ -14,9 +14,9 @@
   <h1 id="title">幸運轉盤</h1>
   <div class="topbar-right">
     <span class="status" id="syncStatus"><i></i>同步：關閉</span>
-    <button class="btn open-panel" data-tab="prizes">🎁 獎項設定</button>
-    <button class="btn open-panel" data-tab="settings">⚙️ 設定 / OBS</button>
-    <button class="btn open-panel" data-tab="records">📗 紀錄 / Excel</button>
+    <button class="btn open-panel" data-tab="prizes">獎項設定</button>
+    <button class="btn open-panel" data-tab="settings">設定 / OBS</button>
+    <button class="btn open-panel" data-tab="records">紀錄 / Excel</button>
   </div>
 </header>
 
@@ -36,7 +36,7 @@
         </div>
       </div>
       <label class="check"><input type="checkbox" id="fastMode"> 連抽快速模式（只轉一次，直接顯示全部結果）</label>
-      <button class="btn warn hidden" id="skipBtn">⏩ 跳過動畫</button>
+      <button class="btn warn hidden" id="skipBtn">跳過動畫</button>
     </div>
     <div class="live-results" id="liveResults"></div>
   </section>
@@ -64,8 +64,8 @@
         </table>
       </div>
       <div class="row-actions">
-        <button class="btn" id="addPrize">＋ 新增獎項</button>
-        <button class="btn" id="resetStock">↺ 重置庫存</button>
+        <button class="btn" id="addPrize">新增獎項</button>
+        <button class="btn" id="resetStock">重置庫存</button>
         <span class="spacer"></span>
         <span id="dirtyHint"></span>
         <button class="btn primary" id="savePrizes">儲存設定</button>
@@ -75,8 +75,8 @@
         數量勾選「無限」代表不限量；「剩餘」可手動修改。抽獎前會自動儲存未存的變更。設定存在這個瀏覽器裡，可用「匯出 / 匯入設定」搬到別台電腦。
       </p>
       <div class="row-actions">
-        <button class="btn" id="exportConfig">⇩ 匯出設定</button>
-        <button class="btn" id="importConfig">⇧ 匯入設定</button>
+        <button class="btn" id="exportConfig">匯出設定</button>
+        <button class="btn" id="importConfig">匯入設定</button>
         <input type="file" id="importFile" accept="application/json" hidden>
       </div>
     </div>
@@ -126,7 +126,7 @@
         <button class="btn primary" id="excelCreate">建立新的 Excel</button>
         <button class="btn" id="excelOpen">選擇既有 Excel</button>
         <button class="btn" id="excelWrite">立即寫入</button>
-        <button class="btn" id="excelDownload">⇩ 下載 Excel</button>
+        <button class="btn" id="excelDownload">下載 Excel</button>
         <button class="btn ghost" id="excelForget">取消綁定</button>
       </div>
       <p class="hint" id="excelHint">綁定後每次抽獎都會自動把完整紀錄寫進該檔案（工作表「抽獎紀錄」，其他工作表保留）。重新整理網頁後第一次抽獎時，瀏覽器會再問一次是否允許寫入。</p>
@@ -149,7 +149,7 @@
 
 <div class="modal hidden control-only" id="resultModal">
   <div class="modal-box">
-    <h2 id="resultTitle">🎉 抽獎結果</h2>
+    <h2 id="resultTitle">抽獎結果</h2>
     <p class="sub" id="resultSub"></p>
     <div class="result-summary" id="resultSummary"></div>
     <div class="result-grid" id="resultGrid"></div>
@@ -165,7 +165,7 @@
 </div>
 <div class="result-layer overlay-only out hidden" id="ovResultLayer">
   <div class="result-card" id="ovResultCard">
-    <h2 id="ovTitle">🎉 抽獎結果</h2>
+    <h2 id="ovTitle">抽獎結果</h2>
     <div class="r-player" id="ovPlayer"></div>
     <div class="result-summary" id="ovSummary"></div>
     <div class="result-grid" id="ovGrid"></div>
@@ -175,7 +175,7 @@
 <canvas id="confetti"></canvas>
 <div id="toast"></div>
 
-<script src="wheel.js?v=4"></script>
-<script src="app.js?v=4"></script>
+<script src="wheel.js?v=5"></script>
+<script src="app.js?v=5"></script>
 </body>
 </html>
