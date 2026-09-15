@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>幸運轉盤</title>
-<link rel="stylesheet" href="style.css?v=9">
+<link rel="stylesheet" href="style.css?v=10">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.1/mqtt.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
@@ -38,7 +38,6 @@
           <button class="btn spin-btn" id="customSpin">連抽</button>
         </div>
       </div>
-      <label class="check"><input type="checkbox" id="fastMode"> 連抽快速模式（只轉一次，直接顯示全部結果）</label>
       <button class="btn warn hidden" id="skipBtn">跳過動畫</button>
     </div>
     <div class="live-results" id="liveResults"></div>
@@ -97,6 +96,12 @@
         <label>連抽每一抽轉動時間（毫秒）<input type="number" id="s-multiSpinDuration" min="300" step="100"></label>
         <label>轉動圈數 <input type="number" id="s-turns" min="1" max="20"></label>
         <label>覆蓋層結果顯示秒數 <input type="number" id="s-overlayResultSeconds" min="1" max="120"></label>
+        <label>連抽方式
+          <select id="s-multiMode">
+            <option value="flip">轉盤轉一次，結果以翻牌逐張揭曉（推薦）</option>
+            <option value="each">每一抽都轉一次轉盤，結果直接顯示</option>
+          </select>
+        </label>
         <label class="check"><input type="checkbox" id="s-sound"> 音效（轉動滴答聲、中獎音）</label>
 
         <h3>OBS 同步</h3>
@@ -178,8 +183,8 @@
 <canvas id="confetti"></canvas>
 <div id="toast"></div>
 
-<script src="wheel.js?v=9"></script>
-<script src="app.js?v=9"></script>
-<script src="bg.js?v=9"></script>
+<script src="wheel.js?v=10"></script>
+<script src="app.js?v=10"></script>
+<script src="bg.js?v=10"></script>
 </body>
 </html>

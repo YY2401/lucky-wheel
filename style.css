@@ -169,6 +169,7 @@ code, .code { background: var(--panel2); padding: 3px 8px; border-radius: 6px; f
   animation: flip .9s cubic-bezier(.45, 0, .2, 1) forwards; animation-delay: var(--d, 0ms);
 }
 @keyframes flip { from { transform: rotateY(0); } to { transform: rotateY(180deg); } }
+.r-card.revealed .flip-inner { animation: none; transform: rotateY(180deg); }
 .flip-face {
   position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; border-radius: 14px;
   display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 12px; text-align: center;

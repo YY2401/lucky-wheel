@@ -19,7 +19,7 @@
 
   const DEFAULT_CONFIG = {
     title: '幸運轉盤', segmentMode: 'weight', spinDuration: 5000, multiSpinDuration: 1500, turns: 6, sound: true,
-    overlayResultSeconds: 8, room: '', sync: false, broker: 'wss://broker.emqx.io:8084/mqtt',
+    overlayResultSeconds: 8, multiMode: 'flip', room: '', sync: false, broker: 'wss://broker.emqx.io:8084/mqtt',
     prizes: [
       { id: 'p1', name: '特獎 iPad', weight: 1, quantity: 1, remaining: 1, image: '', color: '#ff6b6b' },
       { id: 'p2', name: '頭獎 藍牙耳機', weight: 5, quantity: 3, remaining: 3, image: '', color: '#ffd93d' },
@@ -57,6 +57,7 @@
     cfg.sound = cfg.sound !== false;
     cfg.sync = cfg.sync === true;
     cfg.overlayResultSeconds = Math.min(120, Math.max(1, Number(cfg.overlayResultSeconds) || 8));
+    cfg.multiMode = cfg.multiMode === 'each' ? 'each' : 'flip';
     cfg.room = String(cfg.room || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 24) || randId();
     cfg.broker = /^wss?:\/\//.test(cfg.broker || '') ? cfg.broker : DEFAULT_CONFIG.broker;
     cfg.prizes = Array.isArray(cfg.prizes) ? cfg.prizes.map(normalizePrize) : [];
@@ -196,9 +197,9 @@
 
   // 翻牌結果卡：先蓋牌，再依序翻開
   const FLIP_START = 500, FLIP_GAP = 160, FLIP_DUR = 900;
-  function resultCards(results, showIndex) {
+  function resultCards(results, showIndex, flip = true) {
     return results.map((r, i) => `
-      <div class="r-card" style="--c:${esc(r.color || '#888')}">
+      <div class="r-card${flip ? '' : ' revealed'}" style="--c:${esc(r.color || '#888')}">
         <div class="flip-inner" style="--d:${FLIP_START + i * FLIP_GAP}ms">
           <div class="flip-face flip-back"><span class="q">?</span></div>
           <div class="flip-face flip-front">
@@ -212,7 +213,9 @@
   function scheduleFlipSounds(n) {
     for (let i = 0; i < n; i++) setTimeout(() => Sfx.pop(), FLIP_START + i * FLIP_GAP + FLIP_DUR * 0.45);
   }
-  const flipTotal = (n) => FLIP_START + (n - 1) * FLIP_GAP + FLIP_DUR;
+  const flipTotal = (n, flip = true) => (flip ? FLIP_START + (n - 1) * FLIP_GAP + FLIP_DUR : 0);
+  // 連抽且採翻牌模式時，轉盤只轉一次、結果用翻牌揭曉
+  const isFlip = (d) => d.results.length > 1 && d.reveal !== 'each';
 
   // ======================================================================
   //  OBS 覆蓋層模式
@@ -255,10 +258,15 @@
       stage.classList.remove('out');
       if (window.WheelBG) WheelBG.setSpinning(true);
       await wait(mode === 'spin' ? 600 : 50);
-      for (let i = 0; i < d.results.length; i++) {
-        const r = d.results[i]; const first = i === 0;
-        await wheel.spinTo(r.prizeId, { duration: first ? config.spinDuration : config.multiSpinDuration, turns: first ? config.turns : Math.max(2, Math.round(config.turns / 2)) });
-        if (d.results.length > 1) { addLive(r); Sfx.pop(); await wait(350); }
+      const flip = isFlip(d);
+      if (flip) {
+        await wheel.spinTo(d.results[0].prizeId, { duration: config.spinDuration, turns: config.turns });
+      } else {
+        for (let i = 0; i < d.results.length; i++) {
+          const r = d.results[i]; const first = i === 0;
+          await wheel.spinTo(r.prizeId, { duration: first ? config.spinDuration : config.multiSpinDuration, turns: first ? config.turns : Math.max(2, Math.round(config.turns / 2)) });
+          if (d.results.length > 1) { addLive(r); Sfx.pop(); await wait(350); }
+        }
       }
       if (d.prizes) { config.prizes = d.prizes.map(normalizePrize); saveLS(LS.overlayConfig, config); wheel.setPrizes(config.prizes, config.segmentMode); }
       Sfx.win(); confetti.burst(d.results.length > 1 ? 260 : 160);
@@ -268,12 +276,12 @@
       $('#ovTitle').textContent = d.results.length > 1 ? `${d.batchType}結果` : '恭喜獲得';
       $('#ovPlayer').textContent = d.player ? d.player : '';
       $('#ovSummary').innerHTML = d.results.length > 1 ? [...counts].map(([n, c]) => `<span class="chip">${esc(n)} × ${c}</span>`).join('') : '';
-      $('#ovSummary').style.setProperty('--d', `${flipTotal(d.results.length)}ms`);
-      $('#ovGrid').innerHTML = resultCards(d.results, d.results.length > 1);
+      $('#ovSummary').style.setProperty('--d', `${flipTotal(d.results.length, flip)}ms`);
+      $('#ovGrid').innerHTML = resultCards(d.results, d.results.length > 1, flip);
       $('#ovResultLayer').classList.remove('out');
       $('#ovLive').innerHTML = '';
-      scheduleFlipSounds(d.results.length);
-      await wait(flipTotal(d.results.length) + (hideParam || config.overlayResultSeconds || 8) * 1000);
+      if (flip) scheduleFlipSounds(d.results.length);
+      await wait(flipTotal(d.results.length, flip) + (hideParam || config.overlayResultSeconds || 8) * 1000);
       $('#ovResultLayer').classList.add('out');
       $('#ovLive').innerHTML = '';
       if (mode === 'spin') stage.classList.add('out');
@@ -426,7 +434,7 @@
   }
 
   // ---------- 設定頁 ----------
-  const SETTING_KEYS = ['title', 'segmentMode', 'spinDuration', 'multiSpinDuration', 'turns', 'overlayResultSeconds', 'room', 'broker'];
+  const SETTING_KEYS = ['title', 'segmentMode', 'spinDuration', 'multiSpinDuration', 'turns', 'overlayResultSeconds', 'multiMode', 'room', 'broker'];
   function renderSettings() {
     const c = state.config;
     SETTING_KEYS.forEach((k) => { $(`#s-${k}`).value = c[k]; });
@@ -531,7 +539,7 @@
     const time = formatTime(now);
     const recs = results.map((r) => ({ time, batchId, type, index: r.index, player, prize: r.name, prizeId: r.prizeId, remaining: r.remaining, probability: r.probability }));
     if (recs.length) { state.records.push(...recs); saveLS(LS.records, state.records); saveLS(LS.config, state.config); }
-    return { type: 'spin', batchId, batchType: type, count, player, results, prizes: state.config.prizes, exhausted: results.length < count, time };
+    return { type: 'spin', batchId, batchType: type, count, player, results, prizes: state.config.prizes, exhausted: results.length < count, time, reveal: state.config.multiMode };
   }
 
   async function spin(count) {
@@ -559,9 +567,8 @@
     $('#liveResults').innerHTML = ''; state.skipAll = false;
     if (!res.results.length) { toast('沒有可抽的獎項（獎項都抽完或權重為 0）'); return; }
     const cfg = state.config;
-    if ($('#fastMode').checked && res.results.length > 1) {
-      await wheel.spinTo(res.results[res.results.length - 1].prizeId, { duration: cfg.spinDuration, turns: cfg.turns });
-      res.results.forEach(addLive);
+    if (isFlip(res)) {
+      await wheel.spinTo(res.results[0].prizeId, { duration: state.skipAll ? 0 : cfg.spinDuration, turns: cfg.turns });
     } else {
       for (let i = 0; i < res.results.length; i++) {
         const r = res.results[i]; const first = i === 0;
@@ -580,10 +587,11 @@
     $('#resultTitle').textContent = res.results.length > 1 ? `${res.batchType}結果` : '恭喜獲得';
     $('#resultSub').textContent = [res.player && `抽獎者：${res.player}`, res.exhausted && '（部分獎項已抽完，實際抽數少於設定）'].filter(Boolean).join('　');
     $('#resultSummary').innerHTML = res.results.length > 1 ? [...counts].map(([n, c]) => `<span class="chip">${esc(n)} × ${c}</span>`).join('') : '';
-    $('#resultSummary').style.setProperty('--d', `${flipTotal(res.results.length)}ms`);
-    $('#resultGrid').innerHTML = resultCards(res.results, true);
+    const flip = isFlip(res);
+    $('#resultSummary').style.setProperty('--d', `${flipTotal(res.results.length, flip)}ms`);
+    $('#resultGrid').innerHTML = resultCards(res.results, true, flip);
     $('.modal-box', $('#resultModal')).classList.toggle('single', res.results.length === 1);
-    scheduleFlipSounds(res.results.length);
+    if (flip) scheduleFlipSounds(res.results.length);
     const ex = $('#excelStatus'); const e = res.excel || {};
     ex.textContent = e.ok ? `已寫入 Excel：${e.name}` : e.skipped ? '（未綁定 Excel 檔案；可在「紀錄 / Excel」綁定或下載）' : `Excel 寫入失敗：${e.error}（紀錄仍保存在瀏覽器，可稍後「立即寫入」或下載）`;
     ex.classList.toggle('bad', !e.ok && !e.skipped);
