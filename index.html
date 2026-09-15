@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>幸運轉盤</title>
-<link rel="stylesheet" href="style.css?v=10">
+<link rel="stylesheet" href="style.css?v=11">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.1/mqtt.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
@@ -14,7 +14,6 @@
 <canvas id="bg"></canvas>
 <!-- ===== 控制台 ===== -->
 <header class="topbar control-only">
-  <h1 id="title">幸運轉盤</h1>
   <div class="topbar-right">
     <span class="status" id="syncStatus"><i></i>同步：關閉</span>
     <button class="btn open-panel" data-tab="prizes">獎項設定</button>
@@ -38,7 +37,10 @@
           <button class="btn spin-btn" id="customSpin">連抽</button>
         </div>
       </div>
-      <button class="btn warn hidden" id="skipBtn">跳過動畫</button>
+      <div class="check-row">
+        <label class="check"><input type="checkbox" id="skipAnim"> 跳過轉盤動畫（直接顯示結果）</label>
+        <button class="btn warn hidden" id="skipBtn">跳過這次動畫</button>
+      </div>
     </div>
     <div class="live-results" id="liveResults"></div>
   </section>
@@ -85,7 +87,6 @@
 
     <div class="tab" id="tab-settings">
       <div class="form">
-        <label>標題 <input id="s-title"></label>
         <label>扇區大小
           <select id="s-segmentMode">
             <option value="weight">依機率比例（抽完的獎項會從轉盤消失）</option>
@@ -183,8 +184,8 @@
 <canvas id="confetti"></canvas>
 <div id="toast"></div>
 
-<script src="wheel.js?v=10"></script>
-<script src="app.js?v=10"></script>
-<script src="bg.js?v=10"></script>
+<script src="wheel.js?v=11"></script>
+<script src="app.js?v=11"></script>
+<script src="bg.js?v=11"></script>
 </body>
 </html>

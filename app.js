@@ -323,8 +323,7 @@
   }
   function renderAll() {
     const c = state.config;
-    document.title = `${c.title}｜控制台`;
-    $('#title').textContent = c.title;
+    document.title = '幸運轉盤｜控制台';
     renderPrizeRows(); renderSettings(); updateWheel();
   }
   function updateWheel() {
@@ -434,7 +433,7 @@
   }
 
   // ---------- 設定頁 ----------
-  const SETTING_KEYS = ['title', 'segmentMode', 'spinDuration', 'multiSpinDuration', 'turns', 'overlayResultSeconds', 'multiMode', 'room', 'broker'];
+  const SETTING_KEYS = ['segmentMode', 'spinDuration', 'multiSpinDuration', 'turns', 'overlayResultSeconds', 'multiMode', 'room', 'broker'];
   function renderSettings() {
     const c = state.config;
     SETTING_KEYS.forEach((k) => { $(`#s-${k}`).value = c[k]; });
@@ -517,6 +516,8 @@
     $('#skipBtn').classList.toggle('hidden', !v);
   }
   $('#skipBtn').addEventListener('click', () => { state.skipAll = true; wheel.skip(); });
+  $('#skipAnim').checked = loadLS('lw.skipAnim', false) === true;
+  $('#skipAnim').addEventListener('change', (e) => saveLS('lw.skipAnim', e.target.checked));
   $$('.spin-btn[data-count]').forEach((b) => b.addEventListener('click', () => spin(Number(b.dataset.count))));
   $('#customSpin').addEventListener('click', () => spin(Number($('#customCount').value) || 1));
   document.addEventListener('keydown', (e) => {
@@ -564,7 +565,7 @@
     $('#liveResults').appendChild(chip);
   }
   async function playBatch(res) {
-    $('#liveResults').innerHTML = ''; state.skipAll = false;
+    $('#liveResults').innerHTML = ''; state.skipAll = $('#skipAnim').checked;
     if (!res.results.length) { toast('沒有可抽的獎項（獎項都抽完或權重為 0）'); return; }
     const cfg = state.config;
     if (isFlip(res)) {

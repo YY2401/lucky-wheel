@@ -42,7 +42,7 @@ input[type=color] { width: 38px; height: 32px; border: 1px solid var(--line); bo
 .btn.icon { padding: 4px 8px; font-size: 13px; }
 
 .topbar {
-  display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 22px; flex-wrap: wrap;
+  display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 14px 22px; flex-wrap: wrap;
   background: rgba(14, 14, 28, 0.45); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-bottom: 1px solid rgba(255, 255, 255, 0.07);
 }
 .topbar h1 {
@@ -80,6 +80,7 @@ input[type=color] { width: 38px; height: 32px; border: 1px solid var(--line); bo
 .spin-buttons .custom { display: inline-flex; gap: 6px; align-items: center; }
 .spin-buttons .custom input { width: 70px; }
 .check { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 14px; cursor: pointer; }
+.check-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 
 .live-results { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; min-height: 34px; width: min(100%, 560px); }
 .chip {
