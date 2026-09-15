@@ -1,14 +1,17 @@
 /* Three.js 動態背景：粒子星雲 + 漂浮幾何體 + 光暈；抽獎時加速、中獎時爆發 */
 (function () {
-  if (!window.THREE || document.body.classList.contains('overlay')) return;
+  if (!window.THREE) return;
   const canvas = document.getElementById('bg');
   if (!canvas) return;
+  const OVERLAY = document.body.classList.contains('overlay');
+  if (OVERLAY && new URLSearchParams(location.search).get('bg') === '0') return;
   const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'low-power' });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+  renderer.setClearColor(0x000000, 0); // 透明，覆蓋層可直接疊在 OBS 畫面上
   const scene = new THREE.Scene();
-  scene.fog = new THREE.FogExp2(0x0d0d1a, 0.03);
+  if (!OVERLAY) scene.fog = new THREE.FogExp2(0x0d0d1a, 0.03);
   const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 120);
   camera.position.set(0, 0, 20);
   const PAL = [0xffd166, 0xc77dff, 0xff6b6b, 0x4d96ff, 0xff8fab, 0x48cae4, 0xffb703];
@@ -27,7 +30,7 @@
   const dot = radialTexture(64, 'rgba(255,255,255,1)', 'rgba(255,255,255,0)');
 
   // 粒子星雲
-  const N = 2200;
+  const N = OVERLAY ? 1500 : 2200;
   const pos = new Float32Array(N * 3); const col = new Float32Array(N * 3);
   const tmp = new THREE.Color();
   for (let i = 0; i < N; i++) {
@@ -60,7 +63,7 @@
   // 漂浮幾何體
   const geos = [new THREE.IcosahedronGeometry(1, 0), new THREE.OctahedronGeometry(1, 0), new THREE.TorusGeometry(1, 0.32, 8, 28), new THREE.TetrahedronGeometry(1, 0), new THREE.DodecahedronGeometry(1, 0)];
   const shapes = [];
-  for (let i = 0; i < 18; i++) {
+  for (let i = 0; i < (OVERLAY ? 12 : 18); i++) {
     const geo = geos[i % geos.length];
     const color = PAL[i % PAL.length];
     const wire = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color, wireframe: true, transparent: true, opacity: 0.4 }));
