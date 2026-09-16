@@ -85,8 +85,14 @@ npm run test:e2e   # 端對端：真實 Chrome 跑抽獎、撤銷、搜尋、設
 
 ```
 index.html   控制台 + OBS 覆蓋層（?overlay=1）
+app.js       進入點：載入儲存層後依網址啟動控制台或覆蓋層
 core.js      純邏輯：設定正規化、機率、抽獎、保底、撤銷（瀏覽器與 Node 共用）
-app.js       介面、儲存（IndexedDB）、同步頻道、Excel 寫入
+control.js   控制台：獎項表格、設定頁、紀錄 / 統計、抽獎流程
+overlay.js   OBS 覆蓋層：聽同步頻道、播放轉盤與結果卡
+ui.js        共用介面：DOM 工具、提示、頁內對話框、結果卡、主題
+store.js     儲存層（IndexedDB，含舊版 localStorage 搬移）
+sync.js      同步頻道（BroadcastChannel + MQTT）
+excel.js     Excel 綁定與寫入（File System Access API + SheetJS）
 wheel.js     轉盤引擎（繪製、動畫、音效、彩帶）
 bg.js        Three.js 3D 動態背景（僅控制台，覆蓋層維持透明）
 style.css
