@@ -324,3 +324,8 @@ body.overlay .chip { font-size: 16px; padding: 7px 14px 7px 8px; }
 #confirmModal .msg { white-space: pre-line; color: var(--text); font-size: 16px; line-height: 1.7; margin: 0 0 18px; }
 #confirmModal input { width: 100%; margin-bottom: 18px; }
 #confirmModal .modal-actions { margin-top: 0; }
+
+/* 進階摺疊區 */
+details.adv { border: var(--border-w) dashed var(--ink-soft); border-radius: 10px; padding: 10px 14px; }
+details.adv summary { cursor: pointer; font-weight: 700; color: var(--muted); }
+details.adv[open] summary { margin-bottom: 4px; }

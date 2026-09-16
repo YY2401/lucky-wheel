@@ -7,7 +7,7 @@
 <script>try { document.documentElement.dataset.theme = localStorage.getItem('lw.theme') || 'light'; } catch (e) { document.documentElement.dataset.theme = 'light'; }</script>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=24">
+<link rel="stylesheet" href="style.css?v=25">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.1/mqtt.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
@@ -74,7 +74,7 @@
       <div class="prob-bar" id="probBar"></div>
       <div class="table-scroll">
         <table class="prize-table">
-          <thead><tr><th>圖片</th><th>名稱</th><th>權重</th><th>機率</th><th>數量</th><th>剩餘</th><th>顏色</th><th title="勾選的獎項算保底獎">保底</th><th></th></tr></thead>
+          <thead><tr><th>圖片</th><th>名稱</th><th title="數字越大越容易抽到">權重</th><th>機率</th><th>數量</th><th>剩餘</th><th>顏色</th><th title="勾選的獎項算保底獎">保底</th><th></th></tr></thead>
           <tbody id="prizeRows"></tbody>
         </table>
       </div>
@@ -86,8 +86,9 @@
         <button class="btn primary" id="savePrizes">儲存設定</button>
       </div>
       <p class="hint">
-        機率 ＝ 該獎項權重 ÷ 所有「還有庫存」獎項的權重總和。抽完的獎項會自動退出抽獎池，其餘獎項的機率會動態重新分配。<br>
-        數量勾選「無限」代表不限量；「剩餘」可手動修改。「保底」勾選的獎項組成保底獎池（在「設定」開啟保底機制後生效）。抽獎前會自動儲存未存的變更。設定存在這個瀏覽器裡，可用「匯出 / 匯入設定」搬到別台電腦。
+        <b>權重</b>是「相對容易抽到的程度」，數字越大越容易中，機率會自動算出來（例如權重 1、5、94 就是 1%、5%、94%）。某個獎項抽完後會自動退出，剩下的獎項機率會重新分配。<br>
+        <b>數量</b>勾「無限」就是不限量；<b>剩餘</b>可以手動改。<b>保底</b>打勾的獎項會在保底時被抽出（要到「設定」把保底規則打開才有作用）。<br>
+        按抽獎前會自動幫你儲存。設定存在這台電腦的瀏覽器裡，換電腦請用「匯出設定」帶走。
       </p>
       <div class="row-actions">
         <button class="btn" id="exportConfig">匯出設定</button>
@@ -98,80 +99,97 @@
 
     <div class="tab" id="tab-settings">
       <div class="form">
-        <label>扇區大小
+        <h3>轉盤</h3>
+        <label>轉盤格子的大小
           <select id="s-segmentMode">
-            <option value="weight">依機率比例（抽完的獎項會從轉盤消失）</option>
-            <option value="equal">平均等分（抽完的獎項變灰）</option>
+            <option value="weight">照中獎機率分配（機率高的格子大；抽完的獎項會從轉盤上消失）</option>
+            <option value="equal">每個獎項一樣大（抽完的獎項會變灰色）</option>
           </select>
         </label>
-        <label>單抽轉動時間（毫秒）<input type="number" id="s-spinDuration" min="500" step="100"></label>
-        <label>連抽每一抽轉動時間（毫秒）<input type="number" id="s-multiSpinDuration" min="300" step="100"></label>
-        <label>轉動圈數 <input type="number" id="s-turns" min="1" max="20"></label>
-        <label>覆蓋層結果顯示秒數 <input type="number" id="s-overlayResultSeconds" min="1" max="120"></label>
-        <label>最小扇區寬度（%）<input type="number" id="s-minSlice" min="0" max="20" step="0.5"></label>
-        <label>連抽方式
+        <label>最小格子寬度（%）<input type="number" id="s-minSlice" min="0" max="20" step="0.5">
+          <small>讓機率很低的大獎在轉盤上也看得到，不會影響真正的中獎機率。設 0 就完全照機率。</small>
+        </label>
+        <label>轉動圈數 <input type="number" id="s-turns" min="1" max="20"><small>轉盤停下前會轉幾圈。</small></label>
+        <label>單抽轉動時間（秒）<input type="number" id="s-spinDuration" min="0.5" max="30" step="0.5"></label>
+        <label>連抽時每一抽的轉動時間（秒）<input type="number" id="s-multiSpinDuration" min="0.3" max="30" step="0.5"><small>只有選「每一抽都轉一次」時才用得到。</small></label>
+        <label>連抽的呈現方式
           <select id="s-multiMode">
-            <option value="flip">轉盤轉一次，結果以翻牌逐張揭曉（推薦）</option>
+            <option value="flip">轉盤轉一次，結果做成卡片一張張翻開（推薦）</option>
             <option value="each">每一抽都轉一次轉盤，結果直接顯示</option>
           </select>
         </label>
-        <h3>保底機制</h3>
+
+        <h3>保底</h3>
+        <p class="hint">先到「獎項設定」把想當保底的獎項打勾（例如頭獎、二獎），再打開下面的規則。保底時會從這些打勾的獎項裡抽一個，抽完的不算。</p>
         <div class="switch-row">
-          <label class="switch"><input type="checkbox" id="s-pityAccum"><span class="track"></span><span class="switch-label">累積保底：連續</span></label>
-          <input type="number" id="s-pityAccumN" min="1" max="1000" style="width:90px"> <span>抽沒抽到保底獎，下一抽必中</span>
+          <label class="switch"><input type="checkbox" id="s-pityAccum"><span class="track"></span><span class="switch-label">連續</span></label>
+          <input type="number" id="s-pityAccumN" min="1" max="1000" style="width:90px"> <span>抽都沒抽到保底獎的話，下一抽一定中</span>
         </div>
         <div class="switch-row">
-          <label class="switch"><input type="checkbox" id="s-pityBatch"><span class="track"></span><span class="switch-label">連抽保底：每</span></label>
-          <input type="number" id="s-pityBatchK" min="2" max="100" style="width:90px"> <span>抽至少 1 個保底獎（十連抽設 10 就是十連必中）</span>
+          <label class="switch"><input type="checkbox" id="s-pityBatch"><span class="track"></span><span class="switch-label">每</span></label>
+          <input type="number" id="s-pityBatchK" min="2" max="100" style="width:90px"> <span>抽裡面至少有 1 個保底獎（設 10 就是「十連抽必中」）</span>
         </div>
-        <label>累積保底的計數範圍
+        <label>「連續幾抽沒中」怎麼算
           <select id="s-pityScope">
-            <option value="player">依抽獎者名稱分開計數（空白算匿名）</option>
-            <option value="global">全體共用一個計數</option>
+            <option value="player">每個抽獎者分開算（看主畫面輸入的名字；沒填名字的算同一個人）</option>
+            <option value="global">不分人，所有抽獎一起算</option>
           </select>
         </label>
-        <p class="hint">保底獎池 = 在「獎項設定」勾選「保底」的獎項，觸發時在這些獎項之間依權重抽，仍受庫存限制；保底獎全部抽完時不會觸發。計數由紀錄反推，撤銷抽獎後自動修正。</p>
 
         <h3>畫面</h3>
-        <label>主題
+        <label>配色
           <select id="s-theme">
             <option value="light">白底</option>
             <option value="dark">黑底</option>
           </select>
         </label>
         <div class="switch-row">
-          <label class="switch"><input type="checkbox" id="s-bg3d"><span class="track"></span><span class="switch-label">3D 動態背景（效能不足時可關閉；同時套用到覆蓋層）</span></label>
+          <label class="switch"><input type="checkbox" id="s-bg3d"><span class="track"></span><span class="switch-label">背景動態效果（飄動的粒子與幾何體）</span></label>
         </div>
-        <p class="hint">「最小扇區寬度」只影響轉盤畫面，讓 1% 的大獎也看得到，抽獎機率不受影響；設 0 則完全依機率比例。</p>
+        <p class="hint">電腦比較舊或直播時覺得卡，可以把背景動態效果關掉；OBS 畫面會一起關。</p>
 
         <h3>音效</h3>
         <div class="switch-row">
           <label class="switch"><input type="checkbox" id="s-sound"><span class="track"></span><span class="switch-label">開啟音效（轉盤滴答聲、翻牌聲、中獎音）</span></label>
           <button class="btn" id="testSound" type="button">試聽</button>
         </div>
-        <p class="hint">此開關同時套用到控制台與 OBS 覆蓋層；覆蓋層也可用網址參數 <code>sound=0</code> 單獨關閉。</p>
 
-        <h3>OBS 同步</h3>
-        <label>頻道代碼（控制台與覆蓋層要相同）
-          <div style="display:flex;gap:6px"><input id="s-room" maxlength="24" style="flex:1"><button class="btn" id="newRoom" type="button">重新產生</button></div>
+        <h3>OBS 直播畫面</h3>
+        <p class="hint">OBS 直播畫面是一個透明背景的網頁，只有轉盤和結果，沒有任何按鈕。你在這裡按抽獎，OBS 那邊會跟著轉。</p>
+        <div class="switch-row">
+          <label class="switch"><input type="checkbox" id="s-sync"><span class="track"></span><span class="switch-label">讓 OBS 畫面跟著這個控制台動（必須打開）</span></label>
+        </div>
+        <label>配對代碼
+          <div style="display:flex;gap:6px"><input id="s-room" maxlength="24" style="flex:1"><button class="btn" id="newRoom" type="button">換一組</button></div>
+          <small>控制台和 OBS 畫面靠這組代碼認彼此，網址會自動帶上；不用改，除非你想跟別人的區分開。</small>
         </label>
-        <label class="check"><input type="checkbox" id="s-sync"> 跨瀏覽器同步（Chrome 控制台 ↔ OBS 瀏覽器來源，透過公開 MQTT 中繼）</label>
-        <label>中繼伺服器（WebSocket）<input id="s-broker"><small>預設使用公開的 EMQX 測試伺服器；只傳送抽獎結果與獎項設定，不含個資。</small></label>
+        <label>OBS 畫面裡轉盤的大小（像素）<input type="number" id="s-overlaySize" min="200" max="2000" step="20"></label>
+        <label>結果顯示幾秒後自動消失 <input type="number" id="s-overlayResultSeconds" min="1" max="120"></label>
+        <div class="switch-row"><label class="switch"><input type="checkbox" id="s-overlaySpinOnly"><span class="track"></span><span class="switch-label">平常把轉盤藏起來，抽獎時才出現</span></label></div>
+        <div class="switch-row"><label class="switch"><input type="checkbox" id="s-overlayMute"><span class="track"></span><span class="switch-label">OBS 畫面不要出聲音（只有控制台有聲音）</span></label></div>
+        <div class="switch-row"><label class="switch"><input type="checkbox" id="s-overlayHideStatus"><span class="track"></span><span class="switch-label">隱藏 OBS 畫面右下角的連線小綠點</span></label></div>
         <div><button class="btn primary" id="saveSettings">儲存設定</button></div>
 
-        <h3>OBS 設定步驟</h3>
+        <h3>把畫面加進 OBS</h3>
         <ol>
-          <li>把上面「跨瀏覽器同步」打勾並儲存</li>
-          <li>OBS → 來源 → ＋ → <b>瀏覽器</b>，網址填：<span class="code" id="overlayUrl"></span>
-            <div class="row-actions" style="margin:6px 0 0"><button class="btn" id="copyOverlay" type="button">複製覆蓋層網址</button><a class="btn ghost" id="openOverlay" href="?overlay=1" target="_blank">預覽覆蓋層 ↗</a></div></li>
-          <li>寬 / 高建議 1280 × 720 以上，背景已是透明</li>
-          <li>在這個控制台按抽獎，OBS 畫面會同步轉動並顯示結果</li>
-          <li>按 <button class="btn" id="testSync" type="button" style="padding:6px 12px">測試同步</button> 確認覆蓋層有收到訊號（覆蓋層右下角有連線狀態小圓點，可用 <code>status=0</code> 隱藏）</li>
+          <li>先把上面「讓 OBS 畫面跟著這個控制台動」打開，按「儲存設定」</li>
+          <li>按這裡複製網址：<button class="btn" id="copyOverlay" type="button" style="padding:6px 12px">複製 OBS 畫面網址</button> <a class="btn ghost" id="openOverlay" href="?overlay=1" target="_blank" style="padding:6px 12px">先在瀏覽器看看</a>
+            <div><span class="code" id="overlayUrl" style="display:inline-block;margin-top:6px"></span></div></li>
+          <li>打開 OBS → 來源 → 按「＋」→ 選「瀏覽器」→ 把網址貼進去，寬 1280、高 720（或更大）→ 確定</li>
+          <li>回到這裡按 <button class="btn" id="testSync" type="button" style="padding:6px 12px">測試連線</button>，OBS 裡的畫面右下角小綠點會閃一下，這裡也會顯示「已回應」</li>
+          <li>之後在這裡按抽獎，OBS 畫面就會跟著轉並顯示結果</li>
         </ol>
-        <p class="hint">
-          覆蓋層網址參數：<code>size</code> 轉盤像素、<code>mode=spin</code> 只在抽獎時顯示轉盤、<code>hide</code> 結果顯示秒數、<code>sound=0</code> 關閉音效。<br>
-          不想用中繼伺服器？OBS「檢視 → 面板 → 自訂瀏覽器面板」把控制台網址加成面板，再把覆蓋層加為瀏覽器來源，同一個 OBS 內不需要同步伺服器（但 Excel 需改用「下載」）。
-        </p>
+
+        <details class="adv">
+          <summary>進階設定（一般不用動）</summary>
+          <div class="form" style="margin-top:12px">
+            <label>同步用的伺服器<input id="s-broker"><small>控制台和 OBS 畫面透過這個公開伺服器傳「抽到什麼」的訊息，不含個人資料。有自己的 MQTT 伺服器才需要改。</small></label>
+            <p class="hint">
+              不想經過網路伺服器？在 OBS 選「檢視 → 面板 → 自訂瀏覽器面板」，把控制台網址加成一個面板，再把 OBS 畫面網址加成瀏覽器來源。兩個都在 OBS 裡就不需要同步伺服器（但 Excel 要改用「下載」）。<br>
+              OBS 畫面網址也可以手動加參數：<code>size</code> 轉盤像素、<code>mode=spin</code> 平常隱藏、<code>hide</code> 結果秒數、<code>sound=0</code> 靜音、<code>status=0</code> 隱藏小綠點、<code>bg=0</code> 關背景動態、<code>theme=light</code> 或 <code>dark</code> 指定配色。
+            </p>
+          </div>
+        </details>
       </div>
     </div>
 
@@ -185,7 +203,7 @@
         <button class="btn" id="excelDownload">下載 Excel</button>
         <button class="btn ghost" id="excelForget">取消綁定</button>
       </div>
-      <p class="hint" id="excelHint">綁定後每次抽獎都會自動把完整紀錄寫進該檔案（工作表「抽獎紀錄」，其他工作表保留）。重新整理網頁後第一次抽獎時，瀏覽器會再問一次是否允許寫入。</p>
+      <p class="hint" id="excelHint">選好檔案後，每次抽獎都會自動把所有紀錄寫進去（放在「抽獎紀錄」工作表，檔案裡其他工作表不會動）。重新整理網頁後第一次抽獎時，瀏覽器會再問一次「允許寫入嗎」，按允許就好。需要用 Chrome 或 Edge。</p>
       <hr style="border:0;border-top:1px solid var(--line);margin:14px 0">
       <div class="row-actions" style="margin-top:0">
         <input id="recordSearch" placeholder="搜尋紀錄：抽獎者、獎項、類型、日期、批次ID…" style="flex:1;min-width:220px">
@@ -239,8 +257,8 @@
 <canvas id="confetti"></canvas>
 <div id="toast"></div>
 
-<script src="wheel.js?v=24"></script>
-<script src="app.js?v=24"></script>
-<script src="bg.js?v=24"></script>
+<script src="wheel.js?v=25"></script>
+<script src="app.js?v=25"></script>
+<script src="bg.js?v=25"></script>
 </body>
 </html>

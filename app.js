@@ -20,6 +20,7 @@
   const DEFAULT_CONFIG = {
     title: '幸運轉盤', segmentMode: 'weight', spinDuration: 5000, multiSpinDuration: 1500, turns: 6, sound: true,
     overlayResultSeconds: 8, multiMode: 'flip', minSlice: 4, bg3d: true, theme: 'light', themeChosen: false,
+    overlaySize: 520, overlaySpinOnly: false, overlayMute: false, overlayHideStatus: false,
     pityAccum: false, pityAccumN: 30, pityBatch: false, pityBatchK: 10, pityScope: 'player', room: '', sync: false, broker: 'wss://broker.emqx.io:8084/mqtt',
     prizes: [
       { id: 'p1', name: '特獎 iPad', weight: 1, quantity: 1, remaining: 1, image: '', color: '#ff6b6b' },
@@ -88,6 +89,8 @@
     cfg.minSlice = Math.min(20, Math.max(0, Number(cfg.minSlice) || 0));
     cfg.bg3d = cfg.bg3d !== false;
     cfg.themeChosen = cfg.themeChosen === true;
+    cfg.overlaySize = Math.min(2000, Math.max(200, Math.trunc(Number(cfg.overlaySize)) || 520));
+    cfg.overlaySpinOnly = cfg.overlaySpinOnly === true; cfg.overlayMute = cfg.overlayMute === true; cfg.overlayHideStatus = cfg.overlayHideStatus === true;
     cfg.theme = cfg.themeChosen ? (cfg.theme === 'dark' ? 'dark' : 'light') : 'light';
     cfg.pityAccum = cfg.pityAccum === true;
     cfg.pityAccumN = Math.min(1000, Math.max(1, Math.trunc(Number(cfg.pityAccumN)) || 30));
@@ -374,7 +377,12 @@
 
   function overlayUrl() {
     const c = state.config;
-    return `${location.origin}${location.pathname}?overlay=1&room=${encodeURIComponent(c.room)}`;
+    const q = new URLSearchParams({ overlay: '1', room: c.room });
+    if (c.overlaySize !== 520) q.set('size', c.overlaySize);
+    if (c.overlaySpinOnly) q.set('mode', 'spin');
+    if (c.overlayMute) q.set('sound', '0');
+    if (c.overlayHideStatus) q.set('status', '0');
+    return `${location.origin}${location.pathname}?${q.toString()}`;
   }
   function markDirty(v = true) {
     state.dirty = v;
@@ -505,14 +513,14 @@
   }
 
   // ---------- 設定頁 ----------
-  const SETTING_KEYS = ['segmentMode', 'spinDuration', 'multiSpinDuration', 'turns', 'overlayResultSeconds', 'multiMode', 'minSlice', 'pityAccumN', 'pityBatchK', 'pityScope', 'theme', 'room', 'broker'];
+  const SETTING_KEYS = ['segmentMode', 'turns', 'overlayResultSeconds', 'multiMode', 'minSlice', 'pityAccumN', 'pityBatchK', 'pityScope', 'theme', 'room', 'broker', 'overlaySize'];
+  const SEC_KEYS = ['spinDuration', 'multiSpinDuration']; // 畫面用秒，內部存毫秒
+  const BOOL_KEYS = ['sound', 'sync', 'bg3d', 'pityAccum', 'pityBatch', 'overlaySpinOnly', 'overlayMute', 'overlayHideStatus'];
   function renderSettings() {
     const c = state.config;
     SETTING_KEYS.forEach((k) => { $(`#s-${k}`).value = c[k]; });
-    $('#s-sound').checked = !!c.sound;
-    $('#s-bg3d').checked = !!c.bg3d;
-    $('#s-pityAccum').checked = !!c.pityAccum; $('#s-pityBatch').checked = !!c.pityBatch;
-    $('#s-sync').checked = !!c.sync;
+    SEC_KEYS.forEach((k) => { $(`#s-${k}`).value = Math.round(c[k] / 100) / 10; });
+    BOOL_KEYS.forEach((k) => { $(`#s-${k}`).checked = !!c[k]; });
     $('#overlayUrl').textContent = overlayUrl();
     $('#openOverlay').href = overlayUrl();
   }
@@ -520,8 +528,8 @@
     const c = state.config;
     const before = `${c.room}|${c.sync}|${c.broker}`;
     SETTING_KEYS.forEach((k) => { c[k] = $(`#s-${k}`).value; });
-    c.sound = $('#s-sound').checked; c.sync = $('#s-sync').checked; c.bg3d = $('#s-bg3d').checked;
-    c.pityAccum = $('#s-pityAccum').checked; c.pityBatch = $('#s-pityBatch').checked;
+    SEC_KEYS.forEach((k) => { c[k] = Math.round(Number($(`#s-${k}`).value) * 1000); });
+    BOOL_KEYS.forEach((k) => { c[k] = $(`#s-${k}`).checked; });
     c.themeChosen = true;
     if (!saveConfig()) return;
     const c2 = state.config; // saveConfig 會重新 normalize
@@ -535,7 +543,7 @@
   }));
   $('#testSync').addEventListener('click', () => {
     state.pongs = 0; Sync.send({ type: 'ping' }); toast('已送出測試訊號，等待覆蓋層回應…', 3000);
-    setTimeout(() => toast(state.pongs ? `覆蓋層已回應（${state.pongs} 個）` : '3 秒內沒有覆蓋層回應：請確認 OBS 的網址含相同頻道代碼、且「跨瀏覽器同步」已開啟並儲存', 6000), 3000);
+    setTimeout(() => toast(state.pongs ? `OBS 畫面已回應（${state.pongs} 個）` : '3 秒內沒有回應：請確認「讓 OBS 畫面跟著控制台動」已打開並儲存，且 OBS 裡貼的是最新複製的網址', 6000), 3000);
   });
   $('#testSound').addEventListener('click', () => { const on = $('#s-sound').checked; if (!on) { toast('音效目前是關閉的，先打開再試聽'); return; } const was = Sfx.enabled; Sfx.enabled = true; Sfx.tick(); setTimeout(() => Sfx.pop(), 200); setTimeout(() => { Sfx.win(); Sfx.enabled = was || on; }, 500); });
   $('#savePrizes').addEventListener('click', () => saveConfig());
@@ -550,7 +558,7 @@
     saveConfig(true); toast('庫存已重置');
   });
   $('#copyOverlay').addEventListener('click', async () => {
-    try { await navigator.clipboard.writeText(overlayUrl()); toast('已複製覆蓋層網址'); }
+    try { await navigator.clipboard.writeText(overlayUrl()); toast('已複製 OBS 畫面網址'); }
     catch { prompt('請手動複製', overlayUrl()); }
   });
   $('#exportConfig').addEventListener('click', () => {
