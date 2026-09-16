@@ -22,13 +22,7 @@
     overlayResultSeconds: 8, multiMode: 'flip', minSlice: 4, bg3d: true, theme: 'light', themeChosen: false,
     overlaySize: 520, overlaySpinOnly: false, overlayMute: false, overlayHideStatus: false,
     pityAccum: false, pityAccumN: 30, pityBatch: false, pityBatchK: 10, pityScope: 'player', room: '', sync: false, broker: 'wss://broker.emqx.io:8084/mqtt',
-    prizes: [
-      { id: 'p1', name: '特獎 iPad', weight: 1, quantity: 1, remaining: 1, image: '', color: '#ff6b6b' },
-      { id: 'p2', name: '頭獎 藍牙耳機', weight: 5, quantity: 3, remaining: 3, image: '', color: '#ffd93d' },
-      { id: 'p3', name: '二獎 500 元禮券', weight: 15, quantity: 10, remaining: 10, image: '', color: '#6bcb77' },
-      { id: 'p4', name: '三獎 貼圖組', weight: 30, quantity: -1, remaining: -1, image: '', color: '#4d96ff' },
-      { id: 'p5', name: '銘謝惠顧', weight: 49, quantity: -1, remaining: -1, image: '', color: '#c77dff' },
-    ],
+    prizes: [1, 2, 3, 4, 5, 6].map((n) => ({ id: `p${n}`, name: `獎項 ${n}`, weight: 10, quantity: -1, remaining: -1, image: '', color: PALETTE[(n - 1) % PALETTE.length] })),
   };
 
   // ---------- 儲存 ----------
