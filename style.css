@@ -65,19 +65,19 @@ input[type=checkbox] { accent-color: var(--red); width: 17px; height: 17px; }
 
 .btn {
   background: var(--paper); border: var(--border-w) solid var(--ink); color: var(--ink); padding: 9px 16px; border-radius: 10px;
-  cursor: pointer; font-weight: 500; white-space: nowrap; box-shadow: 2px 2px 0 var(--shadow);
-  transition: transform .08s, box-shadow .08s;
+  cursor: pointer; font-weight: 500; white-space: nowrap; box-shadow: none;
+  transition: transform .1s, box-shadow .1s;
 }
-.btn:hover { transform: translate(-1px, -1px); box-shadow: 3px 3px 0 var(--shadow); }
-.btn:active { transform: translate(1px, 1px); box-shadow: 0 0 0 var(--shadow); }
-.btn:disabled { opacity: .4; cursor: not-allowed; transform: none; box-shadow: 2px 2px 0 var(--shadow); }
+.btn:hover { transform: translate(-2px, -2px); box-shadow: 4px 4px 0 var(--shadow); }
+.btn:active { transform: translate(0, 0); box-shadow: 1px 1px 0 var(--shadow); }
+.btn:disabled { opacity: .4; cursor: not-allowed; transform: none; box-shadow: none; }
 .btn.primary { background: var(--yellow); color: #141414; }
 .btn.danger { background: var(--red); color: #fff; }
 .btn.warn { background: var(--blue); color: #fff; }
 .btn.ghost { box-shadow: none; background: transparent; }
 .btn.ghost:hover { box-shadow: none; transform: none; background: var(--surface2); }
-.btn.icon { padding: 4px 9px; font-size: 13px; box-shadow: 1px 1px 0 var(--shadow); }
-.btn.icon:hover { box-shadow: 2px 2px 0 var(--shadow); }
+.btn.icon { padding: 4px 9px; font-size: 13px; }
+.btn.icon:hover { transform: translate(-1px, -1px); box-shadow: 2px 2px 0 var(--shadow); }
 .btn.pulse { animation: wiggle .5s ease-in-out infinite alternate; }
 @keyframes wiggle { from { transform: rotate(-1.5deg); } to { transform: rotate(1.5deg); } }
 
@@ -229,7 +229,7 @@ code, .code { background: var(--surface2); border: 1px solid var(--ink-soft); pa
 .modal-box.wide input[type=number] { width: 96px; }
 .modal-box.wide input[type=color] { width: 46px; height: 42px; }
 .modal-box.wide .tabs { padding-right: 52px; }
-.modal-close { position: absolute; top: 9px; right: 10px; background: var(--paper); border: var(--border-w) solid var(--ink); color: var(--ink); font-size: 18px; font-weight: 500; cursor: pointer; width: 36px; height: 36px; border-radius: 50%; box-shadow: 1px 1px 0 var(--shadow); z-index: 2; }
+.modal-close { position: absolute; top: 9px; right: 10px; background: var(--paper); border: var(--border-w) solid var(--ink); color: var(--ink); font-size: 18px; font-weight: 500; cursor: pointer; width: 36px; height: 36px; border-radius: 50%; z-index: 2; }
 .modal-close:hover { background: var(--red); color: #fff; }
 .modal-box h2 { margin: 0 0 6px; text-align: center; font-size: 30px; font-weight: 900; }
 .modal-box .sub { text-align: center; color: var(--muted); margin: 0 0 18px; }
