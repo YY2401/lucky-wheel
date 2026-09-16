@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Lucky Wheel</title>
-<script>try { document.documentElement.dataset.theme = localStorage.getItem('lw.theme') || 'dark'; } catch (e) { document.documentElement.dataset.theme = 'dark'; }</script>
+<script>try { document.documentElement.dataset.theme = localStorage.getItem('lw.theme') || 'light'; } catch (e) { document.documentElement.dataset.theme = 'light'; }</script>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=19">
+<link rel="stylesheet" href="style.css?v=20">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.1/mqtt.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
@@ -20,8 +20,8 @@
   <div class="brand">
     <span class="logo">LUCKY WHEEL</span>
     <div class="theme-toggle" role="group" aria-label="主題">
-      <button type="button" data-theme="dark">黑底</button>
       <button type="button" data-theme="light">白底</button>
+      <button type="button" data-theme="dark">黑底</button>
     </div>
   </div>
   <div class="topbar-right">
@@ -135,8 +135,8 @@
         <h3>畫面</h3>
         <label>主題
           <select id="s-theme">
-            <option value="dark">黑底</option>
             <option value="light">白底</option>
+            <option value="dark">黑底</option>
           </select>
         </label>
         <div class="switch-row">
@@ -227,12 +227,20 @@
   </div>
 </div>
 
+<div class="modal hidden control-only" id="confirmModal">
+  <div class="modal-box">
+    <h3 id="confirmTitle">確認</h3>
+    <p class="msg" id="confirmMsg"></p>
+    <input id="confirmInput" class="hidden">
+    <div class="modal-actions"><button class="btn" id="confirmCancel">取消</button><button class="btn primary" id="confirmOk">確定</button></div>
+  </div>
+</div>
 <div class="ov-status overlay-only hidden" id="ovStatus" title="同步狀態"></div>
 <canvas id="confetti"></canvas>
 <div id="toast"></div>
 
-<script src="wheel.js?v=19"></script>
-<script src="app.js?v=19"></script>
-<script src="bg.js?v=19"></script>
+<script src="wheel.js?v=20"></script>
+<script src="app.js?v=20"></script>
+<script src="bg.js?v=20"></script>
 </body>
 </html>

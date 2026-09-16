@@ -110,7 +110,7 @@ input[type=checkbox] { accent-color: var(--red); width: 17px; height: 17px; }
   /* 遊樂園帳篷條紋環 */
   content: ""; position: absolute; inset: -7%; border-radius: 50%; z-index: -1;
   background: repeating-conic-gradient(var(--red) 0 10deg, var(--paper) 10deg 20deg);
-  -webkit-mask: radial-gradient(circle, transparent 72%, #000 72.5%); mask: radial-gradient(circle, transparent 72%, #000 72.5%);
+  -webkit-mask: radial-gradient(circle closest-side, transparent 87%, #000 87.5%); mask: radial-gradient(circle closest-side, transparent 87%, #000 87.5%);
   outline: var(--border-w) solid var(--ink); outline-offset: -1px;
   animation: ringspin 40s linear infinite;
 }
@@ -315,3 +315,11 @@ body.overlay .chip { font-size: 16px; padding: 7px 14px 7px 8px; }
 .ov-status.wait { background: var(--yellow); }
 .ov-status.bad { background: var(--red); }
 .ov-status.flash { transform: scale(2.2); background: #fff; }
+
+/* ---------- 頁內確認視窗 ---------- */
+#confirmModal { z-index: 80; }
+#confirmModal .modal-box { width: min(520px, 100%); text-align: center; padding: 30px 32px; }
+#confirmModal h3 { margin: 0 0 12px; font-size: 24px; font-weight: 900; }
+#confirmModal .msg { white-space: pre-line; color: var(--text); font-size: 16px; line-height: 1.7; margin: 0 0 18px; }
+#confirmModal input { width: 100%; margin-bottom: 18px; }
+#confirmModal .modal-actions { margin-top: 0; }

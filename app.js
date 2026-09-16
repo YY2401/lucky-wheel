@@ -19,7 +19,7 @@
 
   const DEFAULT_CONFIG = {
     title: '幸運轉盤', segmentMode: 'weight', spinDuration: 5000, multiSpinDuration: 1500, turns: 6, sound: true,
-    overlayResultSeconds: 8, multiMode: 'flip', minSlice: 4, bg3d: true, theme: 'dark',
+    overlayResultSeconds: 8, multiMode: 'flip', minSlice: 4, bg3d: true, theme: 'light', themeChosen: false,
     pityAccum: false, pityAccumN: 30, pityBatch: false, pityBatchK: 10, pityScope: 'player', room: '', sync: false, broker: 'wss://broker.emqx.io:8084/mqtt',
     prizes: [
       { id: 'p1', name: '特獎 iPad', weight: 1, quantity: 1, remaining: 1, image: '', color: '#ff6b6b' },
@@ -87,7 +87,8 @@
     cfg.multiMode = cfg.multiMode === 'each' ? 'each' : 'flip';
     cfg.minSlice = Math.min(20, Math.max(0, Number(cfg.minSlice) || 0));
     cfg.bg3d = cfg.bg3d !== false;
-    cfg.theme = cfg.theme === 'light' ? 'light' : 'dark';
+    cfg.themeChosen = cfg.themeChosen === true;
+    cfg.theme = cfg.themeChosen ? (cfg.theme === 'dark' ? 'dark' : 'light') : 'light';
     cfg.pityAccum = cfg.pityAccum === true;
     cfg.pityAccumN = Math.min(1000, Math.max(1, Math.trunc(Number(cfg.pityAccumN)) || 30));
     cfg.pityBatch = cfg.pityBatch === true;
@@ -119,6 +120,25 @@
     $$('.theme-toggle button').forEach((b) => b.classList.toggle('active', b.dataset.theme === theme));
     return theme;
   }
+
+  // ---------- 頁內確認 / 輸入視窗（OBS 內建瀏覽器不會顯示原生 confirm，所以自己畫） ----------
+  function dialog({ title = '確認', message = '', input = null, okLabel = '確定', danger = false }) {
+    return new Promise((resolve) => {
+      const m = $('#confirmModal'); if (!m) { resolve(input !== null ? window.prompt(message, input) : window.confirm(message)); return; }
+      $('#confirmTitle').textContent = title; $('#confirmMsg').textContent = message;
+      const inp = $('#confirmInput'); inp.classList.toggle('hidden', input === null); if (input !== null) inp.value = input;
+      const ok = $('#confirmOk'); ok.textContent = okLabel; ok.className = `btn ${danger ? 'danger' : 'primary'}`;
+      m.classList.remove('hidden');
+      const done = (v) => { m.classList.add('hidden'); ok.onclick = null; $('#confirmCancel').onclick = null; m.onclick = null; document.removeEventListener('keydown', onKey); resolve(v); };
+      const onKey = (e) => { if (e.key === 'Escape') done(input !== null ? null : false); if (e.key === 'Enter' && input !== null) done(inp.value); };
+      ok.onclick = () => done(input !== null ? inp.value : true);
+      $('#confirmCancel').onclick = () => done(input !== null ? null : false);
+      m.onclick = (e) => { if (e.target === m) done(input !== null ? null : false); };
+      document.addEventListener('keydown', onKey);
+      setTimeout(() => (input !== null ? inp : ok).focus(), 50);
+    });
+  }
+  const ask = (message, opts = {}) => dialog({ message, ...opts });
 
   // ---------- 抽獎邏輯 ----------
   const pool = (prizes) => prizes.filter((p) => p.weight > 0 && (p.remaining === -1 || p.remaining > 0));
@@ -423,7 +443,7 @@
       on('.f-unlimited', 'change', (e) => { if (e.target.checked) { p.quantity = -1; p.remaining = -1; } else { p.quantity = 10; p.remaining = 10; } rerender(); });
       on('.f-color', 'input', (e) => { p.color = e.target.value; markDirty(); updateWheel(); });
       on('.f-pity', 'change', (e) => { p.pity = e.target.checked; markDirty(); renderPityInfo(); });
-      on('.f-del', 'click', () => { if (confirm(`刪除「${p.name}」？`)) { state.config.prizes.splice(i, 1); rerender(); } });
+      on('.f-del', 'click', async () => { if (await ask(`刪除獎項「${p.name}」？`, { title: '刪除獎項', okLabel: '刪除', danger: true })) { state.config.prizes.splice(i, 1); rerender(); } });
       on('.f-up', 'click', () => { if (i === 0) return; const a = state.config.prizes; [a[i - 1], a[i]] = [a[i], a[i - 1]]; rerender(); });
       on('.f-down', 'click', () => { const a = state.config.prizes; if (i >= a.length - 1) return; [a[i + 1], a[i]] = [a[i], a[i + 1]]; rerender(); });
       on('.thumb', 'click', () => $('.f-file', tr).click());
@@ -432,7 +452,7 @@
         try { p.image = await downscale(file, 200); rerender(); }
         catch (err) { toast(`讀取圖片失敗：${err.message}`); }
       });
-      on('.f-url', 'click', () => { const u = prompt('輸入圖片網址', p.image.startsWith('data:') ? '' : p.image); if (u !== null) { p.image = u.trim(); rerender(); } });
+      on('.f-url', 'click', async () => { const u = await dialog({ title: '圖片網址', message: '輸入圖片網址（https://…）', input: p.image.startsWith('data:') ? '' : p.image }); if (u !== null) { p.image = u.trim(); rerender(); } });
       on('.f-clearimg', 'click', () => { p.image = ''; rerender(); });
     });
     refreshComputed();
@@ -502,13 +522,14 @@
     SETTING_KEYS.forEach((k) => { c[k] = $(`#s-${k}`).value; });
     c.sound = $('#s-sound').checked; c.sync = $('#s-sync').checked; c.bg3d = $('#s-bg3d').checked;
     c.pityAccum = $('#s-pityAccum').checked; c.pityBatch = $('#s-pityBatch').checked;
+    c.themeChosen = true;
     if (!saveConfig()) return;
     const c2 = state.config; // saveConfig 會重新 normalize
     if (before !== `${c2.room}|${c2.sync}|${c2.broker}`) Sync.start(c2.room, c2);
   });
   $('#newRoom').addEventListener('click', () => { $('#s-room').value = randId(); });
   $$('.theme-toggle button').forEach((b) => b.addEventListener('click', () => {
-    state.config.theme = b.dataset.theme; $('#s-theme').value = b.dataset.theme;
+    state.config.theme = b.dataset.theme; state.config.themeChosen = true; $('#s-theme').value = b.dataset.theme;
     saveLS(LS.config, state.config); applyTheme(b.dataset.theme, wheel);
     Sync.send({ type: 'config', config: state.config });
   }));
@@ -523,8 +544,8 @@
     state.config.prizes.push({ id: `p_${randId(8)}`, name: `獎項 ${n + 1}`, weight: 10, quantity: -1, remaining: -1, image: '', color: PALETTE[n % PALETTE.length] });
     markDirty(); renderPrizeRows(); updateWheel();
   });
-  $('#resetStock').addEventListener('click', () => {
-    if (!confirm('把所有獎項的剩餘數量重置為原始數量？')) return;
+  $('#resetStock').addEventListener('click', async () => {
+    if (!(await ask('把所有獎項的剩餘數量重置為原始數量？', { title: '重置庫存', okLabel: '重置' }))) return;
     state.config.prizes.forEach((p) => { p.remaining = p.quantity; });
     saveConfig(true); toast('庫存已重置');
   });
@@ -574,11 +595,13 @@
   $('#excelForget').addEventListener('click', () => Excel.forget());
   $('#excelDownload').addEventListener('click', () => Excel.download());
   $('#recordSearch').addEventListener('input', renderRecords);
-  function undoLastBatch() {
+  async function undoLastBatch() {
     if (!state.records.length) { toast('沒有可撤銷的紀錄'); return false; }
     const bid = state.records[state.records.length - 1].batchId;
     const batch = state.records.filter((r) => r.batchId === bid);
-    if (!confirm(`撤銷上一批抽獎？\n${batch[0].time}　${batch[0].type}　${batch.length} 筆${batch[0].player ? `　抽獎者：${batch[0].player}` : ''}\n\n庫存會加回，紀錄與 Excel 內的這幾筆會一併移除。`)) return false;
+    const names = batch.map((r) => r.prize).join('、');
+    const okd = await ask(`${batch[0].time}　${batch[0].type}　${batch.length} 筆${batch[0].player ? `　抽獎者：${batch[0].player}` : ''}\n獎項：${names}\n\n庫存會加回，紀錄與 Excel 內的這幾筆會一併移除。確定撤銷？`, { title: '撤銷上一批抽獎', okLabel: '確定撤銷', danger: true });
+    if (!okd) return false;
     batch.forEach((r) => { const p = state.config.prizes.find((x) => x.id === r.prizeId); if (p && p.quantity !== -1) p.remaining = Math.min(p.quantity, p.remaining + 1); });
     state.records = state.records.filter((r) => r.batchId !== bid);
     saveLS(LS.records, state.records);
@@ -587,9 +610,9 @@
     return true;
   }
   $('#undoLast').addEventListener('click', undoLastBatch);
-  $('#undoThis').addEventListener('click', () => { if (undoLastBatch()) $('#resultModal').classList.add('hidden'); });
-  $('#clearRecords').addEventListener('click', () => {
-    if (!confirm('清除瀏覽器裡的所有抽獎紀錄？（已綁定的 Excel 檔不會被改動，直到下次寫入）')) return;
+  $('#undoThis').addEventListener('click', async () => { if (await undoLastBatch()) $('#resultModal').classList.add('hidden'); });
+  $('#clearRecords').addEventListener('click', async () => {
+    if (!(await ask('清除瀏覽器裡的所有抽獎紀錄？（已綁定的 Excel 檔不會被改動，直到下次寫入）', { title: '清除紀錄', okLabel: '清除', danger: true }))) return;
     state.records = []; saveLS(LS.records, state.records); renderRecords();
   });
 
