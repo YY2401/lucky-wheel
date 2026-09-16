@@ -65,7 +65,7 @@ input[type=checkbox] { accent-color: var(--red); width: 17px; height: 17px; }
 
 .btn {
   background: var(--paper); border: var(--border-w) solid var(--ink); color: var(--ink); padding: 9px 16px; border-radius: 10px;
-  cursor: pointer; font-weight: 800; white-space: nowrap; box-shadow: 2px 2px 0 var(--shadow);
+  cursor: pointer; font-weight: 500; white-space: nowrap; box-shadow: 2px 2px 0 var(--shadow);
   transition: transform .08s, box-shadow .08s;
 }
 .btn:hover { transform: translate(-1px, -1px); box-shadow: 3px 3px 0 var(--shadow); }
@@ -94,7 +94,7 @@ input[type=checkbox] { accent-color: var(--red); width: 17px; height: 17px; }
 .theme-toggle {
   display: inline-flex; border: var(--border-w) solid var(--ink); border-radius: 999px; overflow: hidden; background: var(--paper);
 }
-.theme-toggle button { background: transparent; border: 0; padding: 5px 12px; cursor: pointer; font-weight: 800; font-size: 13px; color: var(--ink-soft); }
+.theme-toggle button { background: transparent; border: 0; padding: 5px 12px; cursor: pointer; font-weight: 500; font-size: 13px; color: var(--ink-soft); }
 .theme-toggle button.active { background: var(--ink); color: var(--bg); }
 .topbar-right { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .status { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; color: var(--muted); font-weight: 700; }
@@ -147,7 +147,7 @@ input[type=checkbox] { accent-color: var(--red); width: 17px; height: 17px; }
 .tabs { display: flex; border-bottom: var(--border-w) solid var(--ink); background: var(--surface2); }
 .tabs button {
   flex: 1; background: transparent; border: 0; border-right: var(--border-w) solid var(--ink); padding: 16px; cursor: pointer; color: var(--ink-soft);
-  font-weight: 900; font-size: 17px;
+  font-weight: 500; font-size: 17px;
 }
 .tabs button:last-child { border-right: 0; }
 .tabs button.active { color: #141414; background: var(--yellow); }
@@ -229,7 +229,7 @@ code, .code { background: var(--surface2); border: 1px solid var(--ink-soft); pa
 .modal-box.wide input[type=number] { width: 96px; }
 .modal-box.wide input[type=color] { width: 46px; height: 42px; }
 .modal-box.wide .tabs { padding-right: 52px; }
-.modal-close { position: absolute; top: 9px; right: 10px; background: var(--paper); border: var(--border-w) solid var(--ink); color: var(--ink); font-size: 18px; font-weight: 900; cursor: pointer; width: 36px; height: 36px; border-radius: 50%; box-shadow: 1px 1px 0 var(--shadow); z-index: 2; }
+.modal-close { position: absolute; top: 9px; right: 10px; background: var(--paper); border: var(--border-w) solid var(--ink); color: var(--ink); font-size: 18px; font-weight: 500; cursor: pointer; width: 36px; height: 36px; border-radius: 50%; box-shadow: 1px 1px 0 var(--shadow); z-index: 2; }
 .modal-close:hover { background: var(--red); color: #fff; }
 .modal-box h2 { margin: 0 0 6px; text-align: center; font-size: 30px; font-weight: 900; }
 .modal-box .sub { text-align: center; color: var(--muted); margin: 0 0 18px; }
