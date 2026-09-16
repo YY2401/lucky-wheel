@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Lucky Wheel</title>
-<link rel="stylesheet" href="style.css?v=17">
+<link rel="stylesheet" href="style.css?v=18">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.1/mqtt.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
@@ -27,6 +27,7 @@
     <div class="wheel-wrap"><canvas id="wheel"></canvas></div>
     <div class="controls">
       <input id="player" placeholder="抽獎者 / 備註（會一起寫進 Excel）" maxlength="60">
+      <div class="pity-info hidden" id="pityInfo"></div>
       <div class="spin-buttons">
         <button class="btn primary spin-btn" data-count="1">單抽</button>
         <button class="btn spin-btn" data-count="3">三連抽</button>
@@ -63,7 +64,7 @@
       <div class="prob-bar" id="probBar"></div>
       <div class="table-scroll">
         <table class="prize-table">
-          <thead><tr><th>圖片</th><th>名稱</th><th>權重</th><th>機率</th><th>數量</th><th>剩餘</th><th>顏色</th><th></th></tr></thead>
+          <thead><tr><th>圖片</th><th>名稱</th><th>權重</th><th>機率</th><th>數量</th><th>剩餘</th><th>顏色</th><th title="勾選的獎項算保底獎">保底</th><th></th></tr></thead>
           <tbody id="prizeRows"></tbody>
         </table>
       </div>
@@ -76,7 +77,7 @@
       </div>
       <p class="hint">
         機率 ＝ 該獎項權重 ÷ 所有「還有庫存」獎項的權重總和。抽完的獎項會自動退出抽獎池，其餘獎項的機率會動態重新分配。<br>
-        數量勾選「無限」代表不限量；「剩餘」可手動修改。抽獎前會自動儲存未存的變更。設定存在這個瀏覽器裡，可用「匯出 / 匯入設定」搬到別台電腦。
+        數量勾選「無限」代表不限量；「剩餘」可手動修改。「保底」勾選的獎項組成保底獎池（在「設定」開啟保底機制後生效）。抽獎前會自動儲存未存的變更。設定存在這個瀏覽器裡，可用「匯出 / 匯入設定」搬到別台電腦。
       </p>
       <div class="row-actions">
         <button class="btn" id="exportConfig">匯出設定</button>
@@ -104,6 +105,23 @@
             <option value="each">每一抽都轉一次轉盤，結果直接顯示</option>
           </select>
         </label>
+        <h3>保底機制</h3>
+        <div class="switch-row">
+          <label class="switch"><input type="checkbox" id="s-pityAccum"><span class="track"></span><span class="switch-label">累積保底：連續</span></label>
+          <input type="number" id="s-pityAccumN" min="1" max="1000" style="width:90px"> <span>抽沒抽到保底獎，下一抽必中</span>
+        </div>
+        <div class="switch-row">
+          <label class="switch"><input type="checkbox" id="s-pityBatch"><span class="track"></span><span class="switch-label">連抽保底：每</span></label>
+          <input type="number" id="s-pityBatchK" min="2" max="100" style="width:90px"> <span>抽至少 1 個保底獎（十連抽設 10 就是十連必中）</span>
+        </div>
+        <label>累積保底的計數範圍
+          <select id="s-pityScope">
+            <option value="player">依抽獎者名稱分開計數（空白算匿名）</option>
+            <option value="global">全體共用一個計數</option>
+          </select>
+        </label>
+        <p class="hint">保底獎池 = 在「獎項設定」勾選「保底」的獎項，觸發時在這些獎項之間依權重抽，仍受庫存限制；保底獎全部抽完時不會觸發。計數由紀錄反推，撤銷抽獎後自動修正。</p>
+
         <h3>畫面</h3>
         <div class="switch-row">
           <label class="switch"><input type="checkbox" id="s-bg3d"><span class="track"></span><span class="switch-label">3D 動態背景（效能不足時可關閉；同時套用到覆蓋層）</span></label>
@@ -161,7 +179,7 @@
       </div>
       <div class="table-scroll">
         <table class="records-table">
-          <thead><tr><th>時間</th><th>抽獎者</th><th>類型</th><th>#</th><th>獎項</th><th>剩餘</th><th>機率</th></tr></thead>
+          <thead><tr><th>時間</th><th>抽獎者</th><th>類型</th><th>#</th><th>獎項</th><th>剩餘</th><th>機率</th><th>保底</th></tr></thead>
           <tbody id="recordRows"></tbody>
         </table>
       </div>
@@ -197,8 +215,8 @@
 <canvas id="confetti"></canvas>
 <div id="toast"></div>
 
-<script src="wheel.js?v=17"></script>
-<script src="app.js?v=17"></script>
-<script src="bg.js?v=17"></script>
+<script src="wheel.js?v=18"></script>
+<script src="app.js?v=18"></script>
+<script src="bg.js?v=18"></script>
 </body>
 </html>

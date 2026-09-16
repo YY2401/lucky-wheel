@@ -270,6 +270,7 @@
     burst(n = 160) {
       const W = (this.canvas.width = this.canvas.clientWidth || window.innerWidth);
       const H = (this.canvas.height = this.canvas.clientHeight || window.innerHeight);
+      if (this.parts.length > 400) this.parts = this.parts.slice(-200); // 連續抽獎時避免彩帶堆積
       for (let i = 0; i < n; i++) {
         this.parts.push({
           x: W / 2 + (Math.random() - 0.5) * W * 0.4, y: H * 0.45,

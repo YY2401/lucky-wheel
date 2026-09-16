@@ -14,12 +14,13 @@
   const OVERLAY = params.get('overlay') === '1';
   const LS = { config: 'lw.config', records: 'lw.records', overlayConfig: 'lw.overlayConfig' };
   const SHEET = '抽獎紀錄';
-  const HEADERS = ['時間', '批次ID', '抽獎類型', '第幾抽', '抽獎者/備註', '獎項', '獎項ID', '剩餘數量', '當時機率(%)'];
-  const COL_WIDTHS = [20, 22, 10, 8, 20, 24, 14, 10, 12];
+  const HEADERS = ['時間', '批次ID', '抽獎類型', '第幾抽', '抽獎者/備註', '獎項', '獎項ID', '剩餘數量', '當時機率(%)', '保底'];
+  const COL_WIDTHS = [20, 22, 10, 8, 20, 24, 14, 10, 12, 8];
 
   const DEFAULT_CONFIG = {
     title: '幸運轉盤', segmentMode: 'weight', spinDuration: 5000, multiSpinDuration: 1500, turns: 6, sound: true,
-    overlayResultSeconds: 8, multiMode: 'flip', minSlice: 4, bg3d: true, room: '', sync: false, broker: 'wss://broker.emqx.io:8084/mqtt',
+    overlayResultSeconds: 8, multiMode: 'flip', minSlice: 4, bg3d: true,
+    pityAccum: false, pityAccumN: 30, pityBatch: false, pityBatchK: 10, pityScope: 'player', room: '', sync: false, broker: 'wss://broker.emqx.io:8084/mqtt',
     prizes: [
       { id: 'p1', name: '特獎 iPad', weight: 1, quantity: 1, remaining: 1, image: '', color: '#ff6b6b' },
       { id: 'p2', name: '頭獎 藍牙耳機', weight: 5, quantity: 3, remaining: 3, image: '', color: '#ffd93d' },
@@ -70,6 +71,7 @@
       id: String(p.id || `p_${randId(8)}`), name: String(p.name || `獎項 ${i + 1}`).slice(0, 60),
       weight: Math.max(0, Number(p.weight) || 0), quantity, remaining,
       image: String(p.image || ''), color: /^#[0-9a-f]{6}$/i.test(p.color || '') ? p.color : '',
+      pity: p.pity === true,
     };
   }
   function normalizeConfig(c) {
@@ -85,6 +87,11 @@
     cfg.multiMode = cfg.multiMode === 'each' ? 'each' : 'flip';
     cfg.minSlice = Math.min(20, Math.max(0, Number(cfg.minSlice) || 0));
     cfg.bg3d = cfg.bg3d !== false;
+    cfg.pityAccum = cfg.pityAccum === true;
+    cfg.pityAccumN = Math.min(1000, Math.max(1, Math.trunc(Number(cfg.pityAccumN)) || 30));
+    cfg.pityBatch = cfg.pityBatch === true;
+    cfg.pityBatchK = Math.min(100, Math.max(2, Math.trunc(Number(cfg.pityBatchK)) || 10));
+    cfg.pityScope = cfg.pityScope === 'global' ? 'global' : 'player';
     cfg.room = String(cfg.room || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 24) || randId();
     cfg.broker = /^wss?:\/\//.test(cfg.broker || '') ? cfg.broker : DEFAULT_CONFIG.broker;
     cfg.prizes = Array.isArray(cfg.prizes) ? cfg.prizes.map(normalizePrize) : [];
@@ -179,7 +186,7 @@
       if (p !== 'granted') p = await this.handle.requestPermission({ mode: 'readwrite' });
       return p === 'granted';
     },
-    rows() { return state.records.map((r) => [r.time, r.batchId, r.type, r.index, r.player, r.prize, r.prizeId, r.remaining === -1 ? '無限' : r.remaining, r.probability]); },
+    rows() { return state.records.map((r) => [r.time, r.batchId, r.type, r.index, r.player, r.prize, r.prizeId, r.remaining === -1 ? '無限' : r.remaining, r.probability, r.pity ? '是' : '']); },
     buildWorkbook(existing) {
       let wb = null;
       if (existing) { try { wb = XLSX.read(existing, { type: 'array' }); } catch { wb = null; } }
@@ -226,6 +233,7 @@
         <div class="flip-inner" style="--d:${FLIP_START + i * FLIP_GAP}ms">
           <div class="flip-face flip-back"><span class="q">?</span></div>
           <div class="flip-face flip-front">
+            ${r.pity ? '<span class="badge-pity">保底</span>' : ''}
             <div class="r-img">${r.image ? `<img src="${esc(r.image)}" alt="">` : '<span class="r-dot"></span>'}</div>
             <div class="r-name">${esc(r.name)}</div>
             ${showIndex ? `<div class="r-idx">第 ${r.index} 抽</div>` : ''}
@@ -347,7 +355,7 @@
   }
   function renderAll() {
     const c = state.config;
-    renderPrizeRows(); renderSettings(); updateWheel();
+    renderPrizeRows(); renderSettings(); updateWheel(); renderPityInfo();
   }
   function updateWheel() {
     wheel.setPrizes(state.config.prizes, state.config.segmentMode, state.config.minSlice / 100);
@@ -377,6 +385,7 @@
         </div></td>
         <td><input type="number" class="f-remaining" min="0" value="${unlimited ? '' : p.remaining}" ${unlimited ? 'disabled' : ''}></td>
         <td><input type="color" class="f-color" value="${colorOf(p, i)}"></td>
+        <td style="text-align:center"><input type="checkbox" class="f-pity" ${p.pity ? 'checked' : ''} title="勾選＝算保底獎"></td>
         <td style="white-space:nowrap">
           <button class="btn icon f-up" title="上移">↑</button>
           <button class="btn icon f-down" title="下移">↓</button>
@@ -395,6 +404,7 @@
       on('.f-remaining', 'input', (e) => { p.remaining = Math.min(p.quantity, Math.max(0, Math.trunc(Number(e.target.value)) || 0)); markDirty(); updateWheel(); });
       on('.f-unlimited', 'change', (e) => { if (e.target.checked) { p.quantity = -1; p.remaining = -1; } else { p.quantity = 10; p.remaining = 10; } rerender(); });
       on('.f-color', 'input', (e) => { p.color = e.target.value; markDirty(); updateWheel(); });
+      on('.f-pity', 'change', (e) => { p.pity = e.target.checked; markDirty(); renderPityInfo(); });
       on('.f-del', 'click', () => { if (confirm(`刪除「${p.name}」？`)) { state.config.prizes.splice(i, 1); rerender(); } });
       on('.f-up', 'click', () => { if (i === 0) return; const a = state.config.prizes; [a[i - 1], a[i]] = [a[i], a[i - 1]]; rerender(); });
       on('.f-down', 'click', () => { const a = state.config.prizes; if (i >= a.length - 1) return; [a[i + 1], a[i]] = [a[i], a[i + 1]]; rerender(); });
@@ -457,12 +467,13 @@
   }
 
   // ---------- 設定頁 ----------
-  const SETTING_KEYS = ['segmentMode', 'spinDuration', 'multiSpinDuration', 'turns', 'overlayResultSeconds', 'multiMode', 'minSlice', 'room', 'broker'];
+  const SETTING_KEYS = ['segmentMode', 'spinDuration', 'multiSpinDuration', 'turns', 'overlayResultSeconds', 'multiMode', 'minSlice', 'pityAccumN', 'pityBatchK', 'pityScope', 'room', 'broker'];
   function renderSettings() {
     const c = state.config;
     SETTING_KEYS.forEach((k) => { $(`#s-${k}`).value = c[k]; });
     $('#s-sound').checked = !!c.sound;
     $('#s-bg3d').checked = !!c.bg3d;
+    $('#s-pityAccum').checked = !!c.pityAccum; $('#s-pityBatch').checked = !!c.pityBatch;
     $('#s-sync').checked = !!c.sync;
     $('#overlayUrl').textContent = overlayUrl();
     $('#openOverlay').href = overlayUrl();
@@ -472,6 +483,7 @@
     const before = `${c.room}|${c.sync}|${c.broker}`;
     SETTING_KEYS.forEach((k) => { c[k] = $(`#s-${k}`).value; });
     c.sound = $('#s-sound').checked; c.sync = $('#s-sync').checked; c.bg3d = $('#s-bg3d').checked;
+    c.pityAccum = $('#s-pityAccum').checked; c.pityBatch = $('#s-pityBatch').checked;
     if (!saveConfig()) return;
     const c2 = state.config; // saveConfig 會重新 normalize
     if (before !== `${c2.room}|${c2.sync}|${c2.broker}`) Sync.start(c2.room, c2);
@@ -525,12 +537,12 @@
     const q = ($('#recordSearch').value || '').trim().toLowerCase();
     const terms = q ? q.split(/\s+/) : [];
     const list = terms.length
-      ? state.records.filter((r) => { const hay = `${r.time} ${r.player} ${r.type} ${r.prize} ${r.batchId}`.toLowerCase(); return terms.every((t) => hay.includes(t)); })
+      ? state.records.filter((r) => { const hay = `${r.time} ${r.player} ${r.type} ${r.prize} ${r.batchId} ${r.pity ? '保底' : ''}`.toLowerCase(); return terms.every((t) => hay.includes(t)); })
       : state.records;
     $('#recordCount').textContent = terms.length ? `符合 ${list.length} / ${state.records.length} 筆` : `共 ${state.records.length} 筆`;
     $('#recordRows').innerHTML = list.slice(-500).reverse().map((r) => `<tr>
       <td>${esc(r.time)}</td><td>${esc(r.player)}</td><td>${esc(r.type)}</td><td>${r.index}</td>
-      <td>${esc(r.prize)}</td><td>${r.remaining === -1 ? '∞' : r.remaining}</td><td>${r.probability}%</td></tr>`).join('');
+      <td>${esc(r.prize)}</td><td>${r.remaining === -1 ? '∞' : r.remaining}</td><td>${r.probability}%</td><td>${r.pity ? '<span class="badge-pity inline">保底</span>' : ''}</td></tr>`).join('');
   }
   const excelAction = (fn) => async () => { try { const r = await fn(); if (r && r.ok) toast(`已寫入 ${r.name}`); } catch (e) { if (e.name !== 'AbortError') toast(`Excel 失敗：${e.message}`, 5000); } };
   $('#excelCreate').addEventListener('click', excelAction(() => Excel.create()));
@@ -547,7 +559,7 @@
     batch.forEach((r) => { const p = state.config.prizes.find((x) => x.id === r.prizeId); if (p && p.quantity !== -1) p.remaining = Math.min(p.quantity, p.remaining + 1); });
     state.records = state.records.filter((r) => r.batchId !== bid);
     saveLS(LS.records, state.records);
-    saveConfig(true); renderRecords();
+    saveConfig(true); renderRecords(); renderPityInfo();
     Excel.writeAll().then((r) => { if (r.ok) toast(`已撤銷並更新 Excel（${r.name}）`); else toast('已撤銷'); }).catch((e) => toast(`已撤銷，但 Excel 更新失敗：${e.message}`, 6000));
     return true;
   }
@@ -574,21 +586,62 @@
     if (e.code === 'Space' && !['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement.tagName)) { e.preventDefault(); spin(1); }
   });
 
+  // 保底：從紀錄反推「這個計數範圍距離上次抽中保底獎已經幾抽」，撤銷後自動正確
+  const pityPool = (prizes) => pool(prizes).filter((p) => p.pity);
+  function drawsSinceHit(player) {
+    const cfg = state.config;
+    const key = cfg.pityScope === 'global' ? null : (player || '');
+    let n = 0;
+    for (let i = state.records.length - 1; i >= 0; i--) {
+      const r = state.records[i];
+      if (key !== null && (r.player || '') !== key) continue;
+      if (r.hit) break;
+      n++;
+    }
+    return n;
+  }
+  function renderPityInfo() {
+    const cfg = state.config; const el = $('#pityInfo');
+    const hasPool = cfg.prizes.some((p) => p.pity);
+    if (!(cfg.pityAccum || cfg.pityBatch) || !hasPool) { el.classList.add('hidden'); return; }
+    el.classList.remove('hidden');
+    const parts = [];
+    if (cfg.pityAccum) {
+      const player = $('#player').value.trim();
+      const left = Math.max(0, cfg.pityAccumN - drawsSinceHit(player));
+      const who = cfg.pityScope === 'global' ? '全體' : (player || '匿名');
+      parts.push(left === 0 ? `${who}：下一抽必中保底獎` : `${who}：再 ${left} 抽觸發累積保底`);
+    }
+    if (cfg.pityBatch) parts.push(`每 ${cfg.pityBatchK} 抽至少 1 個保底獎`);
+    el.textContent = parts.join('　｜　');
+  }
+  $('#player').addEventListener('input', renderPityInfo);
+
   function doSpin(countRaw, player) {
     const count = Math.min(100, Math.max(1, Math.trunc(Number(countRaw)) || 1));
     const now = new Date();
     const batchId = `${formatTime(now).replace(/[-: ]/g, '')}-${randId(4)}`;
     const type = count === 1 ? '單抽' : `${count}連抽`;
     const results = [];
+    const cfg = state.config;
+    let since = drawsSinceHit(player);
+    let hitsInBatch = 0;
+    const guaranteed = cfg.pityBatch && count >= cfg.pityBatchK ? Math.floor(count / cfg.pityBatchK) : 0;
     for (let i = 0; i < count; i++) {
-      const probs = probabilities(state.config.prizes);
-      const p = drawOne(state.config.prizes);
+      const probs = probabilities(cfg.prizes);
+      let forced = false;
+      if (cfg.pityAccum && since >= cfg.pityAccumN) forced = true;
+      if (guaranteed) { const needed = guaranteed - hitsInBatch; if (needed > 0 && needed >= count - i) forced = true; }
+      let p = forced ? drawOne(pityPool(cfg.prizes)) : null;
+      if (!p) { forced = false; p = drawOne(cfg.prizes); }
       if (!p) break;
       if (p.remaining > 0) p.remaining -= 1;
-      results.push({ index: i + 1, prizeId: p.id, name: p.name, image: p.image, color: p.color, remaining: p.remaining, probability: Math.round(probs[p.id] * 100) / 100 });
+      const hit = !!p.pity;
+      if (hit) { since = 0; hitsInBatch++; } else since++;
+      results.push({ index: i + 1, prizeId: p.id, name: p.name, image: p.image, color: p.color, remaining: p.remaining, probability: Math.round(probs[p.id] * 100) / 100, pity: forced, hit });
     }
     const time = formatTime(now);
-    const recs = results.map((r) => ({ time, batchId, type, index: r.index, player, prize: r.name, prizeId: r.prizeId, remaining: r.remaining, probability: r.probability }));
+    const recs = results.map((r) => ({ time, batchId, type, index: r.index, player, prize: r.name, prizeId: r.prizeId, remaining: r.remaining, probability: r.probability, pity: r.pity, hit: r.hit }));
     if (recs.length) { state.records.push(...recs); saveLS(LS.records, state.records); saveLS(LS.config, state.config); }
     return { type: 'spin', batchId, batchType: type, count, player, results, prizes: state.config.prizes, exhausted: results.length < count, time, reveal: state.config.multiMode };
   }
@@ -629,7 +682,7 @@
         if (!state.skipAll) await wait(350);
       }
     }
-    updateWheel(); renderPrizeRows();
+    updateWheel(); renderPrizeRows(); renderPityInfo();
     Sfx.win(); confetti.burst(res.results.length > 1 ? 260 : 160);
     if (window.WheelBG) WheelBG.burst();
   }

@@ -253,3 +253,13 @@ body.overlay .chip { background: rgba(20, 20, 40, .85); font-size: 16px; padding
 .ov-status.flash { transform: scale(2.2); background: #fff; box-shadow: 0 0 16px #fff; }
 .modal-actions .btn.ghost { color: var(--muted); }
 .form .switch { display: inline-flex; }
+
+/* 保底 */
+.pity-info { font-size: 14px; color: var(--accent); text-align: center; }
+.badge-pity {
+  position: absolute; top: 8px; right: 8px; background: linear-gradient(135deg, #ffd166, #ff9f43); color: #1b1b2f; font-size: 12px; font-weight: 800;
+  padding: 3px 8px; border-radius: 999px; box-shadow: 0 2px 8px rgba(255, 159, 67, .5); letter-spacing: 1px;
+}
+.badge-pity.inline { position: static; font-size: 11px; padding: 2px 7px; }
+.result-card.single .badge-pity, #resultModal .single .badge-pity { font-size: 16px; padding: 5px 12px; top: 12px; right: 12px; }
+.prize-table input[type=checkbox].f-pity { width: 18px; height: 18px; accent-color: var(--accent); }
