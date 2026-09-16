@@ -124,6 +124,7 @@ input[type=checkbox] { accent-color: var(--red); width: 17px; height: 17px; }
 .controls input#player { width: 100%; font-size: 16px; }
 .spin-buttons { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
 .spin-buttons .btn { font-size: 16px; padding: 11px 20px; }
+.spin-buttons .btn:hover:not(:disabled) { background: var(--yellow); color: #141414; }
 .spin-buttons .custom { display: inline-flex; gap: 8px; align-items: center; }
 .spin-buttons .custom input { width: 76px; }
 .check { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 14px; cursor: pointer; font-weight: 700; }
