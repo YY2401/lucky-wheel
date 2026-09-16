@@ -13,6 +13,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Lint
+        run: npm run lint
       - name: 單元測試（核心邏輯、轉盤落點）
         run: npm test
       - name: 端對端測試（真實 Chrome）

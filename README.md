@@ -75,6 +75,7 @@ python3 -m http.server 3000
 
 ```bash
 npm install        # 只需一次（裝 puppeteer-core，用本機 Chrome 跑端對端測試）
+npm run lint       # ESLint
 npm test           # 單元測試：設定正規化、機率、保底、撤銷、轉盤落點（約 1.5 秒）
 npm run test:e2e   # 端對端：真實 Chrome 跑抽獎、撤銷、搜尋、設定、主題、資料搬移、OBS 同步（約 1 分鐘）
 ```

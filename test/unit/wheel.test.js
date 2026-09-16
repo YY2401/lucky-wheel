@@ -14,7 +14,6 @@ function loadWheel() {
   global.requestAnimationFrame = (fn) => setImmediate(() => fn(performance.now()));
   global.cancelAnimationFrame = () => {};
   global.setInterval = () => 0; // 轉盤的閒置 LED 計時器在測試裡不需要，也會讓 Node 無法結束
-  // eslint-disable-next-line no-eval
   eval(fs.readFileSync(path.join(__dirname, '../../wheel.js'), 'utf8'));
   return { ...window.LuckyWheel, canvas: { clientWidth: 400, getContext: () => noop } };
 }
