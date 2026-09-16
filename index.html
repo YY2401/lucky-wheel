@@ -7,7 +7,7 @@
 <script>try { document.documentElement.dataset.theme = localStorage.getItem('lw.theme') || 'light'; } catch (e) { document.documentElement.dataset.theme = 'light'; }</script>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=27">
+<link rel="stylesheet" href="style.css?v=28">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.1/mqtt.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
@@ -221,6 +221,15 @@
         <button class="btn" id="undoLast">撤銷上一批</button>
         <button class="btn danger" id="clearRecords">清除紀錄</button>
       </div>
+      <details class="adv stats" open>
+        <summary id="statsTitle">統計</summary>
+        <div class="table-scroll" style="max-height:40vh;margin-top:8px">
+          <table class="records-table stats-table">
+            <thead><tr><th>獎項</th><th>抽出次數</th><th>佔比</th><th>目前設定機率</th><th>差異</th><th>其中保底觸發</th></tr></thead>
+            <tbody id="statsRows"></tbody>
+          </table>
+        </div>
+      </details>
       <div class="table-scroll">
         <table class="records-table">
           <thead><tr><th>時間</th><th>抽獎者</th><th>類型</th><th>#</th><th>獎項</th><th>剩餘</th><th>機率</th><th>保底</th></tr></thead>
@@ -267,8 +276,8 @@
 <canvas id="confetti"></canvas>
 <div id="toast"></div>
 
-<script src="wheel.js?v=27"></script>
-<script src="app.js?v=27"></script>
-<script src="bg.js?v=27"></script>
+<script src="wheel.js?v=28"></script>
+<script src="app.js?v=28"></script>
+<script src="bg.js?v=28"></script>
 </body>
 </html>

@@ -586,6 +586,7 @@
       ? state.records.filter((r) => { const hay = `${r.time} ${r.player} ${r.type} ${r.prize} ${r.batchId} ${r.pity ? '保底' : ''}`.toLowerCase(); return terms.every((t) => hay.includes(t)); })
       : state.records;
     $('#recordCount').textContent = terms.length ? `符合 ${list.length} / ${state.records.length} 筆` : `共 ${state.records.length} 筆`;
+    renderStats(list, terms.length > 0);
     $('#recordRows').innerHTML = list.slice(-500).reverse().map((r) => `<tr>
       <td>${esc(r.time)}</td><td>${esc(r.player)}</td><td>${esc(r.type)}</td><td>${r.index}</td>
       <td>${esc(r.prize)}</td><td>${r.remaining === -1 ? '∞' : r.remaining}</td><td>${r.probability}%</td><td>${r.pity ? '<span class="badge-pity inline">保底</span>' : ''}</td></tr>`).join('');
@@ -596,6 +597,28 @@
   $('#excelWrite').addEventListener('click', excelAction(() => Excel.writeAll()));
   $('#excelForget').addEventListener('click', () => Excel.forget());
   $('#excelDownload').addEventListener('click', () => Excel.download());
+  // 統計：每個獎項實際抽出幾次，對照目前設定的機率
+  function renderStats(list, filtered) {
+    const total = list.length;
+    const probs = probabilities(state.config.prizes);
+    const byId = new Map();
+    list.forEach((r) => {
+      const e = byId.get(r.prizeId) || { name: r.prize, count: 0, pity: 0 };
+      e.count++; if (r.pity) e.pity++; e.name = r.prize; byId.set(r.prizeId, e);
+    });
+    // 依目前獎項順序排，紀錄裡有但已刪除的獎項排最後
+    const order = state.config.prizes.map((p) => p.id).filter((id) => byId.has(id));
+    byId.forEach((_, id) => { if (!order.includes(id)) order.push(id); });
+    const hits = list.filter((r) => r.hit).length;
+    $('#statsTitle').textContent = `統計${filtered ? '（搜尋結果）' : ''}：共 ${total} 抽，抽到保底獎 ${hits} 次（${total ? (hits / total * 100).toFixed(1) : 0}%）`;
+    $('#statsRows').innerHTML = total ? order.map((id) => {
+      const e = byId.get(id); const share = e.count / total * 100; const cfg = probs[id];
+      const diff = cfg == null ? null : share - cfg;
+      const diffTxt = diff == null ? '—' : `${diff >= 0 ? '+' : ''}${diff.toFixed(1)}%`;
+      const cls = diff == null ? '' : Math.abs(diff) >= 5 ? ' class="stat-off"' : '';
+      return `<tr><td>${esc(e.name)}</td><td>${e.count}</td><td>${share.toFixed(1)}%</td><td>${cfg == null ? '（已抽完 / 已刪除）' : `${cfg.toFixed(1)}%`}</td><td${cls}>${diffTxt}</td><td>${e.pity || ''}</td></tr>`;
+    }).join('') : '<tr><td colspan="6" class="hint">還沒有紀錄</td></tr>';
+  }
   $('#recordSearch').addEventListener('input', renderRecords);
   async function undoLastBatch() {
     if (!state.records.length) { toast('沒有可撤銷的紀錄'); return false; }

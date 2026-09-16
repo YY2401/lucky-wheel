@@ -329,3 +329,8 @@ body.overlay .chip { font-size: 16px; padding: 7px 14px 7px 8px; }
 details.adv { border: var(--border-w) dashed var(--ink-soft); border-radius: 10px; padding: 10px 14px; }
 details.adv summary { cursor: pointer; font-weight: 700; color: var(--muted); }
 details.adv[open] summary { margin-bottom: 4px; }
+
+/* 統計 */
+details.stats { margin-bottom: 14px; }
+.stats-table td:nth-child(n+2), .stats-table th:nth-child(n+2) { text-align: right; }
+.stat-off { color: var(--red); font-weight: 700; }
