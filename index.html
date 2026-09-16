@@ -7,7 +7,7 @@
 <script>try { document.documentElement.dataset.theme = localStorage.getItem('lw.theme') || 'light'; } catch (e) { document.documentElement.dataset.theme = 'light'; }</script>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=26">
+<link rel="stylesheet" href="style.css?v=27">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.1/mqtt.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
@@ -120,7 +120,17 @@
         </label>
 
         <h3>保底</h3>
-        <p class="hint">先到「獎項設定」把想當保底的獎項打勾（例如頭獎、二獎），再打開下面的規則。保底時會從這些打勾的獎項裡抽一個，抽完的不算。</p>
+        <p class="hint">保底＝「防止運氣太差」的底線：就算機率合理，還是會有人連槓好幾次，直播上很難看。先到「獎項設定」把想當保底的獎項打勾（例如二獎、頭獎），再打開下面的規則；觸發時會從打勾的獎項裡照原本權重抽一個，抽完的不算。</p>
+        <details class="adv">
+          <summary>保底是什麼？什麼時候該開？</summary>
+          <div class="hint" style="margin-top:8px">
+            <b>累積保底</b>：某個人連續 N 抽都沒抽到保底獎，下一抽一定中。保護的是「這個人」的體驗，適合觀眾會重複來抽的情境。<br>
+            <b>連抽保底</b>：每 K 抽裡至少 1 個保底獎，設 10 就是「十連抽必中一個」。有開放連抽就建議打開，不然十連全槓的畫面遲早出現。<br>
+            <b>保底不等於送大獎</b>：觸發時是在打勾的獎項之間照權重再抽一次，多半給中獎、偶爾才給大獎。想控制成本，就只勾中低價位的獎項、不勾特獎。<br>
+            <b>代價</b>：保底會讓實際中獎率比設定的機率高一些。只是偶爾單抽幾次、獎品貴不想多送，可以不開，純機率就好。<br>
+            <b>判斷參考</b>：銘謝惠顧 50% 時，十連全槓的機率約 0.1%；70% 時約 2.8%。
+          </div>
+        </details>
         <div class="switch-row">
           <label class="switch"><input type="checkbox" id="s-pityAccum"><span class="track"></span><span class="switch-label">連續</span></label>
           <input type="number" id="s-pityAccumN" min="1" max="1000" style="width:90px"> <span>抽都沒抽到保底獎的話，下一抽一定中</span>
@@ -257,8 +267,8 @@
 <canvas id="confetti"></canvas>
 <div id="toast"></div>
 
-<script src="wheel.js?v=26"></script>
-<script src="app.js?v=26"></script>
-<script src="bg.js?v=26"></script>
+<script src="wheel.js?v=27"></script>
+<script src="app.js?v=27"></script>
+<script src="bg.js?v=27"></script>
 </body>
 </html>
