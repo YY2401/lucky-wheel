@@ -1,5 +1,5 @@
 /* 幸運轉盤（純前端版）：設定與紀錄存在瀏覽器、Excel 由瀏覽器直接寫入、OBS 透過頻道同步 */
-(() => {
+(async () => {
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
   const { Wheel, Sfx, Confetti, PALETTE } = LuckyWheel;
@@ -30,11 +30,36 @@
   };
 
   // ---------- 儲存 ----------
-  function loadLS(k, fb) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : fb; } catch { return fb; } }
-  function saveLS(k, v) {
-    try { localStorage.setItem(k, JSON.stringify(v)); return true; }
-    catch (e) { toast('儲存失敗：瀏覽器儲存空間不足，請縮小圖片或刪除紀錄'); return false; }
-  }
+  // 資料存在 IndexedDB（容量大、非同步不卡頁面），啟動時一次讀進記憶體，之後寫入在背景進行
+  const idb = {
+    open() { return new Promise((res, rej) => { const r = indexedDB.open('lucky-wheel', 1); r.onupgradeneeded = () => r.result.createObjectStore('kv'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); },
+    async get(k) { const db = await this.open(); return new Promise((res, rej) => { const r = db.transaction('kv').objectStore('kv').get(k); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); },
+    async set(k, v) { const db = await this.open(); return new Promise((res, rej) => { const t = db.transaction('kv', 'readwrite'); t.objectStore('kv').put(v, k); t.oncomplete = res; t.onerror = () => rej(t.error); }); },
+    async del(k) { const db = await this.open(); return new Promise((res, rej) => { const t = db.transaction('kv', 'readwrite'); t.objectStore('kv').delete(k); t.oncomplete = res; t.onerror = () => rej(t.error); }); },
+  };
+  const Store = {
+    cache: new Map(),
+    async init(keys) {
+      for (const k of keys) {
+        let v;
+        try { v = await idb.get(k); } catch { v = undefined; }
+        if (v === undefined) { // 從舊版 localStorage 搬移
+          try { const raw = localStorage.getItem(k); if (raw) { v = JSON.parse(raw); await idb.set(k, v); localStorage.removeItem(k); } } catch { /* ignore */ }
+        }
+        if (v !== undefined) this.cache.set(k, v);
+      }
+      try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch { /* ignore */ }
+    },
+    get(k, fb) { return this.cache.has(k) ? this.cache.get(k) : fb; },
+    set(k, v) {
+      this.cache.set(k, v);
+      idb.set(k, JSON.parse(JSON.stringify(v))).catch((e) => toast(`儲存失敗：${e.message}`, 6000));
+      return true;
+    },
+  };
+  const loadLS = (k, fb) => Store.get(k, fb);
+  const saveLS = (k, v) => Store.set(k, v);
+  await Store.init([LS.config, LS.records, LS.overlayConfig, 'lw.skipAnim']);
   function normalizePrize(p, i) {
     const rawQty = p.quantity === '' || p.quantity == null ? -1 : Number(p.quantity);
     const quantity = Number.isFinite(rawQty) ? Math.max(-1, Math.trunc(rawQty)) : -1;
@@ -132,12 +157,6 @@
   };
 
   // ---------- Excel（File System Access API + SheetJS） ----------
-  const idb = {
-    open() { return new Promise((res, rej) => { const r = indexedDB.open('lucky-wheel', 1); r.onupgradeneeded = () => r.result.createObjectStore('kv'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); },
-    async get(k) { const db = await this.open(); return new Promise((res, rej) => { const r = db.transaction('kv').objectStore('kv').get(k); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); },
-    async set(k, v) { const db = await this.open(); return new Promise((res, rej) => { const t = db.transaction('kv', 'readwrite'); t.objectStore('kv').put(v, k); t.oncomplete = res; t.onerror = () => rej(t.error); }); },
-    async del(k) { const db = await this.open(); return new Promise((res, rej) => { const t = db.transaction('kv', 'readwrite'); t.objectStore('kv').delete(k); t.oncomplete = res; t.onerror = () => rej(t.error); }); },
-  };
   const Excel = {
     handle: null,
     supported: typeof window.showSaveFilePicker === 'function',
@@ -246,6 +265,7 @@
       config = normalizeConfig(c);
       saveLS(LS.overlayConfig, config);
       Sfx.enabled = soundParam === '0' ? false : !!config.sound;
+      try { localStorage.setItem('lw.bg3d', config.bg3d ? '1' : '0'); } catch { /* ignore */ }
       wheel.setPrizes(config.prizes, config.segmentMode, config.minSlice / 100);
       if (window.WheelBG && params.get('bg') !== '0') WheelBG.setEnabled(config.bg3d);
     }
@@ -319,6 +339,7 @@
   function saveConfig(silent) {
     state.config = normalizeConfig(state.config);
     if (!saveLS(LS.config, state.config)) return false;
+    try { localStorage.setItem('lw.bg3d', state.config.bg3d ? '1' : '0'); } catch { /* ignore */ }
     markDirty(false); renderAll();
     Sync.send({ type: 'config', config: state.config });
     if (!silent) toast('已儲存設定');

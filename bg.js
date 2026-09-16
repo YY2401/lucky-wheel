@@ -7,7 +7,7 @@
   const params = new URLSearchParams(location.search);
   if (OVERLAY && params.get('bg') === '0') return;
   let enabled = true;
-  try { const c = JSON.parse(localStorage.getItem(OVERLAY ? 'lw.overlayConfig' : 'lw.config') || '{}'); if (c.bg3d === false) enabled = false; } catch { /* ignore */ }
+  try { if (localStorage.getItem('lw.bg3d') === '0') enabled = false; } catch { /* ignore */ }
   canvas.style.display = enabled ? '' : 'none';
   const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
