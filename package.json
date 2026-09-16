@@ -4,6 +4,12 @@
   "private": true,
   "description": "直播用網頁幸運轉盤（純靜態，GitHub Pages）",
   "scripts": {
-    "start": "python3 -m http.server 3000"
+    "start": "python3 -m http.server 3000",
+    "test": "node --test 'test/unit/*.test.js'",
+    "test:e2e": "node --test 'test/e2e/*.test.js'",
+    "test:all": "npm test && npm run test:e2e"
+  },
+  "devDependencies": {
+    "puppeteer-core": "^24.0.0"
   }
 }

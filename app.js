@@ -2,13 +2,10 @@
 (async () => {
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
-  const { Wheel, Sfx, Confetti, PALETTE } = LuckyWheel;
+  const { Wheel, Sfx, Confetti } = LuckyWheel;
+  const { PALETTE, DEFAULT_CONFIG, formatTime, randId, normalizePrize, normalizeConfig, pool, probabilities, drawsSinceHit, drawBatch, undoBatch } = LuckyCore;
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const pad = (n) => String(n).padStart(2, '0');
-  const formatTime = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-  const randId = (n = 6) => { const a = new Uint8Array(n); crypto.getRandomValues(a); return Array.from(a, (b) => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[b % 32]).join(''); };
-  const rand = () => { const a = new Uint32Array(1); crypto.getRandomValues(a); return a[0] / 4294967296; };
 
   const params = new URLSearchParams(location.search);
   const OVERLAY = params.get('overlay') === '1';
@@ -16,14 +13,6 @@
   const SHEET = '抽獎紀錄';
   const HEADERS = ['時間', '批次ID', '抽獎類型', '第幾抽', '抽獎者/備註', '獎項', '獎項ID', '剩餘數量', '當時機率(%)', '保底'];
   const COL_WIDTHS = [20, 22, 10, 8, 20, 24, 14, 10, 12, 8];
-
-  const DEFAULT_CONFIG = {
-    title: '幸運轉盤', segmentMode: 'weight', spinDuration: 5000, multiSpinDuration: 1500, turns: 6, sound: true,
-    overlayResultSeconds: 8, multiMode: 'flip', minSlice: 4, bg3d: true, theme: 'light', themeChosen: false,
-    overlaySize: 520, overlaySpinOnly: false, overlayMute: false, overlayHideStatus: false,
-    pityAccum: false, pityAccumN: 30, pityBatch: false, pityBatchK: 10, pityScope: 'player', room: '', sync: false, broker: 'wss://broker.emqx.io:8084/mqtt',
-    prizes: [1, 2, 3, 4, 5, 6].map((n) => ({ id: `p${n}`, name: `獎項 ${n}`, weight: 10, quantity: -1, remaining: -1, image: '', color: PALETTE[(n - 1) % PALETTE.length] })),
-  };
 
   // ---------- 儲存 ----------
   // 資料存在 IndexedDB（容量大、非同步不卡頁面），啟動時一次讀進記憶體，之後寫入在背景進行
@@ -56,47 +45,6 @@
   const loadLS = (k, fb) => Store.get(k, fb);
   const saveLS = (k, v) => Store.set(k, v);
   await Store.init([LS.config, LS.records, LS.overlayConfig, 'lw.skipAnim']);
-  function normalizePrize(p, i) {
-    const rawQty = p.quantity === '' || p.quantity == null ? -1 : Number(p.quantity);
-    const quantity = Number.isFinite(rawQty) ? Math.max(-1, Math.trunc(rawQty)) : -1;
-    let remaining = p.remaining == null || p.remaining === '' ? quantity : Math.trunc(Number(p.remaining));
-    if (quantity === -1) remaining = -1;
-    else remaining = Math.min(Math.max(0, Number.isFinite(remaining) ? remaining : quantity), quantity);
-    return {
-      id: String(p.id || `p_${randId(8)}`), name: String(p.name || `獎項 ${i + 1}`).slice(0, 60),
-      weight: Math.max(0, Number(p.weight) || 0), quantity, remaining,
-      image: String(p.image || ''), color: /^#[0-9a-f]{6}$/i.test(p.color || '') ? p.color : '',
-      pity: p.pity === true,
-    };
-  }
-  function normalizeConfig(c) {
-    const cfg = { ...DEFAULT_CONFIG, ...(c || {}) };
-    cfg.title = String(cfg.title || DEFAULT_CONFIG.title).slice(0, 40);
-    cfg.segmentMode = cfg.segmentMode === 'equal' ? 'equal' : 'weight';
-    cfg.spinDuration = Math.min(30000, Math.max(500, Number(cfg.spinDuration) || 5000));
-    cfg.multiSpinDuration = Math.min(30000, Math.max(300, Number(cfg.multiSpinDuration) || 1500));
-    cfg.turns = Math.min(20, Math.max(1, Math.trunc(Number(cfg.turns)) || 6));
-    cfg.sound = cfg.sound !== false;
-    cfg.sync = cfg.sync === true;
-    cfg.overlayResultSeconds = Math.min(120, Math.max(1, Number(cfg.overlayResultSeconds) || 8));
-    cfg.multiMode = cfg.multiMode === 'each' ? 'each' : 'flip';
-    cfg.minSlice = Math.min(20, Math.max(0, Number(cfg.minSlice) || 0));
-    cfg.bg3d = cfg.bg3d !== false;
-    cfg.themeChosen = cfg.themeChosen === true;
-    cfg.overlaySize = Math.min(2000, Math.max(200, Math.trunc(Number(cfg.overlaySize)) || 520));
-    cfg.overlaySpinOnly = cfg.overlaySpinOnly === true; cfg.overlayMute = cfg.overlayMute === true; cfg.overlayHideStatus = cfg.overlayHideStatus === true;
-    cfg.theme = cfg.themeChosen ? (cfg.theme === 'dark' ? 'dark' : 'light') : 'light';
-    cfg.pityAccum = cfg.pityAccum === true;
-    cfg.pityAccumN = Math.min(1000, Math.max(1, Math.trunc(Number(cfg.pityAccumN)) || 30));
-    cfg.pityBatch = cfg.pityBatch === true;
-    cfg.pityBatchK = Math.min(100, Math.max(2, Math.trunc(Number(cfg.pityBatchK)) || 10));
-    cfg.pityScope = cfg.pityScope === 'global' ? 'global' : 'player';
-    cfg.room = String(cfg.room || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 24) || randId();
-    cfg.broker = /^wss?:\/\//.test(cfg.broker || '') ? cfg.broker : DEFAULT_CONFIG.broker;
-    cfg.prizes = Array.isArray(cfg.prizes) ? cfg.prizes.map(normalizePrize) : [];
-    return cfg;
-  }
-
   function toast(msg, ms = 3000) {
     const t = $('#toast');
     t.textContent = msg; t.classList.add('show');
@@ -137,19 +85,6 @@
   }
   const ask = (message, opts = {}) => dialog({ message, ...opts });
 
-  // ---------- 抽獎邏輯 ----------
-  const pool = (prizes) => prizes.filter((p) => p.weight > 0 && (p.remaining === -1 || p.remaining > 0));
-  function probabilities(prizes) {
-    const pl = pool(prizes); const total = pl.reduce((s, p) => s + p.weight, 0); const m = {};
-    pl.forEach((p) => { m[p.id] = total ? (p.weight / total) * 100 : 0; });
-    return m;
-  }
-  function drawOne(prizes) {
-    const pl = pool(prizes); if (!pl.length) return null;
-    let r = rand() * pl.reduce((s, p) => s + p.weight, 0);
-    for (const p of pl) { r -= p.weight; if (r < 0) return p; }
-    return pl[pl.length - 1];
-  }
   const colorOf = (p, i) => p.color || PALETTE[i % PALETTE.length];
 
   // ---------- 同步頻道（BroadcastChannel 同瀏覽器 + MQTT 跨瀏覽器） ----------
@@ -627,8 +562,7 @@
     const names = batch.map((r) => r.prize).join('、');
     const okd = await ask(`${batch[0].time}　${batch[0].type}　${batch.length} 筆${batch[0].player ? `　抽獎者：${batch[0].player}` : ''}\n獎項：${names}\n\n庫存會加回，紀錄與 Excel 內的這幾筆會一併移除。確定撤銷？`, { title: '撤銷上一批抽獎', okLabel: '確定撤銷', danger: true });
     if (!okd) return false;
-    batch.forEach((r) => { const p = state.config.prizes.find((x) => x.id === r.prizeId); if (p && p.quantity !== -1) p.remaining = Math.min(p.quantity, p.remaining + 1); });
-    state.records = state.records.filter((r) => r.batchId !== bid);
+    state.records = undoBatch(state.records, state.config.prizes, bid).records;
     saveLS(LS.records, state.records);
     saveConfig(true); renderRecords(); renderPityInfo();
     Excel.writeAll().then((r) => { if (r.ok) toast(`已撤銷並更新 Excel（${r.name}）`); else toast('已撤銷'); }).catch((e) => toast(`已撤銷，但 Excel 更新失敗：${e.message}`, 6000));
@@ -657,20 +591,6 @@
     if (e.code === 'Space' && !['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement.tagName)) { e.preventDefault(); spin(1); }
   });
 
-  // 保底：從紀錄反推「這個計數範圍距離上次抽中保底獎已經幾抽」，撤銷後自動正確
-  const pityPool = (prizes) => pool(prizes).filter((p) => p.pity);
-  function drawsSinceHit(player) {
-    const cfg = state.config;
-    const key = cfg.pityScope === 'global' ? null : (player || '');
-    let n = 0;
-    for (let i = state.records.length - 1; i >= 0; i--) {
-      const r = state.records[i];
-      if (key !== null && (r.player || '') !== key) continue;
-      if (r.hit) break;
-      n++;
-    }
-    return n;
-  }
   function renderPityInfo() {
     const cfg = state.config; const el = $('#pityInfo');
     const hasPool = cfg.prizes.some((p) => p.pity);
@@ -679,7 +599,7 @@
     const parts = [];
     if (cfg.pityAccum) {
       const player = $('#player').value.trim();
-      const left = Math.max(0, cfg.pityAccumN - drawsSinceHit(player));
+      const left = Math.max(0, cfg.pityAccumN - drawsSinceHit(state.records, cfg, player));
       const who = cfg.pityScope === 'global' ? '全體' : (player || '匿名');
       parts.push(left === 0 ? `${who}：下一抽必中保底獎` : `${who}：再 ${left} 抽觸發累積保底`);
     }
@@ -689,33 +609,11 @@
   $('#player').addEventListener('input', renderPityInfo);
 
   function doSpin(countRaw, player) {
-    const count = Math.min(100, Math.max(1, Math.trunc(Number(countRaw)) || 1));
-    const now = new Date();
-    const batchId = `${formatTime(now).replace(/[-: ]/g, '')}-${randId(4)}`;
-    const type = count === 1 ? '單抽' : `${count}連抽`;
-    const results = [];
-    const cfg = state.config;
-    let since = drawsSinceHit(player);
-    let hitsInBatch = 0;
-    const guaranteed = cfg.pityBatch && count >= cfg.pityBatchK ? Math.floor(count / cfg.pityBatchK) : 0;
-    for (let i = 0; i < count; i++) {
-      const probs = probabilities(cfg.prizes);
-      let forced = false;
-      if (cfg.pityAccum && since >= cfg.pityAccumN) forced = true;
-      if (guaranteed) { const needed = guaranteed - hitsInBatch; if (needed > 0 && needed >= count - i) forced = true; }
-      let p = forced ? drawOne(pityPool(cfg.prizes)) : null;
-      if (!p) { forced = false; p = drawOne(cfg.prizes); }
-      if (!p) break;
-      if (p.remaining > 0) p.remaining -= 1;
-      const hit = !!p.pity;
-      if (hit) { since = 0; hitsInBatch++; } else since++;
-      results.push({ index: i + 1, prizeId: p.id, name: p.name, image: p.image, color: p.color, remaining: p.remaining, probability: Math.round(probs[p.id] * 100) / 100, pity: forced, hit });
-    }
-    const time = formatTime(now);
-    const recs = results.map((r) => ({ time, batchId, type, index: r.index, player, prize: r.name, prizeId: r.prizeId, remaining: r.remaining, probability: r.probability, pity: r.pity, hit: r.hit }));
+    const { batchId, type, count, results, recs, time } = drawBatch({ cfg: state.config, records: state.records, count: countRaw, player });
     if (recs.length) { state.records.push(...recs); saveLS(LS.records, state.records); saveLS(LS.config, state.config); }
     return { type: 'spin', batchId, batchType: type, count, player, results, prizes: state.config.prizes, exhausted: results.length < count, time, reveal: state.config.multiMode };
   }
+
 
   async function spin(count) {
     if (state.spinning) return;

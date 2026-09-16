@@ -1,0 +1,21 @@
+name: test
+on:
+  push:
+    branches: [master]
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: 單元測試（核心邏輯、轉盤落點）
+        run: npm test
+      - name: 端對端測試（真實 Chrome）
+        run: npm run test:e2e
+        env:
+          CHROME_PATH: /usr/bin/google-chrome

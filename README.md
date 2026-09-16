@@ -71,14 +71,27 @@ python3 -m http.server 3000
 
 > 注意：Excel 直接寫入與 BroadcastChannel 需要 https 或 localhost。
 
+## 測試
+
+```bash
+npm install        # 只需一次（裝 puppeteer-core，用本機 Chrome 跑端對端測試）
+npm test           # 單元測試：設定正規化、機率、保底、撤銷、轉盤落點（約 1.5 秒）
+npm run test:e2e   # 端對端：真實 Chrome 跑抽獎、撤銷、搜尋、設定、主題、資料搬移、OBS 同步（約 1 分鐘）
+```
+
+每次推上 GitHub 都會自動跑兩套測試（見 Actions 頁籤）。
+
 ## 專案結構
 
 ```
 index.html   控制台 + OBS 覆蓋層（?overlay=1）
-app.js       抽獎邏輯、設定 / 紀錄儲存、同步頻道、Excel 寫入
+core.js      純邏輯：設定正規化、機率、抽獎、保底、撤銷（瀏覽器與 Node 共用）
+app.js       介面、儲存（IndexedDB）、同步頻道、Excel 寫入
 wheel.js     轉盤引擎（繪製、動畫、音效、彩帶）
 bg.js        Three.js 3D 動態背景（僅控制台，覆蓋層維持透明）
 style.css
+test/unit/   單元測試（node --test）
+test/e2e/    端對端測試（puppeteer-core）
 ```
 
 外部套件（CDN）：[SheetJS](https://sheetjs.com/) 產生 Excel、[MQTT.js](https://github.com/mqttjs/MQTT.js) 跨瀏覽器同步、[Three.js](https://threejs.org/) 3D 動態背景、[anime.js](https://animejs.com/) 介面動畫。
