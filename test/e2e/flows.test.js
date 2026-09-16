@@ -73,6 +73,37 @@ if (!H.chromePath()) {
     assert.match(await page.$eval('#statsTitle', (e) => e.textContent), /搜尋結果.*共 3 抽/);
   });
 
+  test('獎項表格：打字不失焦、換順序 / 刪除 / 新增 / 無限切換都正確對帳', async (t) => {
+    const page = await fresh(t);
+    await page.click('.open-panel[data-tab="prizes"]'); await H.sleep(300);
+    // 打字途中表格會因機率重算而更新，焦點與輸入內容都要保留
+    const name = await page.$('#prizeRows tr:nth-child(2) .f-name');
+    await name.click({ clickCount: 3 }); await name.type('頭獎改名');
+    assert.equal(await page.evaluate(() => document.activeElement.className), 'f-name');
+    assert.equal(await page.$eval('#prizeRows tr:nth-child(2) .f-name', (e) => e.value), '頭獎改名');
+    assert.equal(await page.$eval('#prizeRows tr:nth-child(2) .prob', (e) => e.textContent), '5.00%');
+    // 第二列下移 → 順序變成 特獎、銘謝惠顧、頭獎改名；同一個 DOM 節點被搬動而不是重建
+    const nodeBefore = await page.evaluateHandle(() => document.querySelector('#prizeRows tr:nth-child(2)'));
+    await page.click('#prizeRows tr:nth-child(2) .f-down'); await H.sleep(150);
+    assert.deepEqual(await page.$$eval('#prizeRows .f-name', (els) => els.map((e) => e.value)), ['特獎', '銘謝惠顧', '頭獎改名']);
+    assert.equal(await page.evaluate((n) => n === document.querySelector('#prizeRows tr:nth-child(3)'), nodeBefore), true);
+    assert.equal(await page.$eval('#prizeRows tr:nth-child(3) .f-down', (e) => e.disabled), true, '最後一列不能再下移');
+    // 無限切換：欄位啟用並填回數字
+    await page.click('#prizeRows tr:nth-child(2) .f-unlimited'); await H.sleep(150);
+    assert.equal(await page.$eval('#prizeRows tr:nth-child(2) .f-quantity', (e) => e.disabled), false);
+    assert.equal(await page.$eval('#prizeRows tr:nth-child(2) .f-quantity', (e) => e.value), '10');
+    // 刪除第一列、新增一列
+    await page.click('#prizeRows tr:nth-child(1) .f-del'); await H.sleep(200); await page.click('#confirmOk'); await H.sleep(200);
+    await page.click('#addPrize'); await H.sleep(150);
+    assert.deepEqual(await page.$$eval('#prizeRows .f-name', (els) => els.map((e) => e.value)), ['銘謝惠顧', '頭獎改名', '獎項 3']);
+    // 儲存後重整，順序與內容一致
+    await page.click('#savePrizes'); await H.sleep(300);
+    await page.reload({ waitUntil: 'networkidle0' }); await H.sleep(300);
+    await page.click('.open-panel[data-tab="prizes"]'); await H.sleep(200);
+    assert.deepEqual(await page.$$eval('#prizeRows .f-name', (els) => els.map((e) => e.value)), ['銘謝惠顧', '頭獎改名', '獎項 3']);
+    assert.deepEqual(page.errors, []);
+  });
+
   test('保底：連抽保底每 5 抽至少一個，40 批全部符合', async (t) => {
     const page = await fresh(t, { pityBatch: true, pityBatchK: 5, prizes: FAST.prizes.map((p) => ({ ...p, quantity: -1, remaining: -1 })) });
     for (let i = 0; i < 40; i++) { await H.spinOnce(page, 5); await H.closeResult(page); }

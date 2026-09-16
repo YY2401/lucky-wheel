@@ -49,72 +49,102 @@
     // ======================================================================
     //  獎項表格
     // ======================================================================
+    // 表格用「對帳」方式更新：列以獎項 id 為鍵重複使用，只有新增 / 刪除 / 換順序才動 DOM 結構，
+    // 打字、抽獎、儲存都只改欄位值，不會失去焦點或捲動位置
     function renderPrizeRows() {
-      const tb = $('#prizeRows'); tb.innerHTML = '';
-      state.config.prizes.forEach((p, i) => {
-        const unlimited = p.quantity === -1;
-        const tr = document.createElement('tr'); tr.dataset.id = p.id;
-        tr.innerHTML = `
-          <td><div style="display:flex;gap:6px;align-items:center">
-            <div class="thumb" title="點擊上傳圖片">${p.image ? `<img src="${esc(p.image)}" alt="">` : '<span class="thumb-empty">上傳</span>'}</div>
-            <div class="thumb-actions"><button class="f-url">網址</button><button class="f-clearimg">清除</button></div>
-            <input type="file" accept="image/*" class="f-file" hidden>
-          </div></td>
-          <td><input class="f-name" value="${esc(p.name)}" maxlength="60"></td>
-          <td><input type="number" class="f-weight" min="0" step="0.1" value="${p.weight}"></td>
-          <td class="prob">–</td>
-          <td><div class="qty">
-            <input type="number" class="f-quantity" min="0" value="${unlimited ? '' : p.quantity}" ${unlimited ? 'disabled' : ''}>
-            <label><input type="checkbox" class="f-unlimited" ${unlimited ? 'checked' : ''}>無限</label>
-          </div></td>
-          <td><input type="number" class="f-remaining" min="0" value="${unlimited ? '' : p.remaining}" ${unlimited ? 'disabled' : ''}></td>
-          <td><input type="color" class="f-color" value="${colorOf(p, i)}"></td>
-          <td style="text-align:center"><input type="checkbox" class="f-pity" ${p.pity ? 'checked' : ''} title="勾選＝算保底獎"></td>
-          <td style="white-space:nowrap">
-            <button class="btn icon f-up" title="上移">↑</button>
-            <button class="btn icon f-down" title="下移">↓</button>
-            <button class="btn icon f-del" title="刪除">✕</button>
-          </td>`;
-        tb.appendChild(tr);
-        const on = (sel, ev, fn) => $(sel, tr).addEventListener(ev, fn);
-        const touched = () => { markDirty(); updateWheel(); };
-        const rerender = () => { markDirty(); renderPrizeRows(); updateWheel(); };
-        on('.f-name', 'input', (e) => { p.name = e.target.value; touched(); });
-        on('.f-weight', 'input', (e) => { p.weight = Math.max(0, Number(e.target.value) || 0); touched(); });
-        on('.f-quantity', 'input', (e) => {
-          const q = Math.max(0, Math.trunc(Number(e.target.value)) || 0);
-          p.remaining = Math.min(q, Math.max(0, p.remaining + (q - p.quantity)));
-          p.quantity = q; $('.f-remaining', tr).value = p.remaining; touched();
-        });
-        on('.f-remaining', 'input', (e) => { p.remaining = Math.min(p.quantity, Math.max(0, Math.trunc(Number(e.target.value)) || 0)); touched(); });
-        on('.f-unlimited', 'change', (e) => { if (e.target.checked) { p.quantity = -1; p.remaining = -1; } else { p.quantity = 10; p.remaining = 10; } rerender(); });
-        on('.f-color', 'input', (e) => { p.color = e.target.value; touched(); });
-        on('.f-pity', 'change', (e) => { p.pity = e.target.checked; markDirty(); renderPityInfo(); });
-        on('.f-del', 'click', async () => { if (await ask(`刪除獎項「${p.name}」？`, { title: '刪除獎項', okLabel: '刪除', danger: true })) { state.config.prizes.splice(i, 1); rerender(); } });
-        on('.f-up', 'click', () => { if (i === 0) return; const a = state.config.prizes; [a[i - 1], a[i]] = [a[i], a[i - 1]]; rerender(); });
-        on('.f-down', 'click', () => { const a = state.config.prizes; if (i >= a.length - 1) return; [a[i + 1], a[i]] = [a[i], a[i + 1]]; rerender(); });
-        on('.thumb', 'click', () => $('.f-file', tr).click());
-        on('.f-file', 'change', async (e) => {
-          const file = e.target.files[0]; if (!file) return;
-          try { p.image = await downscale(file, 200); rerender(); }
-          catch (err) { toast(`讀取圖片失敗：${err.message}`); }
-        });
-        on('.f-url', 'click', async () => { const u = await dialog({ title: '圖片網址', message: '輸入圖片網址（https://…）', input: p.image.startsWith('data:') ? '' : p.image }); if (u !== null) { p.image = u.trim(); rerender(); } });
-        on('.f-clearimg', 'click', () => { p.image = ''; rerender(); });
+      const tb = $('#prizeRows');
+      const rows = new Map($$('tr', tb).map((tr) => [tr.dataset.id, tr]));
+      state.config.prizes.forEach((p) => {
+        let tr = rows.get(p.id);
+        if (!tr) tr = createPrizeRow(p.id);
+        else rows.delete(p.id);
+        tb.appendChild(tr); // 已存在的列 appendChild 等於搬到正確順序
       });
-      refreshComputed();
+      rows.forEach((tr) => tr.remove()); // 已刪除的獎項
+      syncPrizeRows();
     }
-    function refreshComputed() {
+    function createPrizeRow(id) {
+      const tr = document.createElement('tr'); tr.dataset.id = id;
+      tr.innerHTML = `
+        <td><div style="display:flex;gap:6px;align-items:center">
+          <div class="thumb" title="點擊上傳圖片"></div>
+          <div class="thumb-actions"><button class="f-url">網址</button><button class="f-clearimg">清除</button></div>
+          <input type="file" accept="image/*" class="f-file" hidden>
+        </div></td>
+        <td><input class="f-name" maxlength="60"></td>
+        <td><input type="number" class="f-weight" min="0" step="0.1"></td>
+        <td class="prob">–</td>
+        <td><div class="qty">
+          <input type="number" class="f-quantity" min="0">
+          <label><input type="checkbox" class="f-unlimited">無限</label>
+        </div></td>
+        <td><input type="number" class="f-remaining" min="0"></td>
+        <td><input type="color" class="f-color"></td>
+        <td style="text-align:center"><input type="checkbox" class="f-pity" title="勾選＝算保底獎"></td>
+        <td style="white-space:nowrap">
+          <button class="btn icon f-up" title="上移">↑</button>
+          <button class="btn icon f-down" title="下移">↓</button>
+          <button class="btn icon f-del" title="刪除">✕</button>
+        </td>`;
+      // 事件用 id 回頭找獎項，順序變了也不會綁到錯的列
+      const prize = () => state.config.prizes.find((x) => x.id === id);
+      const index = () => state.config.prizes.findIndex((x) => x.id === id);
+      const on = (sel, ev, fn) => $(sel, tr).addEventListener(ev, (e) => { const p = prize(); if (p) fn(e, p); });
+      const touched = () => { markDirty(); updateWheel(); };
+      const restructure = () => { markDirty(); renderPrizeRows(); updateWheel(); };
+      on('.f-name', 'input', (e, p) => { p.name = e.target.value; touched(); });
+      on('.f-weight', 'input', (e, p) => { p.weight = Math.max(0, Number(e.target.value) || 0); touched(); });
+      on('.f-quantity', 'input', (e, p) => {
+        const q = Math.max(0, Math.trunc(Number(e.target.value)) || 0);
+        p.remaining = Math.min(q, Math.max(0, p.remaining + (q - p.quantity)));
+        p.quantity = q; touched();
+      });
+      on('.f-remaining', 'input', (e, p) => { p.remaining = Math.min(p.quantity, Math.max(0, Math.trunc(Number(e.target.value)) || 0)); touched(); });
+      on('.f-unlimited', 'change', (e, p) => { if (e.target.checked) { p.quantity = -1; p.remaining = -1; } else { p.quantity = 10; p.remaining = 10; } touched(); });
+      on('.f-color', 'input', (e, p) => { p.color = e.target.value; touched(); });
+      on('.f-pity', 'change', (e, p) => { p.pity = e.target.checked; markDirty(); renderPityInfo(); });
+      on('.f-del', 'click', async (e, p) => { if (await ask(`刪除獎項「${p.name}」？`, { title: '刪除獎項', okLabel: '刪除', danger: true })) { state.config.prizes.splice(index(), 1); restructure(); } });
+      on('.f-up', 'click', () => { const i = index(); if (i <= 0) return; const a = state.config.prizes; [a[i - 1], a[i]] = [a[i], a[i - 1]]; restructure(); });
+      on('.f-down', 'click', () => { const i = index(); const a = state.config.prizes; if (i < 0 || i >= a.length - 1) return; [a[i + 1], a[i]] = [a[i], a[i + 1]]; restructure(); });
+      on('.thumb', 'click', () => $('.f-file', tr).click());
+      on('.f-file', 'change', async (e, p) => {
+        const file = e.target.files[0]; if (!file) return;
+        try { p.image = await downscale(file, 200); touched(); }
+        catch (err) { toast(`讀取圖片失敗：${err.message}`); }
+        e.target.value = '';
+      });
+      on('.f-url', 'click', async (e, p) => { const u = await dialog({ title: '圖片網址', message: '輸入圖片網址（https://…）', input: p.image.startsWith('data:') ? '' : p.image }); if (u !== null) { p.image = u.trim(); touched(); } });
+      on('.f-clearimg', 'click', (e, p) => { p.image = ''; touched(); });
+      return tr;
+    }
+    // 把資料同步到每一列的欄位；正在打字的欄位不動
+    function syncPrizeRows() {
       const probs = probabilities(state.config.prizes);
+      const active = document.activeElement;
+      const setVal = (el, v) => { if (el !== active && String(el.value) !== String(v)) el.value = v; };
       $$('#prizeRows tr').forEach((tr) => {
-        const p = state.config.prizes.find((x) => x.id === tr.dataset.id); if (!p) return;
+        const i = state.config.prizes.findIndex((x) => x.id === tr.dataset.id); if (i < 0) return;
+        const p = state.config.prizes[i]; const unlimited = p.quantity === -1;
+        const thumb = $('.thumb', tr); const img = thumb.querySelector('img');
+        if (p.image) { if (!img) thumb.innerHTML = '<img alt="">'; if (thumb.querySelector('img').getAttribute('src') !== p.image) thumb.querySelector('img').src = p.image; }
+        else if (img || !thumb.firstChild) thumb.innerHTML = '<span class="thumb-empty">上傳</span>';
+        setVal($('.f-name', tr), p.name);
+        setVal($('.f-weight', tr), p.weight);
+        const qty = $('.f-quantity', tr); const rem = $('.f-remaining', tr);
+        qty.disabled = rem.disabled = unlimited;
+        setVal(qty, unlimited ? '' : p.quantity);
+        setVal(rem, unlimited ? '' : p.remaining);
+        $('.f-unlimited', tr).checked = unlimited;
+        setVal($('.f-color', tr), colorOf(p, i));
+        $('.f-pity', tr).checked = !!p.pity;
         const pr = probs[p.id];
         $('.prob', tr).textContent = pr == null ? (p.remaining === 0 ? '已抽完' : '0%') : `${pr.toFixed(2)}%`;
         tr.classList.toggle('tr-soldout', pr == null);
-        const rem = $('.f-remaining', tr);
-        if (document.activeElement !== rem && p.quantity !== -1) rem.value = p.remaining;
+        $('.f-up', tr).disabled = i === 0;
+        $('.f-down', tr).disabled = i === state.config.prizes.length - 1;
       });
     }
+    const refreshComputed = syncPrizeRows;
     function renderProbBar() {
       const probs = probabilities(state.config.prizes);
       const bar = $('#probBar'); bar.innerHTML = '';
