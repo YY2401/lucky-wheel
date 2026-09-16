@@ -19,7 +19,7 @@
 
   const DEFAULT_CONFIG = {
     title: '幸運轉盤', segmentMode: 'weight', spinDuration: 5000, multiSpinDuration: 1500, turns: 6, sound: true,
-    overlayResultSeconds: 8, multiMode: 'flip', minSlice: 4, bg3d: true,
+    overlayResultSeconds: 8, multiMode: 'flip', minSlice: 4, bg3d: true, theme: 'dark',
     pityAccum: false, pityAccumN: 30, pityBatch: false, pityBatchK: 10, pityScope: 'player', room: '', sync: false, broker: 'wss://broker.emqx.io:8084/mqtt',
     prizes: [
       { id: 'p1', name: '特獎 iPad', weight: 1, quantity: 1, remaining: 1, image: '', color: '#ff6b6b' },
@@ -87,6 +87,7 @@
     cfg.multiMode = cfg.multiMode === 'each' ? 'each' : 'flip';
     cfg.minSlice = Math.min(20, Math.max(0, Number(cfg.minSlice) || 0));
     cfg.bg3d = cfg.bg3d !== false;
+    cfg.theme = cfg.theme === 'light' ? 'light' : 'dark';
     cfg.pityAccum = cfg.pityAccum === true;
     cfg.pityAccumN = Math.min(1000, Math.max(1, Math.trunc(Number(cfg.pityAccumN)) || 30));
     cfg.pityBatch = cfg.pityBatch === true;
@@ -102,6 +103,21 @@
     const t = $('#toast');
     t.textContent = msg; t.classList.add('show');
     clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), ms);
+  }
+
+  // ---------- 主題 ----------
+  const WHEEL_THEMES = {
+    dark: { ring: '#1c1c1c', ringStroke: '#ffcf33', ledOn: '#ffcf33', ledOff: '#4a4a4a', hubBg: '#f4efe4', hubText: '#141414', hubStroke: '#ffcf33', pointer: '#e63b3b', pointerStroke: '#f4efe4', sliceStroke: '#141414', textFill: '#ffffff', textStroke: 'rgba(0,0,0,0.55)' },
+    light: { ring: '#141414', ringStroke: '#ffcf33', ledOn: '#ffcf33', ledOff: '#4a4a4a', hubBg: '#fffdf7', hubText: '#141414', hubStroke: '#141414', pointer: '#e63b3b', pointerStroke: '#141414', sliceStroke: '#141414', textFill: '#ffffff', textStroke: 'rgba(0,0,0,0.55)' },
+  };
+  function applyTheme(theme, wheelInst) {
+    theme = theme === 'light' ? 'light' : 'dark';
+    document.documentElement.dataset.theme = theme;
+    try { localStorage.setItem('lw.theme', theme); } catch { /* ignore */ }
+    if (wheelInst) wheelInst.setTheme(WHEEL_THEMES[theme]);
+    if (window.WheelBG) WheelBG.setTheme(theme);
+    $$('.theme-toggle button').forEach((b) => b.classList.toggle('active', b.dataset.theme === theme));
+    return theme;
   }
 
   // ---------- 抽獎邏輯 ----------
@@ -274,6 +290,7 @@
       saveLS(LS.overlayConfig, config);
       Sfx.enabled = soundParam === '0' ? false : !!config.sound;
       try { localStorage.setItem('lw.bg3d', config.bg3d ? '1' : '0'); } catch { /* ignore */ }
+      applyTheme(params.get('theme') || config.theme, wheel);
       wheel.setPrizes(config.prizes, config.segmentMode, config.minSlice / 100);
       if (window.WheelBG && params.get('bg') !== '0') WheelBG.setEnabled(config.bg3d);
     }
@@ -358,6 +375,7 @@
     renderPrizeRows(); renderSettings(); updateWheel(); renderPityInfo();
   }
   function updateWheel() {
+    applyTheme(state.config.theme, wheel);
     wheel.setPrizes(state.config.prizes, state.config.segmentMode, state.config.minSlice / 100);
     renderProbBar(); refreshComputed();
     if (window.WheelBG) WheelBG.setEnabled(state.config.bg3d);
@@ -467,7 +485,7 @@
   }
 
   // ---------- 設定頁 ----------
-  const SETTING_KEYS = ['segmentMode', 'spinDuration', 'multiSpinDuration', 'turns', 'overlayResultSeconds', 'multiMode', 'minSlice', 'pityAccumN', 'pityBatchK', 'pityScope', 'room', 'broker'];
+  const SETTING_KEYS = ['segmentMode', 'spinDuration', 'multiSpinDuration', 'turns', 'overlayResultSeconds', 'multiMode', 'minSlice', 'pityAccumN', 'pityBatchK', 'pityScope', 'theme', 'room', 'broker'];
   function renderSettings() {
     const c = state.config;
     SETTING_KEYS.forEach((k) => { $(`#s-${k}`).value = c[k]; });
@@ -489,6 +507,11 @@
     if (before !== `${c2.room}|${c2.sync}|${c2.broker}`) Sync.start(c2.room, c2);
   });
   $('#newRoom').addEventListener('click', () => { $('#s-room').value = randId(); });
+  $$('.theme-toggle button').forEach((b) => b.addEventListener('click', () => {
+    state.config.theme = b.dataset.theme; $('#s-theme').value = b.dataset.theme;
+    saveLS(LS.config, state.config); applyTheme(b.dataset.theme, wheel);
+    Sync.send({ type: 'config', config: state.config });
+  }));
   $('#testSync').addEventListener('click', () => {
     state.pongs = 0; Sync.send({ type: 'ping' }); toast('已送出測試訊號，等待覆蓋層回應…', 3000);
     setTimeout(() => toast(state.pongs ? `覆蓋層已回應（${state.pongs} 個）` : '3 秒內沒有覆蓋層回應：請確認 OBS 的網址含相同頻道代碼、且「跨瀏覽器同步」已開啟並儲存', 6000), 3000);

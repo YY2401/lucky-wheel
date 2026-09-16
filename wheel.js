@@ -44,6 +44,7 @@
       this.canvas = canvas;
       this.ctx = canvas.getContext('2d');
       this.opts = Object.assign({ pointerAngle: -Math.PI / 2, hubText: 'GO', onTick: null }, opts);
+      this.theme = { ring: '#1c1c1c', ringStroke: '#ffcf33', ledOn: '#ffcf33', ledOff: '#4a4a4a', hubBg: '#f4efe4', hubText: '#141414', hubStroke: '#ffcf33', pointer: '#e63b3b', pointerStroke: '#f4efe4', sliceStroke: '#141414', textFill: '#ffffff', textStroke: 'rgba(0,0,0,0.55)' };
       this.rotation = -Math.PI / 2; // 第一個扇區從 12 點鐘方向開始
       this.segments = [];
       this.images = new Map();
@@ -58,6 +59,8 @@
       this._ro.observe(canvas);
       this._idle = setInterval(() => { if (!this.spinning) { this.ledPhase++; this.draw(); } }, 500);
     }
+
+    setTheme(t) { this.theme = Object.assign({}, this.theme, t || {}); this.draw(); }
 
     resize() {
       const dpr = window.devicePixelRatio || 1;
@@ -99,22 +102,23 @@
 
       // 外框與 LED 燈
       ctx.beginPath(); ctx.arc(0, 0, R + 14 * k, 0, TAU);
-      ctx.fillStyle = '#1b1b2f'; ctx.fill();
-      ctx.lineWidth = 3 * k; ctx.strokeStyle = '#ffd166'; ctx.stroke();
+      const T = this.theme;
+      ctx.fillStyle = T.ring; ctx.fill();
+      ctx.lineWidth = 3 * k; ctx.strokeStyle = T.ringStroke; ctx.stroke();
       const leds = 28;
       for (let i = 0; i < leds; i++) {
         const a = (i / leds) * TAU;
         const on = (i + this.ledPhase) % 2 === 0;
         ctx.beginPath(); ctx.arc(Math.cos(a) * (R + 7 * k), Math.sin(a) * (R + 7 * k), 3.2 * k, 0, TAU);
-        ctx.fillStyle = on ? '#fff3b0' : '#5a4a1e';
-        ctx.shadowBlur = on ? 10 : 0; ctx.shadowColor = '#ffd166';
+        ctx.fillStyle = on ? T.ledOn : T.ledOff;
+        ctx.shadowBlur = on ? 8 : 0; ctx.shadowColor = T.ledOn;
         ctx.fill();
       }
       ctx.shadowBlur = 0;
 
       if (!this.segments.length) {
         ctx.beginPath(); ctx.arc(0, 0, R, 0, TAU); ctx.fillStyle = '#2a2a3d'; ctx.fill();
-        ctx.fillStyle = '#aaa'; ctx.font = `${Math.max(14, S * 0.04)}px sans-serif`;
+        ctx.fillStyle = '#888'; ctx.font = `${Math.max(14, S * 0.04)}px sans-serif`;
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.fillText('尚無可抽獎項', 0, 0);
         ctx.restore();
@@ -129,7 +133,7 @@
         ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, R, seg.start, seg.end); ctx.closePath();
         ctx.fillStyle = color; ctx.fill();
         if (this.highlight === seg) { ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.fill(); }
-        ctx.lineWidth = 2 * k; ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.stroke();
+        ctx.lineWidth = 2.5 * k; ctx.strokeStyle = T.sliceStroke; ctx.stroke();
 
         // 扇區內容：圖片在外側、文字沿半徑排
         ctx.save();
@@ -156,7 +160,7 @@
         if (chord * 0.45 < 7) { ctx.restore(); return; } // 扇區太細，文字畫了也看不清
         ctx.font = `bold ${fs}px "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif`;
         ctx.textBaseline = 'middle';
-        ctx.lineJoin = 'round'; ctx.lineWidth = 3 * k; ctx.strokeStyle = 'rgba(0,0,0,0.45)';
+        ctx.lineJoin = 'round'; ctx.lineWidth = 3 * k; ctx.strokeStyle = T.textStroke;
         const label = seg.soldOut ? `${seg.prize.name}（已抽完）` : seg.prize.name;
         // 左半邊的扇區把文字翻 180°，改成由外往內讀，這樣任何角度都不會上下顛倒
         const flip = screenAngle > Math.PI / 2 && screenAngle < Math.PI * 1.5;
@@ -164,7 +168,7 @@
         if (flip) { ctx.rotate(Math.PI); ctx.textAlign = 'right'; tx = -textStart; }
         else ctx.textAlign = 'left';
         ctx.strokeText(label, tx, 0, textMax);
-        ctx.fillStyle = '#fff';
+        ctx.fillStyle = T.textFill;
         ctx.fillText(label, tx, 0, textMax);
         ctx.restore();
       });
@@ -172,9 +176,9 @@
 
       // 中心軸
       ctx.beginPath(); ctx.arc(0, 0, R * 0.13, 0, TAU);
-      ctx.fillStyle = '#fff'; ctx.fill();
-      ctx.lineWidth = 4 * k; ctx.strokeStyle = '#ffd166'; ctx.stroke();
-      ctx.fillStyle = '#1b1b2f'; ctx.font = `bold ${R * 0.085}px sans-serif`;
+      ctx.fillStyle = T.hubBg; ctx.fill();
+      ctx.lineWidth = 4 * k; ctx.strokeStyle = T.hubStroke; ctx.stroke();
+      ctx.fillStyle = T.hubText; ctx.font = `${R * 0.085}px "Bungee", sans-serif`;
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText(this.opts.hubText, 0, 1);
       ctx.restore();
@@ -189,9 +193,10 @@
       ctx.rotate(this.pointerKick * 0.35);
       ctx.beginPath();
       ctx.moveTo(0, 28 * k); ctx.lineTo(-16 * k, -14 * k); ctx.lineTo(16 * k, -14 * k); ctx.closePath();
-      ctx.fillStyle = '#ff3b5c'; ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 8; ctx.fill();
-      ctx.shadowBlur = 0; ctx.lineWidth = 3 * k; ctx.strokeStyle = '#fff'; ctx.stroke();
-      ctx.beginPath(); ctx.arc(0, -8 * k, 6 * k, 0, TAU); ctx.fillStyle = '#fff'; ctx.fill();
+      const T = this.theme;
+      ctx.fillStyle = T.pointer; ctx.fill();
+      ctx.lineWidth = 3 * k; ctx.strokeStyle = T.pointerStroke; ctx.stroke();
+      ctx.beginPath(); ctx.arc(0, -8 * k, 6 * k, 0, TAU); ctx.fillStyle = T.pointerStroke; ctx.fill();
       ctx.restore();
     }
 

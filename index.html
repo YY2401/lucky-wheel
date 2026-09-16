@@ -4,7 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Lucky Wheel</title>
-<link rel="stylesheet" href="style.css?v=18">
+<script>try { document.documentElement.dataset.theme = localStorage.getItem('lw.theme') || 'dark'; } catch (e) { document.documentElement.dataset.theme = 'dark'; }</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css?v=19">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.1/mqtt.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
@@ -14,6 +17,13 @@
 <canvas id="bg"></canvas>
 <!-- ===== 控制台 ===== -->
 <header class="topbar control-only">
+  <div class="brand">
+    <span class="logo">LUCKY WHEEL</span>
+    <div class="theme-toggle" role="group" aria-label="主題">
+      <button type="button" data-theme="dark">黑底</button>
+      <button type="button" data-theme="light">白底</button>
+    </div>
+  </div>
   <div class="topbar-right">
     <span class="status" id="syncStatus"><i></i>同步：關閉</span>
     <button class="btn open-panel" data-tab="prizes">獎項設定</button>
@@ -123,6 +133,12 @@
         <p class="hint">保底獎池 = 在「獎項設定」勾選「保底」的獎項，觸發時在這些獎項之間依權重抽，仍受庫存限制；保底獎全部抽完時不會觸發。計數由紀錄反推，撤銷抽獎後自動修正。</p>
 
         <h3>畫面</h3>
+        <label>主題
+          <select id="s-theme">
+            <option value="dark">黑底</option>
+            <option value="light">白底</option>
+          </select>
+        </label>
         <div class="switch-row">
           <label class="switch"><input type="checkbox" id="s-bg3d"><span class="track"></span><span class="switch-label">3D 動態背景（效能不足時可關閉；同時套用到覆蓋層）</span></label>
         </div>
@@ -215,8 +231,8 @@
 <canvas id="confetti"></canvas>
 <div id="toast"></div>
 
-<script src="wheel.js?v=18"></script>
-<script src="app.js?v=18"></script>
-<script src="bg.js?v=18"></script>
+<script src="wheel.js?v=19"></script>
+<script src="app.js?v=19"></script>
+<script src="bg.js?v=19"></script>
 </body>
 </html>

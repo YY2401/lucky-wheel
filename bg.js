@@ -104,7 +104,7 @@
     orbs.forEach((o) => {
       o.sp.position.x = o.bx + Math.sin(t * o.speed + o.phase) * 3;
       o.sp.position.y = o.by + Math.cos(t * o.speed * 0.8 + o.phase) * 2;
-      o.sp.material.opacity = 0.55 + e * 0.3;
+      o.sp.material.opacity = (o.light ? 0.22 : 0.55) + e * 0.3;
     });
     camera.position.x += (mouse.x * 1.6 - camera.position.x) * 0.04;
     camera.position.y += (mouse.y * 1.0 - camera.position.y) * 0.04;
@@ -117,7 +117,25 @@
     if (window.anime) { anime.remove(target); anime({ targets: target, ...props, ...opts }); }
     else Object.keys(props).forEach((k) => { target[k] = Array.isArray(props[k]) ? props[k][props[k].length - 1] : props[k]; });
   };
+  const wireMats = shapes.map((s) => s.g.children[0].material);
+  const fillMats = shapes.map((s) => s.g.children[1].material);
+  const baseCol = col.slice();
+  function setTheme(theme) {
+    const light = theme === 'light';
+    // 白底：改用一般混合、顏色壓暗；黑底：加色混合發光
+    pMat.blending = light ? THREE.NormalBlending : THREE.AdditiveBlending;
+    pMat.opacity = light ? 0.8 : 0.9; pMat.needsUpdate = true;
+    const arr = pGeo.getAttribute('color').array;
+    for (let i = 0; i < arr.length; i++) arr[i] = light ? baseCol[i] * 0.75 : baseCol[i];
+    pGeo.getAttribute('color').needsUpdate = true;
+    orbs.forEach((o) => { o.sp.material.blending = light ? THREE.NormalBlending : THREE.AdditiveBlending; o.sp.material.needsUpdate = true; o.light = light; });
+    wireMats.forEach((m) => { m.opacity = light ? 0.55 : 0.4; });
+    fillMats.forEach((m) => { m.blending = light ? THREE.NormalBlending : THREE.AdditiveBlending; m.opacity = light ? 0.08 : 0.05; m.needsUpdate = true; });
+    if (!OVERLAY) scene.fog = light ? new THREE.FogExp2(0xf4efe4, 0.03) : new THREE.FogExp2(0x0d0d1a, 0.03);
+  }
+  try { setTheme(localStorage.getItem('lw.theme') || 'dark'); } catch { /* ignore */ }
   window.WheelBG = {
+    setTheme,
     setEnabled(v) { enabled = v !== false; canvas.style.display = enabled ? '' : 'none'; if (enabled) clock.getDelta(); },
     setSpinning(v) { tween(state, { energy: v ? 1 : 0 }, { duration: v ? 700 : 1600, easing: 'easeOutQuad' }); },
     burst() {
