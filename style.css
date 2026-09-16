@@ -334,3 +334,21 @@ details.adv[open] summary { margin-bottom: 4px; }
 details.stats { margin-bottom: 14px; }
 .stats-table td:nth-child(n+2), .stats-table th:nth-child(n+2) { text-align: right; }
 .stat-off { color: var(--red); font-weight: 700; }
+
+/* ---------- 獎項一覽（首頁左上角可收合） ---------- */
+.prize-list {
+  position: fixed; left: 22px; top: 74px; z-index: 5; width: min(320px, calc(100vw - 44px)); max-height: calc(100vh - 100px); overflow: auto;
+  background: var(--surface); border: var(--border-w) solid var(--ink); border-radius: 14px; box-shadow: 4px 4px 0 var(--shadow); padding: 12px 14px;
+  animation: popin .25s cubic-bezier(.2, 1.4, .4, 1);
+}
+.prize-list-head { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; padding-bottom: 8px; border-bottom: var(--border-w) solid var(--ink); }
+.prize-list-title { font-family: "Bungee", "Noto Sans TC", sans-serif; letter-spacing: 1px; margin-right: auto; }
+.prize-list ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.prize-list li { display: flex; align-items: center; gap: 10px; font-size: 15px; }
+.prize-list li.soldout { opacity: .45; text-decoration: line-through; }
+.prize-list .pl-dot { width: 22px; height: 22px; border-radius: 50%; background: var(--c, #888); border: 2px solid var(--ink); flex: none; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+.prize-list .pl-dot img { width: 100%; height: 100%; object-fit: contain; }
+.prize-list .pl-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+.prize-list .pl-prob { font-family: "Bungee", sans-serif; font-size: 13px; }
+.prize-list .pl-stock { font-size: 13px; color: var(--muted); min-width: 3em; text-align: right; }
+.prize-list .pl-pity { font-size: 11px; background: var(--red); color: #fff; border-radius: 999px; padding: 1px 6px; }

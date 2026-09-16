@@ -2,7 +2,7 @@
 (function () {
   const LW = (window.LW = window.LW || {});
 
-  LW.KEYS = { config: 'lw.config', records: 'lw.records', overlayConfig: 'lw.overlayConfig', skipAnim: 'lw.skipAnim', excelHandle: 'excelHandle' };
+  LW.KEYS = { config: 'lw.config', records: 'lw.records', overlayConfig: 'lw.overlayConfig', skipAnim: 'lw.skipAnim', prizeList: 'lw.prizeList', excelHandle: 'excelHandle' };
 
   const idb = {
     open() { return new Promise((res, rej) => { const r = indexedDB.open('lucky-wheel', 1); r.onupgradeneeded = () => r.result.createObjectStore('kv'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); },

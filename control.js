@@ -41,10 +41,38 @@
     function updateWheel() {
       applyTheme(state.config.theme, wheel);
       wheel.setPrizes(state.config.prizes, state.config.segmentMode, state.config.minSlice / 100);
-      renderProbBar(); refreshComputed();
+      renderProbBar(); refreshComputed(); renderPrizeList();
       if (window.WheelBG) WheelBG.setEnabled(state.config.bg3d);
       Sfx.enabled = !!state.config.sound;
     }
+
+    // ======================================================================
+    //  獎項一覽（首頁左上角可收合的清單）
+    // ======================================================================
+    const plPrefs = Object.assign({ open: false, prob: true, stock: true }, Store.get(KEYS.prizeList, {}));
+    function savePlPrefs() { Store.set(KEYS.prizeList, plPrefs); }
+    function renderPrizeList() {
+      const panel = $('#prizeList');
+      panel.classList.toggle('hidden', !plPrefs.open);
+      $('#togglePrizeList').setAttribute('aria-expanded', String(plPrefs.open));
+      $('#togglePrizeList').classList.toggle('primary', plPrefs.open);
+      $('#plShowProb').checked = plPrefs.prob; $('#plShowStock').checked = plPrefs.stock;
+      if (!plPrefs.open) return;
+      const probs = probabilities(state.config.prizes);
+      $('#prizeListRows').innerHTML = state.config.prizes.map((p, i) => {
+        const pr = probs[p.id]; const soldOut = p.remaining === 0;
+        return `<li class="${soldOut ? 'soldout' : ''}">
+          <span class="pl-dot" style="--c:${esc(colorOf(p, i))}">${p.image ? `<img src="${esc(p.image)}" alt="">` : ''}</span>
+          <span class="pl-name">${esc(p.name)}</span>
+          ${p.pity ? '<span class="pl-pity">保底</span>' : ''}
+          ${plPrefs.stock ? `<span class="pl-stock">${p.quantity === -1 ? '不限' : soldOut ? '抽完' : `剩 ${p.remaining}`}</span>` : ''}
+          ${plPrefs.prob ? `<span class="pl-prob">${pr == null ? '—' : `${pr.toFixed(pr < 10 ? 2 : 1)}%`}</span>` : ''}
+        </li>`;
+      }).join('') || '<li class="hint">還沒有獎項</li>';
+    }
+    $('#togglePrizeList').addEventListener('click', () => { plPrefs.open = !plPrefs.open; savePlPrefs(); renderPrizeList(); });
+    $('#plShowProb').addEventListener('change', (e) => { plPrefs.prob = e.target.checked; savePlPrefs(); renderPrizeList(); });
+    $('#plShowStock').addEventListener('change', (e) => { plPrefs.stock = e.target.checked; savePlPrefs(); renderPrizeList(); });
 
     // ======================================================================
     //  獎項表格

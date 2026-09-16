@@ -104,6 +104,33 @@ if (!H.chromePath()) {
     assert.deepEqual(page.errors, []);
   });
 
+  test('獎項一覽：左上角按鈕收合、機率 / 剩餘可切換、抽獎後即時更新、偏好會記住', async (t) => {
+    const page = await fresh(t);
+    assert.equal(await page.$eval('#prizeList', (e) => e.classList.contains('hidden')), true, '預設收合');
+    await page.click('#togglePrizeList'); await H.sleep(150);
+    assert.equal(await page.$eval('#prizeList', (e) => e.classList.contains('hidden')), false);
+    assert.deepEqual(await page.$$eval('#prizeListRows .pl-name', (els) => els.map((e) => e.textContent)), ['特獎', '頭獎', '銘謝惠顧']);
+    assert.deepEqual(await page.$$eval('#prizeListRows .pl-prob', (els) => els.map((e) => e.textContent)), ['1.00%', '5.00%', '94.0%']);
+    assert.deepEqual(await page.$$eval('#prizeListRows .pl-stock', (els) => els.map((e) => e.textContent)), ['剩 1', '剩 3', '不限']);
+    await page.click('#plShowProb'); await H.sleep(100);
+    assert.equal(await page.$$eval('#prizeListRows .pl-prob', (els) => els.length), 0, '關掉機率後不顯示');
+    // 抽獎後清單要跟著更新：與儲存的庫存一致（把銘謝惠顧權重設 0，確保一定扣到限量獎）
+    await page.click('.open-panel[data-tab="prizes"]'); await H.sleep(200);
+    const w = await page.$('#prizeRows tr:nth-child(3) .f-weight'); await w.click({ clickCount: 3 }); await w.type('0');
+    await page.click('#savePrizes'); await H.sleep(200); await page.click('#closePanel');
+    await H.spinOnce(page, 3); await H.closeResult(page); await H.sleep(200);
+    const cfg = await H.readKey(page, 'lw.config');
+    const expect = cfg.prizes.map((p) => (p.quantity === -1 ? '不限' : p.remaining === 0 ? '抽完' : `剩 ${p.remaining}`));
+    assert.deepEqual(await page.$$eval('#prizeListRows .pl-stock', (els) => els.map((e) => e.textContent)), expect);
+    assert.notDeepEqual(expect, ['剩 1', '剩 3', '不限'], '三連抽全部落在限量獎，庫存一定變');
+    await page.reload({ waitUntil: 'networkidle0' }); await H.sleep(400);
+    assert.equal(await page.$eval('#prizeList', (e) => e.classList.contains('hidden')), false, '展開狀態記住');
+    assert.equal(await page.$eval('#plShowProb', (e) => e.checked), false, '機率開關記住');
+    await page.click('#togglePrizeList'); await H.sleep(100);
+    assert.equal(await page.$eval('#prizeList', (e) => e.classList.contains('hidden')), true);
+    assert.deepEqual(page.errors, []);
+  });
+
   test('保底：連抽保底每 5 抽至少一個，40 批全部符合', async (t) => {
     const page = await fresh(t, { pityBatch: true, pityBatchK: 5, prizes: FAST.prizes.map((p) => ({ ...p, quantity: -1, remaining: -1 })) });
     for (let i = 0; i < 40; i++) { await H.spinOnce(page, 5); await H.closeResult(page); }
