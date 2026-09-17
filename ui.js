@@ -66,6 +66,21 @@
     container.appendChild(chip);
   }
 
+  // ---------- 獎項一覽（控制台面板與 OBS 覆蓋層共用） ----------
+  function renderPrizeListRows(container, prizes, { prob = true, stock = true } = {}) {
+    const probs = LuckyCore.probabilities(prizes);
+    container.innerHTML = prizes.map((p, i) => {
+      const pr = probs[p.id]; const soldOut = p.remaining === 0;
+      return `<li class="${soldOut ? 'soldout' : ''}">
+        <span class="pl-dot" style="--c:${esc(colorOf(p, i))}">${p.image ? `<img src="${esc(p.image)}" alt="">` : ''}</span>
+        <span class="pl-name">${esc(p.name)}</span>
+        ${p.pity ? '<span class="pl-pity">保底</span>' : ''}
+        ${stock ? `<span class="pl-stock">${p.quantity === -1 ? '不限' : soldOut ? '抽完' : `剩 ${p.remaining}`}</span>` : ''}
+        ${prob ? `<span class="pl-prob">${pr == null ? '—' : `${pr.toFixed(pr < 10 ? 2 : 1)}%`}</span>` : ''}
+      </li>`;
+    }).join('') || '<li class="hint">還沒有獎項</li>';
+  }
+
   // ---------- 主題 ----------
   const WHEEL_THEMES = {
     dark: { ring: '#1c1c1c', ringStroke: '#ffcf33', ledOn: '#ffcf33', ledOff: '#4a4a4a', hubBg: '#f4efe4', hubText: '#141414', hubStroke: '#ffcf33', pointer: '#e63b3b', pointerStroke: '#f4efe4', sliceStroke: '#141414', textFill: '#ffffff', textStroke: 'rgba(0,0,0,0.55)' },
@@ -81,5 +96,5 @@
     return theme;
   }
 
-  LW.ui = { $, $$, wait, esc, colorOf, toast, dialog, ask, isFlip, flipTotal, resultCards, scheduleFlipSounds, liveChip, applyTheme };
+  LW.ui = { $, $$, wait, esc, colorOf, toast, dialog, ask, isFlip, flipTotal, resultCards, scheduleFlipSounds, liveChip, renderPrizeListRows, applyTheme };
 })();

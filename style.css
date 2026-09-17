@@ -352,3 +352,6 @@ details.stats { margin-bottom: 14px; }
 .prize-list .pl-prob { font-family: "Bungee", sans-serif; font-size: 13px; }
 .prize-list .pl-stock { font-size: 13px; color: var(--muted); min-width: 3em; text-align: right; }
 .prize-list .pl-pity { font-size: 11px; background: var(--red); color: #fff; border-radius: 999px; padding: 1px 6px; }
+body.overlay .prize-list { left: 22px; top: 22px; z-index: 3; width: min(360px, 40vw); font-size: 17px; }
+body.overlay .prize-list li { font-size: 17px; }
+body.overlay .prize-list .pl-dot { width: 26px; height: 26px; }

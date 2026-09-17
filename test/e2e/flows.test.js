@@ -149,6 +149,9 @@ if (!H.chromePath()) {
     await page.click('#saveSettings'); await H.sleep(300);
     const url = await page.$eval('#overlayUrl', (e) => e.textContent);
     assert.match(url, /overlay=1&room=[A-Z0-9]+&size=700&mode=spin$/);
+    await page.evaluate(() => { document.querySelector('#s-overlayList').checked = true; document.querySelector('#s-overlayListStock').checked = false; });
+    await page.click('#saveSettings'); await H.sleep(300);
+    assert.match(await page.$eval('#overlayUrl', (e) => e.textContent), /&list=1&ls=0$/);
     assert.equal((await H.readKey(page, 'lw.config')).spinDuration, 3500);
     await page.reload({ waitUntil: 'networkidle0' }); await H.sleep(300);
     await page.click('.open-panel[data-tab="settings"]'); await H.sleep(200);
@@ -179,7 +182,9 @@ if (!H.chromePath()) {
     const page = await fresh(t, { spinDuration: 600, multiSpinDuration: 300 });
     const room = (await H.readKey(page, 'lw.config')).room;
     const ov = await H.newPage(browser, { width: 1280, height: 720 }); t.after(() => ov.close());
-    await ov.goto(`${srv.url}/?overlay=1&room=${room}&sync=0&t=${Date.now()}`, { waitUntil: 'networkidle0' }); await H.sleep(500);
+    await ov.goto(`${srv.url}/?overlay=1&room=${room}&sync=0&list=1&lp=0&t=${Date.now()}`, { waitUntil: 'networkidle0' }); await H.sleep(500);
+    assert.deepEqual(await ov.$$eval('#ovPrizeListRows .pl-name', (els) => els.map((e) => e.textContent)), ['特獎', '頭獎', '銘謝惠顧'], '覆蓋層獎項一覽');
+    assert.equal(await ov.$$eval('#ovPrizeListRows .pl-prob', (els) => els.length), 0, 'lp=0 不顯示機率');
     await page.bringToFront(); await page.click('.open-panel[data-tab="settings"]'); await H.sleep(200);
     await page.click('#testSync'); await H.sleep(3500);
     assert.match(await page.$eval('#toast', (e) => e.textContent), /已回應（1 個）/);
@@ -189,6 +194,9 @@ if (!H.chromePath()) {
     await ov.bringToFront();
     await ov.waitForSelector('#ovResultLayer:not(.out)', { timeout: 20000 });
     assert.equal(await ov.$$eval('#ovGrid .r-card', (c) => c.length), 3);
+    const ovStocks = await ov.$$eval('#ovPrizeListRows .pl-stock', (els) => els.map((e) => e.textContent));
+    const ctrlCfg = await H.readKey(page, 'lw.config');
+    assert.deepEqual(ovStocks, ctrlCfg.prizes.map((p) => (p.quantity === -1 ? '不限' : p.remaining === 0 ? '抽完' : `剩 ${p.remaining}`)), '抽獎後覆蓋層一覽的剩餘與控制台一致');
     assert.deepEqual(ov.errors, []);
   });
 }

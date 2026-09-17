@@ -3,7 +3,7 @@
   const LW = (window.LW = window.LW || {});
   const { Wheel, Sfx, Confetti } = LuckyWheel;
   const { PALETTE, DEFAULT_CONFIG, randId, normalizeConfig, probabilities, drawsSinceHit, drawBatch, undoBatch } = LuckyCore;
-  const { $, $$, wait, esc, colorOf, toast, dialog, ask, isFlip, resultCards, scheduleFlipSounds, liveChip, applyTheme } = LW.ui;
+  const { $, $$, wait, esc, colorOf, toast, dialog, ask, isFlip, resultCards, scheduleFlipSounds, liveChip, renderPrizeListRows, applyTheme } = LW.ui;
 
   function startControl() {
     const { Store, Sync, Excel, KEYS } = LW;
@@ -21,6 +21,7 @@
       if (c.overlaySpinOnly) q.set('mode', 'spin');
       if (c.overlayMute) q.set('sound', '0');
       if (c.overlayHideStatus) q.set('status', '0');
+      if (c.overlayList) { q.set('list', '1'); if (!c.overlayListProb) q.set('lp', '0'); if (!c.overlayListStock) q.set('ls', '0'); }
       return `${location.origin}${location.pathname}?${q.toString()}`;
     }
     function markDirty(v = true) {
@@ -58,17 +59,7 @@
       $('#togglePrizeList').classList.toggle('primary', plPrefs.open);
       $('#plShowProb').checked = plPrefs.prob; $('#plShowStock').checked = plPrefs.stock;
       if (!plPrefs.open) return;
-      const probs = probabilities(state.config.prizes);
-      $('#prizeListRows').innerHTML = state.config.prizes.map((p, i) => {
-        const pr = probs[p.id]; const soldOut = p.remaining === 0;
-        return `<li class="${soldOut ? 'soldout' : ''}">
-          <span class="pl-dot" style="--c:${esc(colorOf(p, i))}">${p.image ? `<img src="${esc(p.image)}" alt="">` : ''}</span>
-          <span class="pl-name">${esc(p.name)}</span>
-          ${p.pity ? '<span class="pl-pity">保底</span>' : ''}
-          ${plPrefs.stock ? `<span class="pl-stock">${p.quantity === -1 ? '不限' : soldOut ? '抽完' : `剩 ${p.remaining}`}</span>` : ''}
-          ${plPrefs.prob ? `<span class="pl-prob">${pr == null ? '—' : `${pr.toFixed(pr < 10 ? 2 : 1)}%`}</span>` : ''}
-        </li>`;
-      }).join('') || '<li class="hint">還沒有獎項</li>';
+      renderPrizeListRows($('#prizeListRows'), state.config.prizes, plPrefs);
     }
     $('#togglePrizeList').addEventListener('click', () => { plPrefs.open = !plPrefs.open; savePlPrefs(); renderPrizeList(); });
     $('#plShowProb').addEventListener('change', (e) => { plPrefs.prob = e.target.checked; savePlPrefs(); renderPrizeList(); });
@@ -237,7 +228,7 @@
     // ======================================================================
     const SETTING_KEYS = ['segmentMode', 'turns', 'overlayResultSeconds', 'multiMode', 'minSlice', 'pityAccumN', 'pityBatchK', 'pityScope', 'theme', 'room', 'broker', 'overlaySize'];
     const SEC_KEYS = ['spinDuration', 'multiSpinDuration']; // 畫面用秒，內部存毫秒
-    const BOOL_KEYS = ['sound', 'sync', 'bg3d', 'pityAccum', 'pityBatch', 'overlaySpinOnly', 'overlayMute', 'overlayHideStatus'];
+    const BOOL_KEYS = ['sound', 'sync', 'bg3d', 'pityAccum', 'pityBatch', 'overlaySpinOnly', 'overlayMute', 'overlayHideStatus', 'overlayList', 'overlayListProb', 'overlayListStock'];
     function renderSettings() {
       const c = state.config;
       SETTING_KEYS.forEach((k) => { $(`#s-${k}`).value = c[k]; });

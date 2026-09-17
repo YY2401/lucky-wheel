@@ -3,7 +3,7 @@
   const LW = (window.LW = window.LW || {});
   const { Wheel, Sfx, Confetti } = LuckyWheel;
   const { DEFAULT_CONFIG, normalizeConfig, normalizePrize } = LuckyCore;
-  const { $, $$, wait, isFlip, flipTotal, resultCards, scheduleFlipSounds, liveChip, applyTheme } = LW.ui;
+  const { $, $$, wait, isFlip, flipTotal, resultCards, scheduleFlipSounds, liveChip, renderPrizeListRows, applyTheme } = LW.ui;
 
   function startOverlay(params) {
     const { Store, Sync, KEYS } = LW;
@@ -20,6 +20,10 @@
     const confetti = new Confetti($('#confetti'));
     const queue = []; let busy = false;
     if (mode === 'spin') stage.classList.add('out');
+    const showList = params.get('list') === '1';
+    const listOpts = { prob: params.get('lp') !== '0', stock: params.get('ls') !== '0' };
+    if (showList) $('#ovPrizeList').classList.remove('hidden');
+    const renderList = () => { if (showList) renderPrizeListRows($('#ovPrizeListRows'), config.prizes, listOpts); };
 
     // 先用本機快取的設定畫轉盤（同一瀏覽器直接共用，跨瀏覽器則等控制台回覆）
     let config = normalizeConfig(Store.get(KEYS.config, null) || Store.get(KEYS.overlayConfig, null) || DEFAULT_CONFIG);
@@ -31,6 +35,7 @@
       try { localStorage.setItem('lw.bg3d', config.bg3d ? '1' : '0'); } catch { /* ignore */ }
       applyTheme(params.get('theme') || config.theme, wheel);
       wheel.setPrizes(config.prizes, config.segmentMode, config.minSlice / 100);
+      renderList();
       if (window.WheelBG && params.get('bg') !== '0') WheelBG.setEnabled(config.bg3d);
     }
     if (params.get('status') !== '0') $('#ovStatus').classList.remove('hidden');
@@ -52,7 +57,7 @@
           if (d.results.length > 1) { liveChip($('#ovLive'), r); Sfx.pop(); await wait(350); }
         }
       }
-      if (d.prizes) { config.prizes = d.prizes.map(normalizePrize); Store.set(KEYS.overlayConfig, config); wheel.setPrizes(config.prizes, config.segmentMode, config.minSlice / 100); }
+      if (d.prizes) { config.prizes = d.prizes.map(normalizePrize); Store.set(KEYS.overlayConfig, config); wheel.setPrizes(config.prizes, config.segmentMode, config.minSlice / 100); renderList(); }
       Sfx.win(); confetti.burst(d.results.length > 1 ? 260 : 160);
       if (window.WheelBG) { WheelBG.setSpinning(false); WheelBG.burst(); }
       $('#ovResultCard').classList.toggle('single', d.results.length === 1);
