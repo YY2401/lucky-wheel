@@ -22,7 +22,7 @@
     if (mode === 'spin') stage.classList.add('out');
     const showList = params.get('list') === '1';
     const listOpts = { prob: params.get('lp') !== '0', stock: params.get('ls') !== '0' };
-    if (showList) $('#ovPrizeList').classList.remove('hidden');
+    if (showList) { const pl = $('#ovPrizeList'); pl.classList.remove('hidden'); const pos = params.get('lpos'); if (pos === 'c') pl.classList.add('centered'); else if (pos === 'tr') pl.classList.add('pos-tr'); }
     const renderList = () => { if (showList) renderPrizeListRows($('#ovPrizeListRows'), config.prizes, listOpts); };
 
     // 先用本機快取的設定畫轉盤（同一瀏覽器直接共用，跨瀏覽器則等控制台回覆）

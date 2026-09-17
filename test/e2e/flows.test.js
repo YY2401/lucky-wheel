@@ -126,7 +126,22 @@ if (!H.chromePath()) {
     await page.reload({ waitUntil: 'networkidle0' }); await H.sleep(400);
     assert.equal(await page.$eval('#prizeList', (e) => e.classList.contains('hidden')), false, '展開狀態記住');
     assert.equal(await page.$eval('#plShowProb', (e) => e.checked), false, '機率開關記住');
-    await page.click('#togglePrizeList'); await H.sleep(100);
+    // 拖曳：標題列按住拖到 (300,200)，位置記住；雙擊回原位；置中放大
+    const head = await page.$('#prizeListHead'); const hb = await head.boundingBox();
+    const start = await page.$eval('#prizeList', (e) => { const r = e.getBoundingClientRect(); return { left: r.left, top: r.top }; });
+    await page.mouse.move(hb.x + 10, hb.y + 10); await page.mouse.down(); await page.mouse.move(hb.x + 10 + 250, hb.y + 10 + 120, { steps: 5 }); await page.mouse.up(); await H.sleep(150);
+    const box = await page.$eval('#prizeList', (e) => { const r = e.getBoundingClientRect(); return { left: r.left, top: r.top }; });
+    assert.ok(Math.abs(box.left - (start.left + 250)) < 3 && Math.abs(box.top - (start.top + 120)) < 3, `拖曳後位置 ${box.left},${box.top}，預期 ${start.left + 250},${start.top + 120}`);
+    await page.reload({ waitUntil: 'networkidle0' }); await H.sleep(400);
+    const box2 = await page.$eval('#prizeList', (e) => ({ left: e.getBoundingClientRect().left }));
+    assert.ok(Math.abs(box2.left - (start.left + 250)) < 3, '拖曳位置重整後保留');
+    await page.click('#plCenter'); await H.sleep(150);
+    assert.equal(await page.$eval('#prizeList', (e) => e.classList.contains('centered')), true);
+    const cb = await page.$eval('#prizeList', (e) => { const r = e.getBoundingClientRect(); return Math.abs(r.left + r.width / 2 - innerWidth / 2) + Math.abs(r.top + r.height / 2 - innerHeight / 2); });
+    assert.ok(cb < 4, '置中模式在畫面正中間');
+    await page.click('#plCenter'); await page.click('#prizeListHead', { clickCount: 2 }); await H.sleep(150);
+    assert.ok(Math.abs((await page.$eval('#prizeList', (e) => e.getBoundingClientRect().left)) - 22) < 3, '雙擊回到原位');
+    await page.click('#plClose'); await H.sleep(100);
     assert.equal(await page.$eval('#prizeList', (e) => e.classList.contains('hidden')), true);
     assert.deepEqual(page.errors, []);
   });
@@ -182,7 +197,8 @@ if (!H.chromePath()) {
     const page = await fresh(t, { spinDuration: 600, multiSpinDuration: 300 });
     const room = (await H.readKey(page, 'lw.config')).room;
     const ov = await H.newPage(browser, { width: 1280, height: 720 }); t.after(() => ov.close());
-    await ov.goto(`${srv.url}/?overlay=1&room=${room}&sync=0&list=1&lp=0&t=${Date.now()}`, { waitUntil: 'networkidle0' }); await H.sleep(500);
+    await ov.goto(`${srv.url}/?overlay=1&room=${room}&sync=0&list=1&lp=0&lpos=c&t=${Date.now()}`, { waitUntil: 'networkidle0' }); await H.sleep(500);
+    assert.equal(await ov.$eval('#ovPrizeList', (e) => e.classList.contains('centered')), true, 'lpos=c 置中');
     assert.deepEqual(await ov.$$eval('#ovPrizeListRows .pl-name', (els) => els.map((e) => e.textContent)), ['特獎', '頭獎', '銘謝惠顧'], '覆蓋層獎項一覽');
     assert.equal(await ov.$$eval('#ovPrizeListRows .pl-prob', (els) => els.length), 0, 'lp=0 不顯示機率');
     await page.bringToFront(); await page.click('.open-panel[data-tab="settings"]'); await H.sleep(200);

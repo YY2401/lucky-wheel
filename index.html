@@ -7,7 +7,7 @@
 <script>try { document.documentElement.dataset.theme = localStorage.getItem('lw.theme') || 'light'; } catch (e) { document.documentElement.dataset.theme = 'light'; }</script>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=33">
+<link rel="stylesheet" href="style.css?v=34">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.1/mqtt.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
@@ -34,10 +34,12 @@
 </header>
 
 <aside class="prize-list control-only hidden" id="prizeList">
-  <div class="prize-list-head">
+  <div class="prize-list-head" id="prizeListHead" title="按住拖曳可移動；雙擊回到原位">
     <span class="prize-list-title">獎項</span>
     <label class="check"><input type="checkbox" id="plShowProb"> 機率</label>
     <label class="check"><input type="checkbox" id="plShowStock"> 剩餘</label>
+    <button class="btn icon" id="plCenter" title="放大置中，方便向大家說明">置中放大</button>
+    <button class="btn icon" id="plClose" title="收合">✕</button>
   </div>
   <ul id="prizeListRows"></ul>
 </aside>
@@ -193,6 +195,13 @@
           <label class="switch"><input type="checkbox" id="s-overlayListProb"><span class="track"></span><span class="switch-label">一覽裡顯示機率</span></label>
           <label class="switch"><input type="checkbox" id="s-overlayListStock"><span class="track"></span><span class="switch-label">一覽裡顯示剩餘數量</span></label>
         </div>
+        <label style="padding-left:24px">一覽放在哪裡
+          <select id="s-overlayListPos">
+            <option value="tl">左上角</option>
+            <option value="tr">右上角</option>
+            <option value="c">正中間放大（適合向觀眾說明獎項時用）</option>
+          </select>
+        </label>
         <div><button class="btn primary" id="saveSettings">儲存設定</button></div>
 
         <h3>把畫面加進 OBS</h3>
@@ -295,15 +304,15 @@
 <canvas id="confetti"></canvas>
 <div id="toast"></div>
 
-<script src="core.js?v=33"></script>
-<script src="wheel.js?v=33"></script>
-<script src="ui.js?v=33"></script>
-<script src="store.js?v=33"></script>
-<script src="sync.js?v=33"></script>
-<script src="excel.js?v=33"></script>
-<script src="overlay.js?v=33"></script>
-<script src="control.js?v=33"></script>
-<script src="app.js?v=33"></script>
-<script src="bg.js?v=33"></script>
+<script src="core.js?v=34"></script>
+<script src="wheel.js?v=34"></script>
+<script src="ui.js?v=34"></script>
+<script src="store.js?v=34"></script>
+<script src="sync.js?v=34"></script>
+<script src="excel.js?v=34"></script>
+<script src="overlay.js?v=34"></script>
+<script src="control.js?v=34"></script>
+<script src="app.js?v=34"></script>
+<script src="bg.js?v=34"></script>
 </body>
 </html>

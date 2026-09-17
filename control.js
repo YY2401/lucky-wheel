@@ -21,7 +21,7 @@
       if (c.overlaySpinOnly) q.set('mode', 'spin');
       if (c.overlayMute) q.set('sound', '0');
       if (c.overlayHideStatus) q.set('status', '0');
-      if (c.overlayList) { q.set('list', '1'); if (!c.overlayListProb) q.set('lp', '0'); if (!c.overlayListStock) q.set('ls', '0'); }
+      if (c.overlayList) { q.set('list', '1'); if (!c.overlayListProb) q.set('lp', '0'); if (!c.overlayListStock) q.set('ls', '0'); if (c.overlayListPos !== 'tl') q.set('lpos', c.overlayListPos); }
       return `${location.origin}${location.pathname}?${q.toString()}`;
     }
     function markDirty(v = true) {
@@ -50,11 +50,17 @@
     // ======================================================================
     //  獎項一覽（首頁左上角可收合的清單）
     // ======================================================================
-    const plPrefs = Object.assign({ open: false, prob: true, stock: true }, Store.get(KEYS.prizeList, {}));
+    const plPrefs = Object.assign({ open: false, prob: true, stock: true, center: false, x: null, y: null }, Store.get(KEYS.prizeList, {}));
     function savePlPrefs() { Store.set(KEYS.prizeList, plPrefs); }
     function renderPrizeList() {
       const panel = $('#prizeList');
       panel.classList.toggle('hidden', !plPrefs.open);
+      panel.classList.toggle('centered', plPrefs.center);
+      $('#plCenter').classList.toggle('primary', plPrefs.center);
+      $('#plCenter').textContent = plPrefs.center ? '回到角落' : '置中放大';
+      // 置中模式不吃自訂位置；角落模式若拖曳過就用記住的座標
+      if (!plPrefs.center && plPrefs.x != null) { panel.style.left = `${plPrefs.x}px`; panel.style.top = `${plPrefs.y}px`; }
+      else { panel.style.left = ''; panel.style.top = ''; }
       $('#togglePrizeList').setAttribute('aria-expanded', String(plPrefs.open));
       $('#togglePrizeList').classList.toggle('primary', plPrefs.open);
       $('#plShowProb').checked = plPrefs.prob; $('#plShowStock').checked = plPrefs.stock;
@@ -62,6 +68,29 @@
       renderPrizeListRows($('#prizeListRows'), state.config.prizes, plPrefs);
     }
     $('#togglePrizeList').addEventListener('click', () => { plPrefs.open = !plPrefs.open; savePlPrefs(); renderPrizeList(); });
+    $('#plClose').addEventListener('click', () => { plPrefs.open = false; savePlPrefs(); renderPrizeList(); });
+    $('#plCenter').addEventListener('click', () => { plPrefs.center = !plPrefs.center; savePlPrefs(); renderPrizeList(); });
+    // 拖曳標題列移動面板；雙擊標題列回到預設位置
+    (() => {
+      const head = $('#prizeListHead'); const panel = $('#prizeList');
+      let drag = null;
+      head.addEventListener('pointerdown', (e) => {
+        if (e.target.closest('button, input, label') || plPrefs.center) return;
+        const r = panel.getBoundingClientRect();
+        drag = { dx: e.clientX - r.left, dy: e.clientY - r.top };
+        head.setPointerCapture(e.pointerId); panel.classList.add('dragging');
+      });
+      head.addEventListener('pointermove', (e) => {
+        if (!drag) return;
+        const w = panel.offsetWidth, h = panel.offsetHeight;
+        plPrefs.x = Math.min(Math.max(0, e.clientX - drag.dx), window.innerWidth - w);
+        plPrefs.y = Math.min(Math.max(0, e.clientY - drag.dy), window.innerHeight - Math.min(h, 80));
+        panel.style.left = `${plPrefs.x}px`; panel.style.top = `${plPrefs.y}px`;
+      });
+      const end = () => { if (!drag) return; drag = null; panel.classList.remove('dragging'); savePlPrefs(); };
+      head.addEventListener('pointerup', end); head.addEventListener('pointercancel', end);
+      head.addEventListener('dblclick', (e) => { if (e.target.closest('button, input, label')) return; plPrefs.x = plPrefs.y = null; savePlPrefs(); renderPrizeList(); });
+    })();
     $('#plShowProb').addEventListener('change', (e) => { plPrefs.prob = e.target.checked; savePlPrefs(); renderPrizeList(); });
     $('#plShowStock').addEventListener('change', (e) => { plPrefs.stock = e.target.checked; savePlPrefs(); renderPrizeList(); });
 
@@ -226,7 +255,7 @@
     // ======================================================================
     //  設定頁
     // ======================================================================
-    const SETTING_KEYS = ['segmentMode', 'turns', 'overlayResultSeconds', 'multiMode', 'minSlice', 'pityAccumN', 'pityBatchK', 'pityScope', 'theme', 'room', 'broker', 'overlaySize'];
+    const SETTING_KEYS = ['segmentMode', 'turns', 'overlayResultSeconds', 'multiMode', 'minSlice', 'pityAccumN', 'pityBatchK', 'pityScope', 'theme', 'room', 'broker', 'overlaySize', 'overlayListPos'];
     const SEC_KEYS = ['spinDuration', 'multiSpinDuration']; // 畫面用秒，內部存毫秒
     const BOOL_KEYS = ['sound', 'sync', 'bg3d', 'pityAccum', 'pityBatch', 'overlaySpinOnly', 'overlayMute', 'overlayHideStatus', 'overlayList', 'overlayListProb', 'overlayListStock'];
     function renderSettings() {
