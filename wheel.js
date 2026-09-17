@@ -6,16 +6,43 @@
 
   function norm(a) { a %= TAU; return a < 0 ? a + TAU : a; }
 
+  function loadStill(src) {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => resolve(null);
+      img.src = src;
+    });
+  }
+  // GIF 動圖：canvas 的 drawImage 只會畫 <img> 的第一格，所以用 ImageDecoder（Chrome / Edge / OBS）把每一格解出來，
+  // draw 時依時間挑格。不支援或解不開（跨網域等）就退回靜態第一格
+  const GIF_MAX_FRAMES = 200;
+  const isGif = (src) => /^data:image\/gif[;,]/i.test(src) || /\.gif($|[?#])/i.test(src);
+  async function loadGif(src) {
+    if (typeof ImageDecoder === 'undefined') return loadStill(src);
+    try {
+      const data = await (await fetch(src)).arrayBuffer();
+      const dec = new ImageDecoder({ data, type: 'image/gif' });
+      await dec.tracks.ready;
+      const track = dec.tracks.selectedTrack;
+      const n = Math.min(GIF_MAX_FRAMES, track ? track.frameCount : 1);
+      if (n <= 1) { dec.close(); return loadStill(src); }
+      const frames = []; let total = 0;
+      for (let i = 0; i < n; i++) {
+        const { image } = await dec.decode({ frameIndex: i });
+        const dur = Math.max(20, (image.duration || 100000) / 1000); // µs → ms，太短的延遲瀏覽器也是當 ~20ms
+        frames.push({ image, at: total }); total += dur;
+      }
+      dec.close();
+      return { animated: true, frames, total, width: frames[0].image.displayWidth, height: frames[0].image.displayHeight,
+        indexAt(t) { const m = t % total; let lo = 0, hi = frames.length - 1; while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (frames[mid].at <= m) lo = mid; else hi = mid - 1; } return lo; },
+        frameAt(t) { return frames[this.indexAt(t)].image; },
+        nextChangeIn(t) { const m = t % total; const i = this.indexAt(t); return (i + 1 < frames.length ? frames[i + 1].at : total) - m; } };
+    } catch { return loadStill(src); }
+  }
   function loadImage(src) {
     if (!src) return Promise.resolve(null);
-    if (!imgCache.has(src)) {
-      imgCache.set(src, new Promise((resolve) => {
-        const img = new Image();
-        img.onload = () => resolve(img);
-        img.onerror = () => resolve(null);
-        img.src = src;
-      }));
-    }
+    if (!imgCache.has(src)) imgCache.set(src, isGif(src) ? loadGif(src) : loadStill(src));
     return imgCache.get(src);
   }
 
@@ -58,6 +85,17 @@
       this._ro = new ResizeObserver(() => { this.resize(); this.draw(); });
       this._ro.observe(canvas);
       this._idle = setInterval(() => { if (!this.spinning) { this.ledPhase++; this.draw(); } }, 500);
+      this._animTimer = null;
+    }
+
+    // 有 GIF 動圖時，閒置狀態要在「下一格該換」的時間點重畫（轉動中本來就每幀重畫，不用管）
+    _animate() {
+      clearTimeout(this._animTimer); this._animTimer = null;
+      const anim = [...this.images.values()].filter((i) => i && i.animated);
+      if (!anim.length) return;
+      const now = performance.now();
+      const wait = Math.max(16, Math.min(1000, ...anim.map((a) => a.nextChangeIn(now))));
+      this._animTimer = setTimeout(() => { if (!this.spinning) this.draw(); this._animate(); }, wait + 1);
     }
 
     setTheme(t) { this.theme = Object.assign({}, this.theme, t || {}); this.draw(); }
@@ -82,7 +120,9 @@
         const img = await loadImage(p.image);
         if (img) this.images.set(p.id, img); else this.images.delete(p.id);
       }));
+      this.images.forEach((img, id) => { if (!prizes.some((p) => p.id === id)) this.images.delete(id); });
       this.draw();
+      this._animate();
     }
 
     currentSegment() {
@@ -140,7 +180,8 @@
         ctx.rotate(seg.start + seg.span / 2);
         ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, R - 2, -seg.span / 2, seg.span / 2); ctx.closePath(); ctx.clip();
         if (seg.soldOut) ctx.globalAlpha = 0.55;
-        const img = this.images.get(seg.prize.id);
+        const src = this.images.get(seg.prize.id);
+        const img = src && src.animated ? src.frameAt(performance.now()) : src;
         const chord = 2 * R * 0.7 * Math.sin(Math.min(seg.span, Math.PI) / 2);
         const mid = seg.start + seg.span / 2;
         const screenAngle = norm(mid + this.rotation); // 扇區目前在畫面上的方向

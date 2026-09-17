@@ -2,7 +2,7 @@
 (function () {
   const LW = (window.LW = window.LW || {});
   const { Wheel, Sfx, Confetti } = LuckyWheel;
-  const { PALETTE, DEFAULT_CONFIG, randId, normalizeConfig, probabilities, drawsSinceHit, drawBatch, undoBatch } = LuckyCore;
+  const { PALETTE, DEFAULT_CONFIG, randId, normalizeConfig, probabilities, suggestWeights, drawsSinceHit, drawBatch, undoBatch } = LuckyCore;
   const { $, $$, wait, esc, colorOf, toast, dialog, ask, isFlip, resultCards, scheduleFlipSounds, liveChip, renderPrizeListRows, applyTheme } = LW.ui;
 
   function startControl() {
@@ -115,7 +115,7 @@
       const tr = document.createElement('tr'); tr.dataset.id = id;
       tr.innerHTML = `
         <td><div style="display:flex;gap:6px;align-items:center">
-          <div class="thumb" title="點擊上傳圖片"></div>
+          <div class="thumb" title="點擊上傳圖片（支援 GIF 動圖）"></div>
           <div class="thumb-actions"><button class="f-url">網址</button><button class="f-clearimg">清除</button></div>
           <input type="file" accept="image/*" class="f-file" hidden>
         </div></td>
@@ -206,11 +206,15 @@
       });
     }
     // 圖片縮小後以 data URL 存在瀏覽器（webp 支援透明且檔案小）
+    // GIF 不能過 canvas（會只剩第一格），原檔直接存；設定會透過同步送到 OBS，所以限制大小
+    const GIF_MAX = 2 * 1024 * 1024;
     function downscale(file, max) {
       return new Promise((resolve, reject) => {
+        if (file.type === 'image/gif' && file.size > GIF_MAX) return reject(new Error(`GIF 超過 ${GIF_MAX / 1024 / 1024} MB，請先壓縮或改用「網址」`));
         const reader = new FileReader();
         reader.onerror = () => reject(new Error('讀取檔案失敗'));
         reader.onload = () => {
+          if (file.type === 'image/gif') return resolve(reader.result);
           if (file.type === 'image/svg+xml' && file.size < 60000) return resolve(reader.result);
           const img = new Image();
           img.onload = () => {
@@ -233,6 +237,38 @@
       const n = state.config.prizes.length;
       state.config.prizes.push({ id: `p_${randId(8)}`, name: `獎項 ${n + 1}`, weight: 10, quantity: -1, remaining: -1, image: '', color: PALETTE[n % PALETTE.length] });
       markDirty(); renderPrizeRows(); updateWheel();
+    });
+    // 建議機率：依數量反推權重，先在視窗裡預覽，套用後才寫進權重欄（仍需儲存）
+    $('#suggestWeights').addEventListener('click', () => {
+      const m = $('#suggestModal'); const inp = $('#suggestDraws');
+      const s0 = suggestWeights(state.config.prizes, 0);
+      if (!s0.stock && !s0.rows.some((r) => r.weight > 0)) { toast('先幫獎項填數量（或權重），才能算建議機率'); return; }
+      inp.value = s0.draws || '';
+      const fmt = (v) => (v === 0 ? '0%' : v < 0.01 ? '<0.01%' : `${v.toFixed(2)}%`);
+      let last = s0;
+      const render = () => {
+        last = suggestWeights(state.config.prizes, inp.value);
+        $('#suggestNote').textContent = last.capped ? `不能少於總庫存 ${last.stock}，已改成 ${last.draws}` : last.stock ? `限量獎項共 ${last.stock} 個` : '';
+        $('#suggestRows').innerHTML = last.rows.map((r) => {
+          const d = r.suggested - r.current; const cls = Math.abs(d) < 0.005 ? '' : d > 0 ? ' up' : ' down';
+          const arrow = Math.abs(d) < 0.005 ? '' : d > 0 ? ' ↑' : ' ↓';
+          const every = r.every ? (r.every < 1.05 ? '幾乎每抽' : `約每 ${r.every >= 100 ? Math.round(r.every) : r.every.toFixed(1)} 抽`) : '不會出現';
+          return `<tr class="${r.weight ? '' : 'zero'}"><td>${esc(r.name)}</td><td class="num">${r.quantity === -1 ? '∞' : r.quantity}</td><td class="num">${fmt(r.current)}</td><td class="num${cls}">${fmt(r.suggested)}${arrow}</td><td class="num">${every}</td></tr>`;
+        }).join('');
+      };
+      render();
+      inp.oninput = render;
+      const close = () => { m.classList.add('hidden'); inp.oninput = null; $('#suggestApply').onclick = null; $('#suggestCancel').onclick = null; m.onclick = null; document.removeEventListener('keydown', onKey); };
+      const onKey = (e) => { if (e.key === 'Escape') close(); };
+      $('#suggestCancel').onclick = close;
+      m.onclick = (e) => { if (e.target === m) close(); };
+      $('#suggestApply').onclick = () => {
+        last.rows.forEach((r) => { const p = state.config.prizes.find((x) => x.id === r.id); if (p) p.weight = r.weight; });
+        close(); markDirty(); updateWheel(); toast('已套用建議機率到權重，記得儲存設定');
+      };
+      document.addEventListener('keydown', onKey);
+      m.classList.remove('hidden');
+      setTimeout(() => inp.focus(), 50);
     });
     $('#resetStock').addEventListener('click', async () => {
       if (!(await ask('把所有獎項的剩餘數量重置為原始數量？', { title: '重置庫存', okLabel: '重置' }))) return;

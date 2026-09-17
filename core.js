@@ -1,4 +1,4 @@
-/* 純邏輯：設定正規化、機率、抽獎、保底。不碰 DOM，瀏覽器與 Node 都能用（Node 端用來跑測試） */
+/* 純邏輯：設定正規化、機率、建議機率、抽獎、保底。不碰 DOM，瀏覽器與 Node 都能用（Node 端用來跑測試） */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
   else root.LuckyCore = factory();
@@ -80,6 +80,33 @@
     return pl[pl.length - 1];
   }
 
+  // ---------- 建議機率：依「數量」反推每個獎項該給多少機率 ----------
+  // 想法：預計總共抽 N 次，數量 q 的獎項機率設 q / N，平均剛好在第 N 抽左右送完（大獎數量少 → 機率自然低）。
+  // 無限量的獎項（銘謝惠顧、小獎）分掉剩下的機率，比例照它們目前的權重。
+  // 回傳 { draws, rows: [{ id, name, quantity, current, suggested, weight, every }], capped }
+  function suggestWeights(prizes, expectedDraws) {
+    const limited = prizes.filter((p) => p.quantity > 0);
+    const unlimited = prizes.filter((p) => p.quantity === -1 && p.weight > 0);
+    const stock = limited.reduce((s, p) => s + p.quantity, 0);
+    let draws = Math.trunc(Number(expectedDraws)) || 0;
+    if (draws < 1) draws = unlimited.length ? stock * 2 : stock; // 預設：有無限量獎就抓庫存的兩倍（一半機率槓龜），沒有就剛好抽完
+    let capped = false;
+    if (draws < stock) { draws = stock; capped = true; } // 抽數比庫存少，機率會超過 100%，退回剛好抽完
+    const current = probabilities(prizes);
+    const limitedShare = draws ? Math.min(1, stock / draws) : 0;
+    const rest = 1 - limitedShare;
+    const uw = unlimited.reduce((s, p) => s + p.weight, 0);
+    const rows = prizes.map((p) => {
+      let share = 0;
+      if (p.quantity > 0) share = draws ? p.quantity / draws : 0;
+      else if (p.quantity === -1 && p.weight > 0 && uw > 0) share = rest * (p.weight / uw);
+      const suggested = share * 100;
+      const weight = suggested > 0 ? Math.max(0.01, Math.round(suggested * 100) / 100) : 0;
+      return { id: p.id, name: p.name, quantity: p.quantity, current: current[p.id] == null ? 0 : current[p.id], suggested, weight, every: share > 0 ? 1 / share : 0 };
+    });
+    return { draws: draws || 0, stock, rows, capped };
+  }
+
   // ---------- 保底：從紀錄反推「距上次抽中保底獎已經幾抽」，撤銷後自動正確 ----------
   function drawsSinceHit(records, cfg, player) {
     const key = cfg.pityScope === 'global' ? null : (player || '');
@@ -127,5 +154,5 @@
     return { batch, records: records.filter((r) => r.batchId !== batchId) };
   }
 
-  return { PALETTE, DEFAULT_CONFIG, formatTime, randId, rand, normalizePrize, normalizeConfig, pool, pityPool, probabilities, drawOne, drawsSinceHit, drawBatch, undoBatch };
+  return { PALETTE, DEFAULT_CONFIG, formatTime, randId, rand, normalizePrize, normalizeConfig, pool, pityPool, probabilities, drawOne, suggestWeights, drawsSinceHit, drawBatch, undoBatch };
 });

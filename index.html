@@ -7,7 +7,7 @@
 <script>try { document.documentElement.dataset.theme = localStorage.getItem('lw.theme') || 'light'; } catch (e) { document.documentElement.dataset.theme = 'light'; }</script>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=34">
+<link rel="stylesheet" href="style.css?v=35">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.1/mqtt.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
@@ -92,6 +92,7 @@
       </div>
       <div class="row-actions">
         <button class="btn" id="addPrize">新增獎項</button>
+        <button class="btn" id="suggestWeights" title="依數量算出每個獎項該給多少機率">建議機率</button>
         <button class="btn" id="resetStock">重置庫存</button>
         <span class="spacer"></span>
         <span id="dirtyHint"></span>
@@ -99,7 +100,9 @@
       </div>
       <p class="hint">
         <b>權重</b>是「相對容易抽到的程度」，數字越大越容易中，機率會自動算出來（例如權重 1、5、94 就是 1%、5%、94%）。某個獎項抽完後會自動退出，剩下的獎項機率會重新分配。<br>
+        <b>不知道權重怎麼設？</b>按「建議機率」，會依每個獎項的數量算好（數量少的大獎機率低、抽完剛好用完）。<br>
         <b>數量</b>勾「無限」就是不限量；<b>剩餘</b>可以手動改。<b>保底</b>打勾的獎項會在保底時被抽出（要到「設定」把保底規則打開才有作用）。<br>
+        <b>圖片</b>可以上傳 GIF 動圖（2 MB 內）或貼 GIF 網址，結果卡、獎項一覽、轉盤上都會動。<br>
         按抽獎前會自動幫你儲存。設定存在這台電腦的瀏覽器裡，換電腦請用「匯出設定」帶走。
       </p>
       <div class="row-actions">
@@ -292,6 +295,21 @@
   </div>
 </div>
 
+<div class="modal hidden control-only" id="suggestModal">
+  <div class="modal-box suggest-box">
+    <h3>建議機率</h3>
+    <p class="msg">依「數量」反推機率：預計總共抽 N 次，數量 q 的獎項機率＝q ÷ N，平均會在第 N 抽左右剛好送完，大獎數量少、機率自然低。無限量的獎項分掉剩下的機率（比例照目前權重）。</p>
+    <label class="suggest-draws">預計總抽數 <input type="number" id="suggestDraws" min="1" max="100000"> <small id="suggestNote"></small></label>
+    <div class="table-scroll">
+      <table class="prize-table suggest-table">
+        <thead><tr><th>獎項</th><th>數量</th><th>目前機率</th><th>建議機率</th><th>平均每幾抽出 1 次</th></tr></thead>
+        <tbody id="suggestRows"></tbody>
+      </table>
+    </div>
+    <p class="hint">套用後會把「權重」欄改成建議機率的數字（權重＝機率 %），還沒儲存，看過覺得可以再按「儲存設定」。以原始數量計算，抽到一半想重算請先「重置庫存」。</p>
+    <div class="modal-actions"><button class="btn" id="suggestCancel">取消</button><button class="btn primary" id="suggestApply">套用到權重</button></div>
+  </div>
+</div>
 <div class="modal hidden control-only" id="confirmModal">
   <div class="modal-box">
     <h3 id="confirmTitle">確認</h3>
@@ -304,15 +322,15 @@
 <canvas id="confetti"></canvas>
 <div id="toast"></div>
 
-<script src="core.js?v=34"></script>
-<script src="wheel.js?v=34"></script>
-<script src="ui.js?v=34"></script>
-<script src="store.js?v=34"></script>
-<script src="sync.js?v=34"></script>
-<script src="excel.js?v=34"></script>
-<script src="overlay.js?v=34"></script>
-<script src="control.js?v=34"></script>
-<script src="app.js?v=34"></script>
-<script src="bg.js?v=34"></script>
+<script src="core.js?v=35"></script>
+<script src="wheel.js?v=35"></script>
+<script src="ui.js?v=35"></script>
+<script src="store.js?v=35"></script>
+<script src="sync.js?v=35"></script>
+<script src="excel.js?v=35"></script>
+<script src="overlay.js?v=35"></script>
+<script src="control.js?v=35"></script>
+<script src="app.js?v=35"></script>
+<script src="bg.js?v=35"></script>
 </body>
 </html>

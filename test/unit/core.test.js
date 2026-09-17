@@ -138,3 +138,45 @@ test('drawsSinceHit：撤銷後計數自動回到正確值', () => {
   const after = core.undoBatch(recs, c.prizes, 'B').records;
   assert.equal(core.drawsSinceHit(after, c, 'x'), 3);
 });
+
+test('suggestWeights：數量 q / 總抽數 N ＝ 建議機率，無限量獎項分掉剩餘', () => {
+  const ps = core.normalizeConfig({ prizes: [
+    { id: 'a', name: '特獎', weight: 1, quantity: 1 }, { id: 'b', name: '頭獎', weight: 1, quantity: 3 },
+    { id: 'c', name: '二獎', weight: 1, quantity: 10 }, { id: 'd', name: '銘謝惠顧', weight: 1, quantity: -1 },
+  ] }).prizes;
+  const r = core.suggestWeights(ps, 100);
+  assert.equal(r.stock, 14);
+  assert.equal(r.draws, 100);
+  assert.equal(r.capped, false);
+  const by = Object.fromEntries(r.rows.map((x) => [x.id, x]));
+  assert.equal(by.a.weight, 1); assert.equal(by.b.weight, 3); assert.equal(by.c.weight, 10); assert.equal(by.d.weight, 86);
+  assert.equal(by.a.every, 100, '特獎平均每 100 抽出現一次');
+  assert.ok(Math.abs(r.rows.reduce((s, x) => s + x.suggested, 0) - 100) < 1e-9, '建議機率加總 100%');
+});
+
+test('suggestWeights：沒有無限量獎項時，權重＝數量（大家同時抽完）；抽數少於庫存會被拉高', () => {
+  const ps = core.normalizeConfig({ prizes: [{ id: 'a', weight: 50, quantity: 1 }, { id: 'b', weight: 50, quantity: 3 }] }).prizes;
+  const r = core.suggestWeights(ps, 0);
+  assert.equal(r.draws, 4);
+  assert.deepEqual(r.rows.map((x) => x.weight), [25, 75]);
+  const c = core.suggestWeights(ps, 2);
+  assert.equal(c.capped, true); assert.equal(c.draws, 4);
+});
+
+test('suggestWeights：多個無限量獎項照目前權重比例分；數量 0 的獎項不分機率', () => {
+  const ps = core.normalizeConfig({ prizes: [
+    { id: 'a', weight: 1, quantity: 5 }, { id: 'x', weight: 30, quantity: -1 }, { id: 'y', weight: 10, quantity: -1 }, { id: 'z', weight: 5, quantity: 0 },
+  ] }).prizes;
+  const by = Object.fromEntries(core.suggestWeights(ps, 50).rows.map((r) => [r.id, r]));
+  assert.equal(by.a.suggested, 10);
+  assert.ok(Math.abs(by.x.suggested - 67.5) < 1e-9);
+  assert.ok(Math.abs(by.y.suggested - 22.5) < 1e-9);
+  assert.equal(by.z.weight, 0);
+});
+
+test('suggestWeights：極小機率不會被四捨五入成 0', () => {
+  const ps = core.normalizeConfig({ prizes: [{ id: 'a', weight: 1, quantity: 1 }, { id: 'b', weight: 1, quantity: -1 }] }).prizes;
+  const by = Object.fromEntries(core.suggestWeights(ps, 100000).rows.map((r) => [r.id, r]));
+  assert.equal(by.a.weight, 0.01);
+  assert.ok(by.a.suggested > 0 && by.a.suggested < 0.01);
+});

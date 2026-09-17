@@ -215,4 +215,38 @@ if (!H.chromePath()) {
     assert.deepEqual(ovStocks, ctrlCfg.prizes.map((p) => (p.quantity === -1 ? '不限' : p.remaining === 0 ? '抽完' : `剩 ${p.remaining}`)), '抽獎後覆蓋層一覽的剩餘與控制台一致');
     assert.deepEqual(ov.errors, []);
   });
+
+  test('建議機率：預覽依數量算出、改總抽數即時重算、套用後權重更新且標記未儲存', async (t) => {
+    const page = await fresh(t);
+    await page.click('.open-panel[data-tab="prizes"]'); await H.sleep(300);
+    await page.click('#suggestWeights'); await H.sleep(200);
+    assert.equal(await page.$eval('#suggestModal', (e) => !e.classList.contains('hidden')), true);
+    assert.equal(await page.$eval('#suggestDraws', (e) => e.value), '8', '預設：有無限量獎項 → 庫存 4 的兩倍');
+    assert.deepEqual(await page.$$eval('#suggestRows tr td:nth-child(4)', (els) => els.map((e) => e.textContent.replace(/[↑↓ ]/g, ''))), ['12.50%', '37.50%', '50.00%']);
+    await page.click('#suggestDraws', { clickCount: 3 }); await page.type('#suggestDraws', '100'); await H.sleep(150);
+    assert.deepEqual(await page.$$eval('#suggestRows tr td:nth-child(4)', (els) => els.map((e) => e.textContent.replace(/[↑↓ ]/g, ''))), ['1.00%', '3.00%', '96.00%']);
+    await page.click('#suggestApply'); await H.sleep(200);
+    assert.equal(await page.$eval('#suggestModal', (e) => e.classList.contains('hidden')), true);
+    assert.deepEqual(await page.$$eval('#prizeRows .f-weight', (els) => els.map((e) => Number(e.value))), [1, 3, 96]);
+    assert.equal(await page.$eval('#prizeRows tr:nth-child(1) .prob', (e) => e.textContent), '1.00%');
+    assert.match(await page.$eval('#dirtyHint', (e) => e.textContent), /未儲存/);
+    assert.deepEqual(page.errors, []);
+  });
+
+  test('GIF 動圖：轉盤會逐格換圖（不是只畫第一格）', async (t) => {
+    const page = await fresh(t, { prizes: [{ id: 'g', name: 'GIF', weight: 1, quantity: -1, remaining: -1, image: '/test/e2e/anim.gif' }, { id: 'c', name: '銘謝惠顧', weight: 1, quantity: -1, remaining: -1 }] });
+    await H.sleep(500);
+    const seen = await page.evaluate(async () => {
+      const c = document.querySelector('#wheel'); const ctx = c.getContext('2d'); const colors = new Set();
+      const isTest = (r, g, b) => (r > 240 && g < 20 && b < 20) || (g > 180 && r < 20 && b < 20) || (b > 240 && r < 20 && g < 20) || (r > 240 && g > 200 && g < 240 && b < 20);
+      for (let k = 0; k < 16; k++) {
+        const d = ctx.getImageData(0, 0, c.width, c.height).data;
+        for (let j = 0; j < d.length; j += 4) if (isTest(d[j], d[j + 1], d[j + 2])) colors.add(`${d[j]},${d[j + 1]},${d[j + 2]}`);
+        await new Promise((r) => setTimeout(r, 110));
+      }
+      return [...colors];
+    });
+    assert.ok(seen.length >= 3, `1.7 秒內至少應看到 3 種格子顏色，實際：${seen.join(' / ')}`);
+    assert.deepEqual(page.errors, []);
+  });
 }
