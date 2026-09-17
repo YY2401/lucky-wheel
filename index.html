@@ -7,7 +7,7 @@
 <script>try { document.documentElement.dataset.theme = localStorage.getItem('lw.theme') || 'light'; } catch (e) { document.documentElement.dataset.theme = 'light'; }</script>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=35">
+<link rel="stylesheet" href="style.css?v=36">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.1/mqtt.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
@@ -48,7 +48,8 @@
   <section class="stage">
     <div class="wheel-wrap"><canvas id="wheel"></canvas></div>
     <div class="controls">
-      <input id="player" placeholder="抽獎者 / 備註（會一起寫進 Excel）" maxlength="60">
+      <input id="player" placeholder="抽獎者 / 備註（會一起寫進 Excel）" maxlength="60" list="playerNames" autocomplete="off">
+      <datalist id="playerNames"></datalist>
       <div class="pity-info hidden" id="pityInfo"></div>
       <div class="spin-buttons">
         <button class="btn spin-btn" data-count="1">單抽</button>
@@ -186,7 +187,7 @@
         </div>
         <label>配對代碼
           <div style="display:flex;gap:6px"><input id="s-room" maxlength="24" style="flex:1"><button class="btn" id="newRoom" type="button">換一組</button></div>
-          <small>控制台和 OBS 畫面靠這組代碼認彼此，網址會自動帶上；不用改，除非你想跟別人的區分開。</small>
+          <small>控制台和 OBS 畫面靠這組代碼認彼此，網址會自動帶上（連同一組只有你知道的金鑰，別人無法假造訊息）。按「換一組」會連金鑰一起換，之後要重新複製網址貼進 OBS。</small>
         </label>
         <label>OBS 畫面裡轉盤的大小（像素）<input type="number" id="s-overlaySize" min="200" max="2000" step="20"></label>
         <label>結果顯示幾秒後自動消失 <input type="number" id="s-overlayResultSeconds" min="1" max="120"></label>
@@ -259,7 +260,7 @@
       </details>
       <div class="table-scroll">
         <table class="records-table">
-          <thead><tr><th>時間</th><th>抽獎者</th><th>類型</th><th>#</th><th>獎項</th><th>剩餘</th><th>機率</th><th>保底</th></tr></thead>
+          <thead><tr><th>時間</th><th>抽獎者</th><th>類型</th><th>#</th><th>獎項</th><th>剩餘</th><th>機率</th><th>保底</th><th></th></tr></thead>
           <tbody id="recordRows"></tbody>
         </table>
       </div>
@@ -310,6 +311,13 @@
     <div class="modal-actions"><button class="btn" id="suggestCancel">取消</button><button class="btn primary" id="suggestApply">套用到權重</button></div>
   </div>
 </div>
+<div class="modal hidden control-only" id="lockScreen">
+  <div class="modal-box" style="text-align:center;width:min(520px,100%)">
+    <h3 style="margin:0 0 10px;font-size:22px">另一個分頁已經開著控制台</h3>
+    <p class="hint" style="font-size:15px">兩個控制台同時操作會互相蓋掉資料，所以這個分頁先鎖住。請回到原本的分頁操作，或按下面按鈕改由這個分頁接手（原分頁會被鎖住）。</p>
+    <div class="modal-actions"><button class="btn primary" id="takeover">改由這個分頁接手</button></div>
+  </div>
+</div>
 <div class="modal hidden control-only" id="confirmModal">
   <div class="modal-box">
     <h3 id="confirmTitle">確認</h3>
@@ -322,15 +330,15 @@
 <canvas id="confetti"></canvas>
 <div id="toast"></div>
 
-<script src="core.js?v=35"></script>
-<script src="wheel.js?v=35"></script>
-<script src="ui.js?v=35"></script>
-<script src="store.js?v=35"></script>
-<script src="sync.js?v=35"></script>
-<script src="excel.js?v=35"></script>
-<script src="overlay.js?v=35"></script>
-<script src="control.js?v=35"></script>
-<script src="app.js?v=35"></script>
-<script src="bg.js?v=35"></script>
+<script src="core.js?v=36"></script>
+<script src="wheel.js?v=36"></script>
+<script src="ui.js?v=36"></script>
+<script src="store.js?v=36"></script>
+<script src="sync.js?v=36"></script>
+<script src="excel.js?v=36"></script>
+<script src="overlay.js?v=36"></script>
+<script src="control.js?v=36"></script>
+<script src="app.js?v=36"></script>
+<script src="bg.js?v=36"></script>
 </body>
 </html>

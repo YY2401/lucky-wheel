@@ -374,3 +374,6 @@ details.stats { margin-bottom: 14px; }
 .prize-list.pos-tr { left: auto; right: 22px; }
 body.overlay .prize-list { left: 22px; top: 22px; z-index: 3; width: min(460px, 40vw); --pl-size: 20px; }
 body.overlay .prize-list.centered { width: min(820px, 92vw); --pl-size: 30px; z-index: 3; }
+.ov-status.reject { background: var(--red); transform: scale(1.6); }
+#lockScreen { z-index: 90; }
+.records-table .f-undo { padding: 3px 8px; font-size: 12px; }

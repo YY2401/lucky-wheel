@@ -16,7 +16,7 @@
     overlayResultSeconds: 8, multiMode: 'flip', minSlice: 4, bg3d: true, theme: 'light', themeChosen: false,
     overlaySize: 520, overlaySpinOnly: false, overlayMute: false, overlayHideStatus: false,
     overlayList: false, overlayListProb: true, overlayListStock: true, overlayListPos: 'tl',
-    pityAccum: false, pityAccumN: 30, pityBatch: false, pityBatchK: 10, pityScope: 'player', room: '', sync: false, broker: 'wss://broker.emqx.io:8084/mqtt',
+    pityAccum: false, pityAccumN: 30, pityBatch: false, pityBatchK: 10, pityScope: 'player', room: '', secret: '', sync: false, broker: 'wss://broker.emqx.io:8084/mqtt',
     prizes: [1, 2, 3, 4, 5, 6].map((n) => ({ id: `p${n}`, name: `獎項 ${n}`, weight: 10, quantity: -1, remaining: -1, image: '', color: PALETTE[(n - 1) % PALETTE.length] })),
   };
 
@@ -60,6 +60,7 @@
     cfg.pityBatchK = Math.min(100, Math.max(2, Math.trunc(Number(cfg.pityBatchK)) || 10));
     cfg.pityScope = cfg.pityScope === 'global' ? 'global' : 'player';
     cfg.room = String(cfg.room || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 24) || randId();
+    cfg.secret = String(cfg.secret || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 40) || randId(20); // 同步訊息簽章用，只出現在 OBS 網址裡
     cfg.broker = /^wss?:\/\//.test(cfg.broker || '') ? cfg.broker : DEFAULT_CONFIG.broker;
     cfg.prizes = Array.isArray(cfg.prizes) ? cfg.prizes.map(normalizePrize) : [];
     return cfg;
@@ -147,6 +148,27 @@
     return { batchId, type, count, results, recs, time };
   }
 
+  // ---------- 同步訊息簽章（HMAC-SHA256）：公開 MQTT 誰都能監聽 / 發送，靠簽章擋掉假訊息 ----------
+  const SIG_WINDOW_MS = 5 * 60 * 1000;
+  const enc = (s) => new TextEncoder().encode(s);
+  async function hmacKey(secret) { return cryptoObj.subtle.importKey('raw', enc(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify']); }
+  const hex = (buf) => Array.from(new Uint8Array(buf), (b) => b.toString(16).padStart(2, '0')).join('');
+  function sortKeys(v) { if (Array.isArray(v)) return v.map(sortKeys); if (v && typeof v === 'object') return Object.keys(v).sort().reduce((o, k) => { o[k] = sortKeys(v[k]); return o; }, {}); return v; }
+  function canonical(msg) { const { sig, ...rest } = msg; void sig; return JSON.stringify(sortKeys(rest)); }
+  async function signMessage(secret, msg) {
+    const body = { ...msg, ts: msg.ts || Date.now() };
+    const sig = hex(await cryptoObj.subtle.sign('HMAC', await hmacKey(secret), enc(canonical(body))));
+    return { ...body, sig };
+  }
+  async function verifyMessage(secret, msg, now = Date.now()) {
+    if (!msg || typeof msg.sig !== 'string' || typeof msg.ts !== 'number') return false;
+    if (Math.abs(now - msg.ts) > SIG_WINDOW_MS) return false;
+    const expected = hex(await cryptoObj.subtle.sign('HMAC', await hmacKey(secret), enc(canonical(msg))));
+    if (expected.length !== msg.sig.length) return false;
+    let diff = 0; for (let i = 0; i < expected.length; i++) diff |= expected.charCodeAt(i) ^ msg.sig.charCodeAt(i);
+    return diff === 0;
+  }
+
   // ---------- 撤銷一批：把庫存加回去，回傳移除後的紀錄 ----------
   function undoBatch(records, prizes, batchId) {
     const batch = records.filter((r) => r.batchId === batchId);
@@ -154,5 +176,5 @@
     return { batch, records: records.filter((r) => r.batchId !== batchId) };
   }
 
-  return { PALETTE, DEFAULT_CONFIG, formatTime, randId, rand, normalizePrize, normalizeConfig, pool, pityPool, probabilities, drawOne, suggestWeights, drawsSinceHit, drawBatch, undoBatch };
+  return { PALETTE, DEFAULT_CONFIG, formatTime, randId, rand, normalizePrize, normalizeConfig, pool, pityPool, probabilities, drawOne, suggestWeights, drawsSinceHit, drawBatch, undoBatch, signMessage, verifyMessage, SIG_WINDOW_MS };
 });

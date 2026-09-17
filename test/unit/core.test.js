@@ -180,3 +180,23 @@ test('suggestWeights：極小機率不會被四捨五入成 0', () => {
   assert.equal(by.a.weight, 0.01);
   assert.ok(by.a.suggested > 0 && by.a.suggested < 0.01);
 });
+
+test('簽章：正確金鑰通過；錯誤金鑰、竄改內容、過期時間戳都拒絕', async () => {
+  const m = await core.signMessage('s3cret', { type: 'spin', results: [{ name: 'A', nested: { b: 1, a: 2 } }] });
+  assert.ok(m.sig && m.ts);
+  assert.equal(await core.verifyMessage('s3cret', m), true);
+  assert.equal(await core.verifyMessage('other', m), false);
+  assert.equal(await core.verifyMessage('s3cret', { ...m, type: 'config' }), false);
+  assert.equal(await core.verifyMessage('s3cret', { ...m, results: [{ name: 'B' }] }), false);
+  assert.equal(await core.verifyMessage('s3cret', m, Date.now() + core.SIG_WINDOW_MS + 1000), false);
+  assert.equal(await core.verifyMessage('s3cret', { ...m, sig: undefined }), false);
+  // 鍵順序不同但內容相同 → 同一個簽章（JSON 正規化）
+  const reordered = { results: m.results, type: m.type, ts: m.ts, mid: m.mid, sig: m.sig };
+  assert.equal(await core.verifyMessage('s3cret', reordered), true);
+});
+
+test('normalizeConfig：會自動產生金鑰，且只留英數', () => {
+  const c = core.normalizeConfig({});
+  assert.match(c.secret, /^[A-Z0-9]{20}$/);
+  assert.equal(core.normalizeConfig({ secret: 'ab-c!d' }).secret, 'abcd');
+});

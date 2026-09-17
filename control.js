@@ -16,7 +16,7 @@
     // ======================================================================
     function overlayUrl() {
       const c = state.config;
-      const q = new URLSearchParams({ overlay: '1', room: c.room });
+      const q = new URLSearchParams({ overlay: '1', room: c.room, key: c.secret });
       if (c.overlaySize !== 520) q.set('size', c.overlaySize);
       if (c.overlaySpinOnly) q.set('mode', 'spin');
       if (c.overlayMute) q.set('sound', '0');
@@ -29,16 +29,24 @@
       $('#dirtyHint').textContent = v ? '● 有未儲存的變更' : '';
       $('#savePrizes').classList.toggle('pulse', v);
     }
+    // 同步訊息有大小上限（公開 MQTT 約 1MB）：內嵌圖片太多時改成不帶圖片送出，OBS 畫面會用色點代替
+    const SYNC_LIMIT = 450 * 1024;
+    let sizeWarned = false;
+    function forSync(prizes) {
+      if (JSON.stringify(prizes).length <= SYNC_LIMIT) return prizes;
+      if (!sizeWarned) { sizeWarned = true; toast('獎項圖片總量太大，OBS 畫面會改用色點代替圖片；請縮小或減少圖片', 8000); }
+      return prizes.map((p) => (p.image.startsWith('data:') ? { ...p, image: '' } : p));
+    }
     function saveConfig(silent) {
       state.config = normalizeConfig(state.config);
       if (!Store.set(KEYS.config, state.config)) return false;
       try { localStorage.setItem('lw.bg3d', state.config.bg3d ? '1' : '0'); } catch { /* ignore */ }
       markDirty(false); renderAll();
-      Sync.send({ type: 'config', config: state.config });
+      Sync.send({ type: 'config', config: { ...state.config, prizes: forSync(state.config.prizes) } });
       if (!silent) toast('已儲存設定');
       return true;
     }
-    function renderAll() { renderPrizeRows(); renderSettings(); updateWheel(); renderPityInfo(); }
+    function renderAll() { renderPrizeRows(); renderSettings(); updateWheel(); renderPityInfo(); renderPlayerNames(); }
     function updateWheel() {
       applyTheme(state.config.theme, wheel);
       wheel.setPrizes(state.config.prizes, state.config.segmentMode, state.config.minSlice / 100);
@@ -304,24 +312,24 @@
     }
     $('#saveSettings').addEventListener('click', () => {
       const c = state.config;
-      const before = `${c.room}|${c.sync}|${c.broker}`;
+      const before = `${c.room}|${c.sync}|${c.broker}|${c.secret}`;
       SETTING_KEYS.forEach((k) => { c[k] = $(`#s-${k}`).value; });
       SEC_KEYS.forEach((k) => { c[k] = Math.round(Number($(`#s-${k}`).value) * 1000); });
       BOOL_KEYS.forEach((k) => { c[k] = $(`#s-${k}`).checked; });
       c.themeChosen = true;
       if (!saveConfig()) return;
       const c2 = state.config; // saveConfig 會重新 normalize
-      if (before !== `${c2.room}|${c2.sync}|${c2.broker}`) Sync.start(c2.room, c2);
+      if (before !== `${c2.room}|${c2.sync}|${c2.broker}|${c2.secret}`) Sync.start(c2.room, c2);
     });
-    $('#newRoom').addEventListener('click', () => { $('#s-room').value = randId(); });
+    $('#newRoom').addEventListener('click', () => { $('#s-room').value = randId(); state.config.secret = randId(20); });
     $$('.theme-toggle button').forEach((b) => b.addEventListener('click', () => {
       state.config.theme = b.dataset.theme; state.config.themeChosen = true; $('#s-theme').value = b.dataset.theme;
       Store.set(KEYS.config, state.config); applyTheme(b.dataset.theme, wheel);
-      Sync.send({ type: 'config', config: state.config });
+      Sync.send({ type: 'config', config: { ...state.config, prizes: forSync(state.config.prizes) } });
     }));
     $('#testSync').addEventListener('click', () => {
       state.pongs = 0; Sync.send({ type: 'ping' }); toast('已送出測試訊號，等待覆蓋層回應…', 3000);
-      setTimeout(() => toast(state.pongs ? `OBS 畫面已回應（${state.pongs} 個）` : '3 秒內沒有回應：請確認「讓 OBS 畫面跟著控制台動」已打開並儲存，且 OBS 裡貼的是最新複製的網址', 6000), 3000);
+      setTimeout(() => toast(state.pongs ? `OBS 畫面已回應（${state.pongs} 個）` : '3 秒內沒有回應：請確認「讓 OBS 畫面跟著控制台動」已打開並儲存，且 OBS 裡貼的是最新複製的網址（新版網址含金鑰，舊網址收不到）', 8000), 3000);
     });
     $('#testSound').addEventListener('click', () => {
       if (!$('#s-sound').checked) { toast('音效目前是關閉的，先打開再試聽'); return; }
@@ -332,6 +340,8 @@
       try { await navigator.clipboard.writeText(overlayUrl()); toast('已複製 OBS 畫面網址'); }
       catch { dialog({ title: '請手動複製', message: overlayUrl(), input: overlayUrl() }); }
     });
+    let rejectWarned = false;
+    Sync.onReject = () => { if (rejectWarned) return; rejectWarned = true; toast('收到簽章不符的同步訊息（已忽略）。若你剛換過配對代碼，請重新複製 OBS 畫面網址', 8000); };
     Sync.onStatus = (s, room) => {
       const el = $('#syncStatus');
       const map = { off: ['', '同步：關閉'], local: ['ok', `頻道 ${room}（同瀏覽器）`], connecting: ['', `頻道 ${room}：連線中…`], online: ['ok', `頻道 ${room}：跨瀏覽器同步中`], offline: ['bad', `頻道 ${room}：中繼離線，重連中…`] };
@@ -361,10 +371,17 @@
         : state.records;
       $('#recordCount').textContent = terms.length ? `符合 ${list.length} / ${state.records.length} 筆` : `共 ${state.records.length} 筆`;
       renderStats(list, terms.length > 0);
-      $('#recordRows').innerHTML = list.slice(-500).reverse().map((r) => `<tr>
+      // 每批只在最新的那一列放撤銷按鈕（列表是倒序，所以是該批第一次出現時）
+      const seen = new Set();
+      $('#recordRows').innerHTML = list.slice(-500).reverse().map((r) => {
+        const first = !seen.has(r.batchId); seen.add(r.batchId);
+        return `<tr data-batch="${esc(r.batchId)}">
         <td>${esc(r.time)}</td><td>${esc(r.player)}</td><td>${esc(r.type)}</td><td>${r.index}</td>
-        <td>${esc(r.prize)}</td><td>${r.remaining === -1 ? '∞' : r.remaining}</td><td>${r.probability}%</td><td>${r.pity ? '<span class="badge-pity inline">保底</span>' : ''}</td></tr>`).join('');
+        <td>${esc(r.prize)}</td><td>${r.remaining === -1 ? '∞' : r.remaining}</td><td>${r.probability}%</td><td>${r.pity ? '<span class="badge-pity inline">保底</span>' : ''}</td>
+        <td>${first ? `<button class="btn icon f-undo" data-batch="${esc(r.batchId)}" title="撤銷這批">撤銷</button>` : ''}</td></tr>`;
+      }).join('');
     }
+    $('#recordRows').addEventListener('click', (e) => { const b = e.target.closest('.f-undo'); if (b) undoBatchById(b.dataset.batch); });
     // 統計：每個獎項實際抽出幾次，對照目前設定的機率
     function renderStats(list, filtered) {
       const total = list.length;
@@ -390,14 +407,18 @@
     $('#recordSearch').addEventListener('input', renderRecords);
     async function undoLastBatch() {
       if (!state.records.length) { toast('沒有可撤銷的紀錄'); return false; }
-      const bid = state.records[state.records.length - 1].batchId;
+      return undoBatchById(state.records[state.records.length - 1].batchId);
+    }
+    async function undoBatchById(bid) {
       const batch = state.records.filter((r) => r.batchId === bid);
+      if (!batch.length) { toast('找不到這批紀錄'); return false; }
       const names = batch.map((r) => r.prize).join('、');
-      const okd = await ask(`${batch[0].time}　${batch[0].type}　${batch.length} 筆${batch[0].player ? `　抽獎者：${batch[0].player}` : ''}\n獎項：${names}\n\n庫存會加回，紀錄與 Excel 內的這幾筆會一併移除。確定撤銷？`, { title: '撤銷上一批抽獎', okLabel: '確定撤銷', danger: true });
+      const isLast = state.records[state.records.length - 1].batchId === bid;
+      const okd = await ask(`${batch[0].time}　${batch[0].type}　${batch.length} 筆${batch[0].player ? `　抽獎者：${batch[0].player}` : ''}\n獎項：${names}\n\n庫存會加回，紀錄與 Excel 內的這幾筆會一併移除。確定撤銷？`, { title: isLast ? '撤銷上一批抽獎' : '撤銷這批抽獎', okLabel: '確定撤銷', danger: true });
       if (!okd) return false;
       state.records = undoBatch(state.records, state.config.prizes, bid).records;
       Store.set(KEYS.records, state.records);
-      saveConfig(true); renderRecords(); renderPityInfo();
+      saveConfig(true); renderRecords(); renderPityInfo(); renderPlayerNames();
       Excel.writeAll().then((r) => toast(r.ok ? `已撤銷並更新 Excel（${r.name}）` : '已撤銷')).catch((e) => toast(`已撤銷，但 Excel 更新失敗：${e.message}`, 6000));
       return true;
     }
@@ -427,6 +448,7 @@
       const hasPool = cfg.prizes.some((p) => p.pity);
       if (!(cfg.pityAccum || cfg.pityBatch) || !hasPool) { el.classList.add('hidden'); return; }
       el.classList.remove('hidden');
+      if (!LuckyCore.pityPool(cfg.prizes).length) { el.textContent = '保底獎已全部抽完，保底不會再觸發'; return; }
       const parts = [];
       if (cfg.pityAccum) {
         const player = $('#player').value.trim();
@@ -438,6 +460,12 @@
       el.textContent = parts.join('　｜　');
     }
     $('#player').addEventListener('input', renderPityInfo);
+    // 最近用過的抽獎者名字做成選單（最新在前，最多 30 個）
+    function renderPlayerNames() {
+      const names = []; const seen = new Set();
+      for (let i = state.records.length - 1; i >= 0 && names.length < 30; i--) { const n = (state.records[i].player || '').trim(); if (n && !seen.has(n)) { seen.add(n); names.push(n); } }
+      $('#playerNames').innerHTML = names.map((n) => `<option value="${esc(n)}"></option>`).join('');
+    }
 
     function setSpinning(v) {
       state.spinning = v;
@@ -450,6 +478,11 @@
       if (recs.length) { state.records.push(...recs); Store.set(KEYS.records, state.records); Store.set(KEYS.config, state.config); }
       return { type: 'spin', batchId, batchType: type, count, player, results, prizes: state.config.prizes, exhausted: results.length < count, time, reveal: state.config.multiMode };
     }
+    function forSyncSpin(res) {
+      const prizes = forSync(res.prizes);
+      const stripped = prizes !== res.prizes;
+      return { ...res, prizes, results: stripped ? res.results.map((r) => (r.image.startsWith('data:') ? { ...r, image: '' } : r)) : res.results };
+    }
     async function spin(count) {
       if (state.spinning) return;
       setSpinning(true);
@@ -457,7 +490,7 @@
         if (state.dirty && !saveConfig(true)) return;
         if (Excel.handle) await Excel.ensurePermission(); // 需在使用者點擊後立即詢問
         const res = doSpin(count, $('#player').value.trim());
-        Sync.send(res);
+        Sync.send(forSyncSpin(res));
         const excelP = res.results.length ? Excel.writeAll().catch((e) => ({ ok: false, error: e.message })) : Promise.resolve({ ok: false, skipped: true });
         await playBatch(res);
         res.excel = await excelP;
@@ -480,7 +513,7 @@
           if (!state.skipAll) await wait(350);
         }
       }
-      updateWheel(); renderPrizeRows(); renderPityInfo();
+      updateWheel(); renderPrizeRows(); renderPityInfo(); renderPlayerNames();
       Sfx.win(); confetti.burst(res.results.length > 1 ? 260 : 160);
       if (window.WheelBG) WheelBG.burst();
     }
@@ -524,11 +557,28 @@
       anime({ targets: '.controls, .topbar', translateY: [24, 0], opacity: [0, 1], delay: anime.stagger(120, { start: 200 }), duration: 700, easing: 'easeOutCubic' });
     }
     Sync.on((msg) => {
-      if (msg.type === 'hello') Sync.send({ type: 'config', config: state.config });
+      if (msg.type === 'hello') Sync.send({ type: 'config', config: { ...state.config, prizes: forSync(state.config.prizes) } });
       else if (msg.type === 'pong') state.pongs += 1;
     });
     Sync.start(state.config.room, state.config);
     window.addEventListener('beforeunload', (e) => { if (state.dirty) { e.preventDefault(); e.returnValue = ''; } });
+
+    // 同一個瀏覽器只能有一個控制台在操作：兩個分頁各改各的會互相蓋掉資料
+    (() => {
+      const tabId = randId(8); const ch = new BroadcastChannel('lucky-wheel:control-lock');
+      let locked = false;
+      const lock = () => { locked = true; $('#lockScreen').classList.remove('hidden'); };
+      let claiming = true;
+      ch.onmessage = (e) => {
+        const m = e.data || {};
+        if (m.type === 'claim' && !locked) ch.postMessage({ type: 'held', by: tabId }); // 我在用，回覆新開的分頁
+        else if (m.type === 'held' && claiming && m.by !== tabId) lock();               // 有人回覆表示已被占用
+        else if (m.type === 'takeover' && m.by !== tabId) lock();                       // 別的分頁接手了
+      };
+      ch.postMessage({ type: 'claim', by: tabId });
+      setTimeout(() => { claiming = false; }, 400);
+      $('#takeover').addEventListener('click', () => { ch.postMessage({ type: 'takeover', by: tabId }); location.reload(); });
+    })();
   }
 
   LW.startControl = startControl;

@@ -146,6 +146,43 @@ if (!H.chromePath()) {
     assert.deepEqual(page.errors, []);
   });
 
+  test('撤銷指定批次：中間那批撤掉，前後兩批保留、庫存正確加回', async (t) => {
+    const page = await fresh(t, { prizes: [{ id: 'a', name: '限量', weight: 1, quantity: 10, remaining: 10 }] });
+    for (const n of ['一', '二', '三']) { await page.evaluate((n) => { document.querySelector('#player').value = n; }, n); await H.spinOnce(page, 3); await H.closeResult(page); }
+    assert.equal((await H.readKey(page, 'lw.config')).prizes[0].remaining, 1);
+    await page.click('.open-panel[data-tab="records"]'); await H.sleep(300);
+    const btns = await page.$$('#recordRows .f-undo');
+    assert.equal(btns.length, 3, '每批一顆撤銷鈕');
+    await btns[1].click(); await H.sleep(300); await page.click('#confirmOk'); await H.sleep(400);
+    const recs = await H.readKey(page, 'lw.records');
+    assert.deepEqual([...new Set(recs.map((r) => r.player))], ['一', '三']);
+    assert.equal((await H.readKey(page, 'lw.config')).prizes[0].remaining, 4);
+    assert.equal((await page.$$('#recordRows .f-undo')).length, 2);
+  });
+
+  test('抽獎者名字選單：用過的名字出現在下拉清單，最新在前', async (t) => {
+    const page = await fresh(t);
+    for (const n of ['小明', '阿花', '小明']) { await page.evaluate((n) => { document.querySelector('#player').value = n; }, n); await H.spinOnce(page, 1); await H.closeResult(page); }
+    assert.deepEqual(await page.$$eval('#playerNames option', (els) => els.map((e) => e.value)), ['小明', '阿花']);
+    assert.equal(await page.$eval('#player', (e) => e.getAttribute('list')), 'playerNames');
+  });
+
+  test('保底獎全部抽完時，主畫面提示改為「已抽完」而不是倒數', async (t) => {
+    const page = await fresh(t, { pityAccum: true, pityAccumN: 5, prizes: [{ id: 'a', name: '保底獎', weight: 1, quantity: 1, remaining: 0, pity: true }, { id: 'c', name: '銘謝惠顧', weight: 9, quantity: -1, remaining: -1 }] });
+    assert.match(await page.$eval('#pityInfo', (e) => e.textContent), /保底獎已全部抽完/);
+  });
+
+  test('多分頁：第二個控制台分頁會被鎖住，接手後原分頁被鎖', async (t) => {
+    const page = await fresh(t);
+    const second = await H.newPage(browser); t.after(() => second.close());
+    await second.goto(`${srv.url}/?t=${Date.now()}`, { waitUntil: 'networkidle0' }); await H.sleep(800);
+    assert.equal(await second.$eval('#lockScreen', (e) => e.classList.contains('hidden')), false, '第二個分頁鎖住');
+    assert.equal(await page.$eval('#lockScreen', (e) => e.classList.contains('hidden')), true, '原分頁不受影響');
+    await second.click('#takeover'); await H.sleep(1200);
+    assert.equal(await second.$eval('#lockScreen', (e) => e.classList.contains('hidden')), true, '接手的分頁可用');
+    assert.equal(await page.$eval('#lockScreen', (e) => e.classList.contains('hidden')), false, '原分頁被鎖');
+  });
+
   test('保底：連抽保底每 5 抽至少一個，40 批全部符合', async (t) => {
     const page = await fresh(t, { pityBatch: true, pityBatchK: 5, prizes: FAST.prizes.map((p) => ({ ...p, quantity: -1, remaining: -1 })) });
     for (let i = 0; i < 40; i++) { await H.spinOnce(page, 5); await H.closeResult(page); }
@@ -163,7 +200,7 @@ if (!H.chromePath()) {
     await page.evaluate(() => { document.querySelector('#s-spinDuration').value = '3.5'; document.querySelector('#s-overlaySize').value = '700'; document.querySelector('#s-overlaySpinOnly').checked = true; });
     await page.click('#saveSettings'); await H.sleep(300);
     const url = await page.$eval('#overlayUrl', (e) => e.textContent);
-    assert.match(url, /overlay=1&room=[A-Z0-9]+&size=700&mode=spin$/);
+    assert.match(url, /overlay=1&room=[A-Z0-9]+&key=[A-Z0-9]{20}&size=700&mode=spin$/);
     await page.evaluate(() => { document.querySelector('#s-overlayList').checked = true; document.querySelector('#s-overlayListStock').checked = false; });
     await page.click('#saveSettings'); await H.sleep(300);
     assert.match(await page.$eval('#overlayUrl', (e) => e.textContent), /&list=1&ls=0$/);
@@ -195,9 +232,9 @@ if (!H.chromePath()) {
 
   test('OBS 覆蓋層：同瀏覽器同步、測試連線有回應、會播放抽獎結果', async (t) => {
     const page = await fresh(t, { spinDuration: 600, multiSpinDuration: 300 });
-    const room = (await H.readKey(page, 'lw.config')).room;
+    const { room, secret } = await H.readKey(page, 'lw.config');
     const ov = await H.newPage(browser, { width: 1280, height: 720 }); t.after(() => ov.close());
-    await ov.goto(`${srv.url}/?overlay=1&room=${room}&sync=0&list=1&lp=0&lpos=c&t=${Date.now()}`, { waitUntil: 'networkidle0' }); await H.sleep(500);
+    await ov.goto(`${srv.url}/?overlay=1&room=${room}&key=${secret}&sync=0&list=1&lp=0&lpos=c&t=${Date.now()}`, { waitUntil: 'networkidle0' }); await H.sleep(500);
     assert.equal(await ov.$eval('#ovPrizeList', (e) => e.classList.contains('centered')), true, 'lpos=c 置中');
     assert.deepEqual(await ov.$$eval('#ovPrizeListRows .pl-name', (els) => els.map((e) => e.textContent)), ['特獎', '頭獎', '銘謝惠顧'], '覆蓋層獎項一覽');
     assert.equal(await ov.$$eval('#ovPrizeListRows .pl-prob', (els) => els.length), 0, 'lp=0 不顯示機率');
@@ -210,6 +247,12 @@ if (!H.chromePath()) {
     await ov.bringToFront();
     await ov.waitForSelector('#ovResultLayer:not(.out)', { timeout: 20000 });
     assert.equal(await ov.$$eval('#ovGrid .r-card', (c) => c.length), 3);
+    // 金鑰錯誤的覆蓋層：同一個瀏覽器、同頻道，但收不到任何東西
+    const bad = await H.newPage(browser, { width: 1280, height: 720 }); t.after(() => bad.close());
+    await bad.goto(`${srv.url}/?overlay=1&room=${room}&key=WRONGKEY&sync=0&t=${Date.now()}`, { waitUntil: 'networkidle0' }); await H.sleep(300);
+    await page.bringToFront(); await H.closeResult(page); await page.evaluate(() => { document.querySelector('#skipAnim').checked = true; });
+    await H.spinOnce(page, 1); await H.closeResult(page); await H.sleep(800);
+    assert.equal(await bad.$eval('#ovResultLayer', (e) => e.classList.contains('out')), true, '簽章不符的訊息不會被播放');
     const ovStocks = await ov.$$eval('#ovPrizeListRows .pl-stock', (els) => els.map((e) => e.textContent));
     const ctrlCfg = await H.readKey(page, 'lw.config');
     assert.deepEqual(ovStocks, ctrlCfg.prizes.map((p) => (p.quantity === -1 ? '不限' : p.remaining === 0 ? '抽完' : `剩 ${p.remaining}`)), '抽獎後覆蓋層一覽的剩餘與控制台一致');
