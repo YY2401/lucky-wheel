@@ -7,6 +7,7 @@
 
   function startControl() {
     const { Store, Sync, Excel, KEYS } = LW;
+    const IS_PHONE = window.matchMedia('(max-width: 700px)').matches;
     const state = { config: null, records: [], dirty: false, spinning: false, skipAll: false, pongs: 0 };
     const wheel = new Wheel($('#wheel'), { onTick: () => Sfx.tick(), hubDom: true }); // 中心由 #hubBtn 負責（點一下 = 單抽）
     const confetti = new Confetti($('#confetti'));
@@ -51,7 +52,7 @@
       applyTheme(state.config.theme, wheel);
       wheel.setPrizes(state.config.prizes, state.config.segmentMode, state.config.minSlice / 100);
       renderProbBar(); refreshComputed(); renderPrizeList();
-      if (window.WheelBG) WheelBG.setEnabled(state.config.bg3d);
+      if (window.WheelBG) WheelBG.setEnabled(state.config.bg3d && !IS_PHONE); // 手機當遙控器用，省電不畫 3D
       Sfx.enabled = !!state.config.sound;
     }
 
@@ -122,22 +123,22 @@
     function createPrizeRow(id) {
       const tr = document.createElement('tr'); tr.dataset.id = id;
       tr.innerHTML = `
-        <td><div style="display:flex;gap:6px;align-items:center">
+        <td data-label="圖片"><div style="display:flex;gap:6px;align-items:center">
           <div class="thumb" title="點擊上傳圖片（支援 GIF 動圖）"></div>
           <div class="thumb-actions"><button class="f-url">網址</button><button class="f-clearimg">清除</button></div>
           <input type="file" accept="image/*" class="f-file" hidden>
         </div></td>
-        <td><input class="f-name" maxlength="60"></td>
-        <td><input type="number" class="f-weight" min="0" step="0.1"></td>
-        <td class="prob">–</td>
-        <td><div class="qty">
+        <td data-label="名稱"><input class="f-name" maxlength="60"></td>
+        <td data-label="權重"><input type="number" class="f-weight" min="0" step="0.1"></td>
+        <td data-label="機率" class="prob">–</td>
+        <td data-label="數量"><div class="qty">
           <input type="number" class="f-quantity" min="0">
           <label><input type="checkbox" class="f-unlimited">無限</label>
         </div></td>
-        <td><input type="number" class="f-remaining" min="0"></td>
-        <td><input type="color" class="f-color"></td>
-        <td style="text-align:center"><input type="checkbox" class="f-pity" title="勾選＝算保底獎"></td>
-        <td style="white-space:nowrap">
+        <td data-label="剩餘"><input type="number" class="f-remaining" min="0"></td>
+        <td data-label="顏色"><input type="color" class="f-color"></td>
+        <td data-label="保底" style="text-align:center"><input type="checkbox" class="f-pity" title="勾選＝算保底獎"></td>
+        <td class="row-tools" style="white-space:nowrap">
           <button class="btn icon f-up" title="上移">↑</button>
           <button class="btn icon f-down" title="下移">↓</button>
           <button class="btn icon f-del" title="刪除">✕</button>
@@ -618,7 +619,7 @@
       };
     })();
     $('#skipBtn').addEventListener('click', () => { state.skipAll = true; wheel.skip(); });
-    $('#skipAnim').checked = Store.get(KEYS.skipAnim, false) === true;
+    $('#skipAnim').checked = Store.get(KEYS.skipAnim, IS_PHONE) === true; // 手機預設跳過動畫（通常是拿來遙控，動畫在 OBS 那邊看）
     $('#skipAnim').addEventListener('change', (e) => Store.set(KEYS.skipAnim, e.target.checked));
     $$('.spin-btn[data-count]').forEach((b) => b.addEventListener('click', () => spin(Number(b.dataset.count))));
     $('#customSpin').addEventListener('click', () => spin(Number($('#customCount').value) || 1));

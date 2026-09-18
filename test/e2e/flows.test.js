@@ -264,6 +264,27 @@ if (!H.chromePath()) {
     assert.deepEqual(page.errors, []); assert.deepEqual(ov.errors, []);
   });
 
+  test('手機版：版面不橫向溢出、預設跳過動畫、設定表格改卡片、能抽獎', async (t) => {
+    const page = await browser.newPage(); t.after(() => page.close());
+    page.errors = []; page.on('pageerror', (e) => page.errors.push(e.message));
+    await page.emulate({ viewport: { width: 390, height: 844, deviceScaleFactor: 2, isMobile: true, hasTouch: true }, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) Mobile Safari' });
+    await page.goto(`${srv.url}/?t=${Date.now()}`, { waitUntil: 'networkidle0' });
+    await page.evaluate(() => new Promise((res) => { const r = indexedDB.deleteDatabase('lucky-wheel'); r.onsuccess = r.onerror = r.onblocked = () => res(); }));
+    await H.seed(page, { 'lw.config': FAST, 'lw.records': [] });
+    await page.reload({ waitUntil: 'networkidle0' }); await H.sleep(500);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 390, '首頁不橫向溢出');
+    assert.equal(await page.$eval('#skipAnim', (e) => e.checked), true, '手機預設跳過動畫');
+    await page.click('.open-panel[data-tab="prizes"]'); await H.sleep(300);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 390, '設定頁不橫向溢出');
+    assert.equal(await page.$eval('#prizeRows tr', (e) => getComputedStyle(e).display), 'block', '表格列改成卡片');
+    assert.equal(await page.$eval('#prizeRows td[data-label="名稱"]', (e) => getComputedStyle(e, '::before').content), '"名稱"', '卡片欄位有標籤');
+    await page.click('#closePanel');
+    await page.tap('.spin-btn[data-count="3"]');
+    await page.waitForSelector('#resultModal:not(.hidden)', { timeout: 15000 });
+    assert.equal(await page.$$eval('#resultGrid .r-card', (c) => c.length), 3);
+    assert.deepEqual(page.errors, []);
+  });
+
   test('保底：連抽保底每 5 抽至少一個，40 批全部符合', async (t) => {
     const page = await fresh(t, { pityBatch: true, pityBatchK: 5, prizes: FAST.prizes.map((p) => ({ ...p, quantity: -1, remaining: -1 })) });
     for (let i = 0; i < 40; i++) { await H.spinOnce(page, 5); await H.closeResult(page); }

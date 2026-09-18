@@ -406,3 +406,83 @@ body.overlay .hub-pos { display: none; }
 .ov-banner-who { font-size: 30px; font-weight: 900; background: var(--surface); color: var(--ink); border: var(--border-w) solid var(--ink); border-radius: 999px; padding: 8px 26px; box-shadow: 4px 4px 0 var(--shadow); }
 .ov-banner-pity { font-size: 18px; font-weight: 800; background: var(--yellow); color: #141414; border: var(--border-w) solid var(--ink); border-radius: 999px; padding: 4px 16px; }
 .ov-banner-pity:empty { display: none; }
+
+/* ============================================================
+   手機 / 窄螢幕：定位為「遙控器」——抽獎、看一覽好按；設定表格改卡片式
+   ============================================================ */
+@media (max-width: 700px) {
+  body { font-size: 16px; }
+  .topbar { flex-direction: column; align-items: stretch; gap: 10px; padding: 10px 14px; }
+  .brand { justify-content: space-between; }
+  .brand .logo { font-size: 18px; padding: 3px 10px; }
+  .theme-toggle button { white-space: nowrap; padding: 6px 12px; }
+  .topbar-right { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .topbar-right .status { grid-column: 1 / -1; justify-content: center; font-size: 12px; }
+  .topbar-right .btn { padding: 10px 6px; font-size: 14px; text-align: center; }
+  #togglePrizeList { padding: 8px 12px; font-size: 14px; }
+
+  html, body { overflow-x: hidden; }
+  .layout { padding: 14px 12px 30px; overflow-x: clip; } /* 條紋環超出螢幕會把版面撐寬，裁掉 */
+  .wheel-wrap::before { inset: -5%; }
+  .wheel-wrap { width: min(100%, calc(100vh - 380px)); }
+  .controls { width: 100%; padding: 14px; gap: 12px; }
+  .controls input#player { font-size: 18px; padding: 12px; }
+  .spin-buttons { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .spin-buttons .btn { min-height: 54px; font-size: 18px; padding: 10px 6px; }
+  .spin-buttons .custom { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 2fr; gap: 10px; }
+  .spin-buttons .custom input { width: 100%; min-height: 54px; font-size: 18px; text-align: center; }
+  .check-row { flex-direction: column; align-items: stretch; }
+  .check-row .btn { min-height: 48px; }
+  .pity-info { font-size: 13px; white-space: normal; text-align: center; }
+
+  .prize-list { left: 12px; top: 64px; width: calc(100vw - 24px); --pl-size: 17px; }
+  .prize-list.centered { width: calc(100vw - 24px); --pl-size: 20px; padding: 16px; }
+  .prize-list-head { flex-wrap: wrap; gap: 8px; }
+
+  /* 彈出視窗：全螢幕 */
+  .modal { padding: 0; align-items: stretch; }
+  .modal-box { border-radius: 0; border-width: 0; box-shadow: none; max-height: 100vh; width: 100%; padding: 18px 14px; }
+  .modal-box.wide { max-height: 100vh; height: 100vh; }
+  .modal-box, .modal-box.wide { min-width: 0; max-width: 100vw; overflow-x: hidden; }
+  .form label, .form > * { min-width: 0; }
+  select, .form label > select { max-width: 100%; width: 100%; text-overflow: ellipsis; }
+  .tab, .table-scroll, .row-actions { max-width: 100%; }
+  .prize-table tr { box-sizing: border-box; }
+  .switch-row { flex-wrap: wrap; }
+  .modal-box.wide .tab { padding: 14px 12px; }
+  .modal-box.wide .btn { padding: 10px 12px; font-size: 15px; }
+  .tabs button { font-size: 15px; padding: 14px 6px; }
+  .modal-close { top: 6px; right: 8px; }
+  .form { grid-template-columns: 1fr; max-width: none; }
+  .form > label:has(> input[type=number]) { grid-column: 1 / -1; }
+  .row-actions { gap: 8px; }
+  .row-actions .btn { flex: 1 1 auto; text-align: center; }
+  #resultModal .result-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
+  #resultModal .modal-box h2 { font-size: 26px; }
+
+  /* 獎項表格 → 一張卡片一個獎項 */
+  .prize-table thead { display: none; }
+  .prize-table, .prize-table tbody, .prize-table tr { display: block; width: 100%; }
+  .prize-table tr { border: var(--border-w) solid var(--ink); border-radius: 12px; padding: 8px 12px; margin-bottom: 12px; background: var(--paper); }
+  .prize-table td { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px dashed var(--ink-soft); }
+  .prize-table td:last-child { border-bottom: 0; }
+  .prize-table td::before { content: attr(data-label); color: var(--muted); font-size: 13px; font-weight: 700; flex: none; min-width: 3em; }
+  .prize-table td[data-label="圖片"]::before, .prize-table td.row-tools::before { content: none; }
+  .prize-table td.row-tools { justify-content: flex-end; gap: 8px; }
+  .prize-table td.row-tools .btn.icon { padding: 8px 14px; font-size: 15px; }
+  .prize-table input[type=text], .prize-table input:not([type]) { width: auto; flex: 1; }
+  .prize-table input[type=number] { width: 110px; }
+  .prize-table .prob { font-size: 16px; }
+  .prize-table td[data-label="保底"] { text-align: left; }
+  .prob-bar span { font-size: 11px; }
+
+  /* 紀錄表：只留時間 / 抽獎者 / 獎項 / 撤銷 */
+  .records-table th:nth-child(3), .records-table td:nth-child(3),
+  .records-table th:nth-child(4), .records-table td:nth-child(4),
+  .records-table th:nth-child(6), .records-table td:nth-child(6),
+  .records-table th:nth-child(7), .records-table td:nth-child(7),
+  .records-table th:nth-child(8), .records-table td:nth-child(8) { display: none; }
+  .records-table th, .records-table td { padding: 8px 4px; font-size: 14px; white-space: normal; }
+  .stats-table th, .stats-table td { display: table-cell; font-size: 13px; }
+  #recordSearch { min-width: 0; width: 100%; }
+}
