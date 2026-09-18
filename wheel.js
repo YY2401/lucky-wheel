@@ -85,6 +85,15 @@
       this._ro = new ResizeObserver(() => { this.resize(); this.draw(); });
       this._ro.observe(canvas);
       this._idle = setInterval(() => { if (!this.spinning) { this.ledPhase++; this.draw(); } }, 500);
+      // 中心「GO」可當按鈕：有給 onHubClick 才啟用（覆蓋層不給，純顯示）
+      this.hubHover = false; this.hubPressed = false;
+      if (this.opts.onHubClick) {
+        const inHub = (e) => { const r = canvas.getBoundingClientRect(); const s = this.size / r.width; const x = (e.clientX - r.left) * s - this.size / 2; const y = (e.clientY - r.top) * s - this.size / 2; return Math.hypot(x, y) <= this.hubRadius(); };
+        canvas.addEventListener('pointermove', (e) => { const h = inHub(e); if (h !== this.hubHover) { this.hubHover = h; canvas.style.cursor = h && !this.spinning ? 'pointer' : ''; this.draw(); } });
+        canvas.addEventListener('pointerleave', () => { this.hubHover = false; this.hubPressed = false; canvas.style.cursor = ''; this.draw(); });
+        canvas.addEventListener('pointerdown', (e) => { if (inHub(e) && !this.spinning) { this.hubPressed = true; this.draw(); } });
+        canvas.addEventListener('pointerup', (e) => { const was = this.hubPressed; this.hubPressed = false; this.draw(); if (was && inHub(e) && !this.spinning) this.opts.onHubClick(); });
+      }
       this._animTimer = null;
     }
 
@@ -99,6 +108,8 @@
     }
 
     setTheme(t) { this.theme = Object.assign({}, this.theme, t || {}); this.draw(); }
+
+    hubRadius() { const R = this.size / 2 - Math.max(16, this.size * 0.045); return R * 0.13 * 1.1; }
 
     resize() {
       const dpr = window.devicePixelRatio || 1;
@@ -215,11 +226,15 @@
       });
       ctx.restore();
 
-      // 中心軸
-      ctx.beginPath(); ctx.arc(0, 0, R * 0.13, 0, TAU);
-      ctx.fillStyle = T.hubBg; ctx.fill();
+      if (this.opts.hubDom) { ctx.restore(); this._drawPointer(c, R, k); return; } // 中心由 DOM 按鈕負責
+      // 中心軸（有 onHubClick 時是按鈕：滑過放大、按下縮小）
+      const clickable = !!this.opts.onHubClick && !this.spinning;
+      const hubScale = clickable ? (this.hubPressed ? 0.94 : this.hubHover ? 1.1 : 1) : 1;
+      const hr = R * 0.13 * hubScale;
+      ctx.beginPath(); ctx.arc(0, 0, hr, 0, TAU);
+      ctx.fillStyle = clickable && this.hubHover ? T.ledOn : T.hubBg; ctx.fill();
       ctx.lineWidth = 4 * k; ctx.strokeStyle = T.hubStroke; ctx.stroke();
-      ctx.fillStyle = T.hubText; ctx.font = `${R * 0.085}px "Bungee", sans-serif`;
+      ctx.fillStyle = T.hubText; ctx.font = `${R * 0.085 * hubScale}px "Bungee", sans-serif`;
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText(this.opts.hubText, 0, 1);
       ctx.restore();

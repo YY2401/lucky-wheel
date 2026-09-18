@@ -8,7 +8,7 @@
   function startControl() {
     const { Store, Sync, Excel, KEYS } = LW;
     const state = { config: null, records: [], dirty: false, spinning: false, skipAll: false, pongs: 0 };
-    const wheel = new Wheel($('#wheel'), { onTick: () => Sfx.tick() });
+    const wheel = new Wheel($('#wheel'), { onTick: () => Sfx.tick(), hubDom: true }); // 中心由 #hubBtn 負責（點一下 = 單抽）
     const confetti = new Confetti($('#confetti'));
 
     // ======================================================================
@@ -519,6 +519,7 @@
 
     function setSpinning(v) {
       state.spinning = v;
+      hub.setSpinning(v);
       if (window.WheelBG) WheelBG.setSpinning(v);
       $$('.spin-btn').forEach((b) => { b.disabled = v; });
       $('#skipBtn').classList.toggle('hidden', !v);
@@ -583,6 +584,34 @@
         anime({ targets: '#resultTitle', scale: [0.6, 1], opacity: [0, 1], duration: 600, easing: 'easeOutBack' });
       }
     }
+    // ---------- 中心 GO 按鈕：anime.js 做待機呼吸 / 滑過 / 按下，Three.js 做點擊粒子 ----------
+    const hub = (() => {
+      const btn = $('#hubBtn'); const text = $('.hub-text', btn); const ring = $('.hub-ring', btn);
+      const A = window.anime;
+      let hovering = false;
+      const stopAll = () => { if (A) { A.remove(btn); A.remove(ring); A.remove(text); } };
+      const startIdle = () => { if (!A || state.spinning) return; stopAll(); btn.style.transform = ''; A({ targets: btn, scale: [1, 1.06], duration: 1500, direction: 'alternate', loop: true, easing: 'easeInOutSine' }); };
+      const rippleLoop = () => { if (!A) return; A.remove(ring); A({ targets: ring, scale: [1, 1.75], opacity: [0.7, 0], duration: 1100, loop: true, easing: 'easeOutCubic' }); };
+      btn.addEventListener('pointerenter', () => { hovering = true; if (state.spinning) return; stopAll(); A && A({ targets: btn, scale: 1.14, rotate: [0, -4, 0], duration: 350, easing: 'easeOutBack' }); rippleLoop(); });
+      btn.addEventListener('pointerleave', () => { hovering = false; if (state.spinning) return; if (A) { A.remove(ring); A({ targets: ring, opacity: 0, duration: 200, easing: 'linear' }); } startIdle(); });
+      btn.addEventListener('pointerdown', () => { if (state.spinning || !A) return; A.remove(btn); A({ targets: btn, scale: 0.88, duration: 90, easing: 'easeOutQuad' }); });
+      btn.addEventListener('click', (e) => {
+        if (state.spinning) return;
+        if (A) { A.remove(btn); A({ targets: btn, scale: [0.88, 1.25, 1], duration: 650, easing: 'easeOutElastic(1, .5)' }); A.remove(ring); A({ targets: ring, scale: [1, 2.6], opacity: [0.9, 0], duration: 700, easing: 'easeOutCubic' }); }
+        const r = btn.getBoundingClientRect();
+        if (window.WheelBG) WheelBG.burstAt(r.left + r.width / 2, r.top + r.height / 2);
+        e.preventDefault(); spin(1);
+      });
+      startIdle();
+      return {
+        setSpinning(v) {
+          btn.classList.toggle('spinning', v);
+          btn.setAttribute('aria-disabled', String(v));
+          if (v) { stopAll(); if (A) { A({ targets: btn, scale: 0.92, duration: 250, easing: 'easeOutQuad' }); A({ targets: text, opacity: 0.45, duration: 250, easing: 'linear' }); A.remove(ring); ring.style.opacity = 0; } }
+          else { if (A) { A({ targets: text, opacity: 1, duration: 250, easing: 'linear' }); A({ targets: btn, scale: [0.92, 1.18, 1], duration: 600, easing: 'easeOutElastic(1, .5)', complete: () => (hovering ? null : startIdle()) }); } }
+        },
+      };
+    })();
     $('#skipBtn').addEventListener('click', () => { state.skipAll = true; wheel.skip(); });
     $('#skipAnim').checked = Store.get(KEYS.skipAnim, false) === true;
     $('#skipAnim').addEventListener('change', (e) => Store.set(KEYS.skipAnim, e.target.checked));

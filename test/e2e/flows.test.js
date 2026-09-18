@@ -222,6 +222,24 @@ if (!H.chromePath()) {
     assert.deepEqual(page.errors, []);
   });
 
+  test('轉盤中心 GO：點一下＝單抽；轉動中不會重複觸發', async (t) => {
+    const page = await fresh(t, { spinDuration: 800 });
+    await page.evaluate(() => { document.querySelector('#skipAnim').checked = false; });
+    const box = await page.$eval('#hubBtn', (e) => { const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
+    await page.mouse.move(box.x, box.y); await H.sleep(200);
+    assert.equal(await page.$eval('#hubBtn', (e) => getComputedStyle(e).cursor), 'pointer', '滑到中心游標變手指');
+    await page.mouse.click(box.x, box.y);
+    await H.sleep(100);
+    assert.equal(await page.$eval('#hubBtn', (e) => e.classList.contains('spinning')), true, '轉動中 GO 變成轉動狀態');
+    await page.waitForSelector('#resultModal:not(.hidden)', { timeout: 15000 });
+    assert.equal((await H.readKey(page, 'lw.records')).length, 1);
+    assert.equal(await page.$$eval('#resultGrid .r-card', (c) => c.length), 1);
+    await H.closeResult(page);
+    // 點在中心以外（扇區上）不會抽
+    await page.mouse.click(box.x + 150, box.y + 150); await H.sleep(400);
+    assert.equal((await H.readKey(page, 'lw.records')).length, 1);
+  });
+
   test('保底：連抽保底每 5 抽至少一個，40 批全部符合', async (t) => {
     const page = await fresh(t, { pityBatch: true, pityBatchK: 5, prizes: FAST.prizes.map((p) => ({ ...p, quantity: -1, remaining: -1 })) });
     for (let i = 0; i < 40; i++) { await H.spinOnce(page, 5); await H.closeResult(page); }

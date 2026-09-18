@@ -85,6 +85,26 @@
   function resize() { renderer.setSize(window.innerWidth, window.innerHeight, false); camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); }
   window.addEventListener('resize', resize); resize();
 
+  const bursts = [];
+  // 把畫面座標換成攝影機前方 z=8 平面上的世界座標，粒子從那裡往四面八方噴
+  function burstAt(clientX, clientY, n = 90) {
+    if (!enabled) return;
+    const ndc = new THREE.Vector3((clientX / window.innerWidth) * 2 - 1, -(clientY / window.innerHeight) * 2 + 1, 0.5).unproject(camera);
+    const dir = ndc.sub(camera.position).normalize();
+    const origin = camera.position.clone().add(dir.multiplyScalar(12));
+    const pos = new Float32Array(n * 3); const vel = new Float32Array(n * 3); const c = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) {
+      pos.set([origin.x, origin.y, origin.z], i * 3);
+      const a = Math.random() * Math.PI * 2; const sp = 14 + Math.random() * 12; // 要快到能立刻衝出轉盤外緣（背景層在轉盤下面）
+      vel.set([Math.cos(a) * sp, Math.sin(a) * sp + 3, (Math.random() - 0.5) * 4], i * 3);
+      tmp.setHex(PAL[Math.floor(Math.random() * PAL.length)]); c.set([tmp.r, tmp.g, tmp.b], i * 3);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('color', new THREE.BufferAttribute(c, 3));
+    const mat = new THREE.PointsMaterial({ size: 0.5, vertexColors: true, map: dot, transparent: true, opacity: 1, blending: pMat.blending, depthWrite: false });
+    const pts = new THREE.Points(geo, mat); scene.add(pts);
+    bursts.push({ pts, geo, mat, vel, n, age: 0, life: 1.6 });
+  }
   const clock = new THREE.Clock();
   let running = !document.hidden;
   document.addEventListener('visibilitychange', () => { running = !document.hidden; clock.getDelta(); });
@@ -109,6 +129,15 @@
     camera.position.x += (mouse.x * 1.6 - camera.position.x) * 0.04;
     camera.position.y += (mouse.y * 1.0 - camera.position.y) * 0.04;
     camera.lookAt(0, 0, -6);
+    // 一次性粒子爆發（GO 按鈕點擊）
+    for (let i = bursts.length - 1; i >= 0; i--) {
+      const b = bursts[i]; b.age += dt;
+      const arr = b.geo.getAttribute('position').array;
+      for (let j = 0; j < b.n; j++) { b.vel[j * 3 + 1] -= 9 * dt; arr[j * 3] += b.vel[j * 3] * dt; arr[j * 3 + 1] += b.vel[j * 3 + 1] * dt; arr[j * 3 + 2] += b.vel[j * 3 + 2] * dt; }
+      b.geo.getAttribute('position').needsUpdate = true;
+      b.mat.opacity = Math.max(0, 1 - b.age / b.life);
+      if (b.age >= b.life) { scene.remove(b.pts); b.geo.dispose(); b.mat.dispose(); bursts.splice(i, 1); }
+    }
     renderer.render(scene, camera);
   }
   tick();
@@ -135,6 +164,7 @@
   }
   try { setTheme(localStorage.getItem('lw.theme') || 'dark'); } catch { /* ignore */ }
   window.WheelBG = {
+    burstAt,
     setTheme,
     setEnabled(v) { enabled = v !== false; canvas.style.display = enabled ? '' : 'none'; if (enabled) clock.getDelta(); },
     setSpinning(v) { tween(state, { energy: v ? 1 : 0 }, { duration: v ? 700 : 1600, easing: 'easeOutQuad' }); },
