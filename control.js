@@ -527,25 +527,26 @@
       $$('.spin-btn').forEach((b) => { b.disabled = v; });
       $('#skipBtn').classList.toggle('hidden', !v);
     }
-    function doSpin(countRaw, player, skip) {
+    function doSpin(countRaw, player, noCountdown) {
       const pity = pityText(player); // 抽之前的保底狀態
       const { batchId, type, count, results, recs, time } = drawBatch({ cfg: state.config, records: state.records, count: countRaw, player });
       if (recs.length) { state.records.push(...recs); Store.set(KEYS.records, state.records); Store.set(KEYS.config, state.config); }
-      return { type: 'spin', batchId, batchType: type, count, player, results, prizes: state.config.prizes, exhausted: results.length < count, time, reveal: state.config.multiMode, pity, countdown: skip ? 0 : state.config.countdown };
+      return { type: 'spin', batchId, batchType: type, count, player, results, prizes: state.config.prizes, exhausted: results.length < count, time, reveal: state.config.multiMode, pity, countdown: noCountdown ? 0 : state.config.countdown };
     }
     function forSyncSpin(res) {
       const prizes = forSync(res.prizes);
       const stripped = prizes !== res.prizes;
       return { ...res, prizes, results: stripped ? res.results.map((r) => (r.image.startsWith('data:') ? { ...r, image: '' } : r)) : res.results };
     }
-    async function spin(count) {
+    // opts.noCountdown：GO 按鈕直接轉，不倒數
+    async function spin(count, opts = {}) {
       if (state.spinning) return;
       setSpinning(true);
       try {
         if (state.dirty && !saveConfig(true)) return;
         if (Excel.handle) await Excel.ensurePermission(); // 需在使用者點擊後立即詢問
         state.skipAll = $('#skipAnim').checked;
-        const res = doSpin(count, $('#player').value.trim(), state.skipAll);
+        const res = doSpin(count, $('#player').value.trim(), state.skipAll || opts.noCountdown);
         Sync.send(forSyncSpin(res));
         const excelP = res.results.length ? Excel.writeAll().catch((e) => ({ ok: false, error: e.message })) : Promise.resolve({ ok: false, skipped: true });
         if (res.results.length && res.countdown) await runCountdown(res.countdown, { onTick: () => Sfx.tick(), shouldStop: () => state.skipAll });
@@ -606,7 +607,7 @@
         if (A) { A.remove(btn); A({ targets: btn, scale: [0.88, 1.35, 1], duration: 650, easing: 'easeOutElastic(1, .5)' }); A.remove(ring); A({ targets: ring, scale: [1, 2.6], opacity: [0.9, 0], duration: 700, easing: 'easeOutCubic' }); }
         const r = btn.getBoundingClientRect();
         if (window.WheelBG) WheelBG.burstAt(r.left + r.width / 2, r.top + r.height / 2);
-        e.preventDefault(); spin(1);
+        e.preventDefault(); spin(1, { noCountdown: true });
       });
       startIdle();
       return {

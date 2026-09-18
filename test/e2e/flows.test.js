@@ -222,15 +222,16 @@ if (!H.chromePath()) {
     assert.deepEqual(page.errors, []);
   });
 
-  test('轉盤中心 GO：點一下＝單抽；轉動中不會重複觸發', async (t) => {
-    const page = await fresh(t, { spinDuration: 800 });
+  test('轉盤中心 GO：點一下＝單抽、不倒數；轉動中不會重複觸發', async (t) => {
+    const page = await fresh(t, { spinDuration: 800, countdown: 3 });
     await page.evaluate(() => { document.querySelector('#skipAnim').checked = false; });
     const box = await page.$eval('#hubBtn', (e) => { const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
     await page.mouse.move(box.x, box.y); await H.sleep(200);
     assert.equal(await page.$eval('#hubBtn', (e) => getComputedStyle(e).cursor), 'pointer', '滑到中心游標變手指');
     await page.mouse.click(box.x, box.y);
-    await H.sleep(100);
+    await H.sleep(150);
     assert.equal(await page.$eval('#hubBtn', (e) => e.classList.contains('spinning')), true, '轉動中 GO 變成轉動狀態');
+    assert.equal(await page.$eval('#countdown', (e) => e.classList.contains('hidden')), true, 'GO 單抽不倒數');
     await page.waitForSelector('#resultModal:not(.hidden)', { timeout: 15000 });
     assert.equal((await H.readKey(page, 'lw.records')).length, 1);
     assert.equal(await page.$$eval('#resultGrid .r-card', (c) => c.length), 1);
