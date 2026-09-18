@@ -183,6 +183,45 @@ if (!H.chromePath()) {
     assert.equal(await page.$eval('#lockScreen', (e) => e.classList.contains('hidden')), false, '原分頁被鎖');
   });
 
+  test('備份與還原：備份檔含設定＋紀錄，清空後還原可完整回來；匯入設定拒收備份檔', async (t) => {
+    const fs = require('node:fs'); const os = require('node:os'); const path = require('node:path');
+    const page = await fresh(t);
+    await page.evaluate(() => { document.querySelector('#player').value = '備份君'; });
+    await H.spinOnce(page, 3); await H.closeResult(page);
+    await page.click('#togglePrizeList'); await H.sleep(100); // 偏好也要一起備份
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lw-backup-'));
+    const cdp = await page.createCDPSession();
+    await cdp.send('Browser.setDownloadBehavior', { behavior: 'allow', downloadPath: dir, eventsEnabled: true });
+    await page.click('.open-panel[data-tab="records"]'); await H.sleep(200);
+    assert.equal(await page.$eval('#backupInfo', (e) => e.textContent), '還沒備份過');
+    await page.click('#backupAll');
+    let file; for (let i = 0; i < 40 && !file; i++) { await H.sleep(100); file = fs.readdirSync(dir).find((f) => f.endsWith('.json')); }
+    assert.ok(file, '有下載備份檔');
+    const backup = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8'));
+    assert.equal(backup.kind, 'lucky-wheel-backup');
+    assert.equal(backup.records.length, 3);
+    assert.equal(backup.config.prizes.length, 3);
+    assert.equal(backup.prizeList.open, true);
+    assert.match(await page.$eval('#backupInfo', (e) => e.textContent), /上次備份：/);
+    // 清空（模擬換電腦）再還原
+    await page.evaluate(() => new Promise((res) => { const r = indexedDB.deleteDatabase('lucky-wheel'); r.onsuccess = r.onerror = r.onblocked = () => res(); }));
+    await page.reload({ waitUntil: 'networkidle0' }); await H.sleep(400);
+    assert.equal((await H.readKey(page, 'lw.records') || []).length, 0);
+    await page.click('.open-panel[data-tab="records"]'); await H.sleep(200);
+    const input = await page.$('#restoreFile'); await input.uploadFile(path.join(dir, file)); await H.sleep(400);
+    assert.equal(await page.$eval('#confirmModal', (e) => !e.classList.contains('hidden')), true, '還原前有確認');
+    await page.click('#confirmOk'); await H.sleep(500);
+    assert.equal((await H.readKey(page, 'lw.records')).length, 3);
+    assert.deepEqual((await H.readKey(page, 'lw.config')).prizes.map((p) => p.name), ['特獎', '頭獎', '銘謝惠顧']);
+    assert.equal(await page.$eval('#prizeList', (e) => e.classList.contains('hidden')), false, '偏好一起還原');
+    assert.deepEqual([...new Set((await H.readKey(page, 'lw.records')).map((r) => r.player))], ['備份君']);
+    // 「匯入設定」拿到備份檔要指路，不要亂套
+    await page.click('.tabs button[data-tab="prizes"]'); await H.sleep(100);
+    const imp = await page.$('#importFile'); await imp.uploadFile(path.join(dir, file)); await H.sleep(300);
+    assert.match(await page.$eval('#toast', (e) => e.textContent), /完整備份檔/);
+    assert.deepEqual(page.errors, []);
+  });
+
   test('保底：連抽保底每 5 抽至少一個，40 批全部符合', async (t) => {
     const page = await fresh(t, { pityBatch: true, pityBatchK: 5, prizes: FAST.prizes.map((p) => ({ ...p, quantity: -1, remaining: -1 })) });
     for (let i = 0; i < 40; i++) { await H.spinOnce(page, 5); await H.closeResult(page); }

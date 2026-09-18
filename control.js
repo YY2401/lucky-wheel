@@ -2,7 +2,7 @@
 (function () {
   const LW = (window.LW = window.LW || {});
   const { Wheel, Sfx, Confetti } = LuckyWheel;
-  const { PALETTE, DEFAULT_CONFIG, randId, normalizeConfig, probabilities, suggestWeights, drawsSinceHit, drawBatch, undoBatch } = LuckyCore;
+  const { PALETTE, DEFAULT_CONFIG, randId, formatTime, normalizeConfig, probabilities, suggestWeights, drawsSinceHit, drawBatch, undoBatch } = LuckyCore;
   const { $, $$, wait, esc, colorOf, toast, dialog, ask, isFlip, resultCards, scheduleFlipSounds, liveChip, renderPrizeListRows, applyTheme } = LW.ui;
 
   function startControl() {
@@ -291,10 +291,60 @@
     $('#importConfig').addEventListener('click', () => $('#importFile').click());
     $('#importFile').addEventListener('change', async (e) => {
       const f = e.target.files[0]; if (!f) return;
-      try { state.config = normalizeConfig(JSON.parse(await f.text())); saveConfig(); Sync.start(state.config.room, state.config); }
-      catch { toast('匯入失敗：不是有效的設定檔'); }
-      e.target.value = '';
+      try {
+        const data = JSON.parse(await f.text());
+        if (data && data.kind === 'lucky-wheel-backup') { toast('這是完整備份檔，請到「紀錄 / Excel」用「還原備份」', 6000); return; }
+        state.config = normalizeConfig(data); saveConfig(); Sync.start(state.config.room, state.config);
+      } catch { toast('匯入失敗：不是有效的設定檔'); }
+      finally { e.target.value = ''; }
     });
+
+    // ---------- 備份 / 還原（設定＋紀錄＋偏好一個檔）----------
+    const meta = Object.assign({ lastBackup: null, recordsAtBackup: 0 }, Store.get(KEYS.meta, {}));
+    function downloadJson(obj, name) {
+      const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    }
+    function backupAll() {
+      const stamp = formatTime(new Date()).replace(/[-: ]/g, '').slice(0, 12);
+      downloadJson({ kind: 'lucky-wheel-backup', version: 1, exportedAt: new Date().toISOString(), config: state.config, records: state.records, prizeList: plPrefs }, `lucky-wheel-備份_${stamp}.json`);
+      meta.lastBackup = Date.now(); meta.recordsAtBackup = state.records.length; Store.set(KEYS.meta, meta);
+      renderBackupInfo(); toast('已下載備份檔');
+    }
+    async function restoreAll(file) {
+      let data;
+      try { data = JSON.parse(await file.text()); } catch { toast('還原失敗：檔案不是有效的 JSON'); return; }
+      if (!data || data.kind !== 'lucky-wheel-backup' || !data.config) { toast('這不是完整備份檔（可能只是「匯出設定」的檔案，請到「獎項設定」用「匯入設定」）', 7000); return; }
+      const recs = Array.isArray(data.records) ? data.records : [];
+      const when = data.exportedAt ? formatTime(new Date(data.exportedAt)) : '未知時間';
+      const ok = await ask(`備份時間：${when}\n獎項 ${Array.isArray(data.config.prizes) ? data.config.prizes.length : 0} 個、抽獎紀錄 ${recs.length} 筆\n\n會整份取代目前的設定與 ${state.records.length} 筆紀錄。確定還原？`, { title: '還原備份', okLabel: '確定還原', danger: true });
+      if (!ok) return;
+      state.config = normalizeConfig(data.config);
+      state.records = recs.filter((r) => r && typeof r === 'object');
+      Store.set(KEYS.records, state.records);
+      if (data.prizeList) { Object.assign(plPrefs, data.prizeList); savePlPrefs(); }
+      saveConfig(true); Sync.start(state.config.room, state.config); renderRecords();
+      Excel.writeAll().catch(() => {});
+      toast(`已還原：${state.records.length} 筆紀錄`);
+    }
+    function renderBackupInfo() {
+      const el = $('#backupInfo');
+      const since = state.records.length - meta.recordsAtBackup;
+      el.textContent = meta.lastBackup ? `上次備份：${formatTime(new Date(meta.lastBackup))}（之後新增 ${Math.max(0, since)} 筆紀錄）` : '還沒備份過';
+      el.classList.toggle('bad', !meta.lastBackup ? state.records.length >= 20 : since >= 50);
+    }
+    $('#backupAll').addEventListener('click', backupAll);
+    $('#restoreAll').addEventListener('click', () => $('#restoreFile').click());
+    $('#restoreFile').addEventListener('change', async (e) => { const f = e.target.files[0]; e.target.value = ''; if (f) await restoreAll(f); });
+    // 啟動時提醒：紀錄不少卻從沒備份、或上次備份後累積很多
+    function backupReminder() {
+      const since = state.records.length - meta.recordsAtBackup;
+      const weekAgo = Date.now() - 7 * 86400000;
+      if ((!meta.lastBackup && state.records.length >= 50) || (meta.lastBackup && meta.lastBackup < weekAgo && since >= 50)) {
+        toast(`已有 ${state.records.length} 筆抽獎紀錄${meta.lastBackup ? '，上次備份是一週前' : '但還沒備份過'}；建議到「紀錄 / Excel → 備份全部」存一份`, 9000);
+      }
+    }
 
     // ======================================================================
     //  設定頁
@@ -370,7 +420,7 @@
         ? state.records.filter((r) => { const hay = `${r.time} ${r.player} ${r.type} ${r.prize} ${r.batchId} ${r.pity ? '保底' : ''}`.toLowerCase(); return terms.every((t) => hay.includes(t)); })
         : state.records;
       $('#recordCount').textContent = terms.length ? `符合 ${list.length} / ${state.records.length} 筆` : `共 ${state.records.length} 筆`;
-      renderStats(list, terms.length > 0);
+      renderStats(list, terms.length > 0); renderBackupInfo();
       // 每批只在最新的那一列放撤銷按鈕（列表是倒序，所以是該批第一次出現時）
       const seen = new Set();
       $('#recordRows').innerHTML = list.slice(-500).reverse().map((r) => {
@@ -552,6 +602,7 @@
     Store.set(KEYS.config, state.config);
     renderAll(); markDirty(false);
     Excel.init({ getRecords: () => state.records, onChange: renderExcel });
+    setTimeout(backupReminder, 1500);
     if (window.anime) {
       anime({ targets: '.wheel-wrap', scale: [0.6, 1], opacity: [0, 1], rotate: [-40, 0], duration: 1100, easing: 'easeOutElastic(1, .6)' });
       anime({ targets: '.controls, .topbar', translateY: [24, 0], opacity: [0, 1], delay: anime.stagger(120, { start: 200 }), duration: 700, easing: 'easeOutCubic' });
