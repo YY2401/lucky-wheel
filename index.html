@@ -7,7 +7,7 @@
 <script>try { document.documentElement.dataset.theme = localStorage.getItem('lw.theme') || 'light'; } catch (e) { document.documentElement.dataset.theme = 'light'; }</script>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=41">
+<link rel="stylesheet" href="style.css?v=42">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.1/mqtt.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
@@ -130,6 +130,7 @@
           <small>讓機率很低的大獎在轉盤上也看得到，不會影響真正的中獎機率。設 0 就完全照機率。</small>
         </label>
         <label>轉動圈數 <input type="number" id="s-turns" min="1" max="20"><small>轉盤停下前會轉幾圈。</small></label>
+        <label>抽獎前倒數（秒）<input type="number" id="s-countdown" min="0" max="10"><small>按下抽獎後先倒數再轉，讓觀眾有時間反應；設 0 就不倒數。「跳過轉盤動畫」勾著時也不倒數。</small></label>
         <label>單抽轉動時間（秒）<input type="number" id="s-spinDuration" min="0.5" max="30" step="0.5"></label>
         <label>連抽時每一抽的轉動時間（秒）<input type="number" id="s-multiSpinDuration" min="0.3" max="30" step="0.5"><small>只有選「每一抽都轉一次」時才用得到。</small></label>
         <label>連抽的呈現方式
@@ -298,6 +299,7 @@
   <ul id="ovPrizeListRows"></ul>
 </aside>
 <div class="stage overlay-only hidden" id="ovStage">
+  <div class="ov-banner hidden" id="ovBanner"><div class="ov-banner-who" id="ovWho"></div><div class="ov-banner-pity" id="ovPity"></div></div>
   <div class="wheel-wrap"><canvas id="ovWheel"></canvas></div>
   <div class="live-results" id="ovLive"></div>
 </div>
@@ -340,18 +342,19 @@
   </div>
 </div>
 <div class="ov-status overlay-only hidden" id="ovStatus" title="同步狀態"></div>
+<div id="countdown" class="countdown hidden"><span>3</span></div>
 <canvas id="confetti"></canvas>
 <div id="toast"></div>
 
-<script src="core.js?v=41"></script>
-<script src="wheel.js?v=41"></script>
-<script src="ui.js?v=41"></script>
-<script src="store.js?v=41"></script>
-<script src="sync.js?v=41"></script>
-<script src="excel.js?v=41"></script>
-<script src="overlay.js?v=41"></script>
-<script src="control.js?v=41"></script>
-<script src="app.js?v=41"></script>
-<script src="bg.js?v=41"></script>
+<script src="core.js?v=42"></script>
+<script src="wheel.js?v=42"></script>
+<script src="ui.js?v=42"></script>
+<script src="store.js?v=42"></script>
+<script src="sync.js?v=42"></script>
+<script src="excel.js?v=42"></script>
+<script src="overlay.js?v=42"></script>
+<script src="control.js?v=42"></script>
+<script src="app.js?v=42"></script>
+<script src="bg.js?v=42"></script>
 </body>
 </html>

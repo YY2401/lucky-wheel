@@ -66,6 +66,20 @@
     container.appendChild(chip);
   }
 
+  // ---------- 抽獎前倒數 3、2、1（控制台與覆蓋層共用；anime.js 有載入就做縮放淡出） ----------
+  async function runCountdown(n, { onTick, shouldStop } = {}) {
+    const box = $('#countdown'); if (!box || !(n > 0)) return;
+    const num = box.firstElementChild;
+    box.classList.remove('hidden');
+    for (let i = n; i >= 1; i--) {
+      if (shouldStop && shouldStop()) break;
+      num.textContent = i; if (onTick) onTick(i);
+      if (window.anime) { anime.remove(num); anime({ targets: num, scale: [{ value: 1, duration: 500, easing: 'easeOutBack' }], opacity: [{ value: 1, duration: 120 }, { value: 1, duration: 580 }, { value: 0, duration: 250 }], rotate: [{ value: 0, duration: 500 }], easing: 'easeOutCubic' }); num.style.transform = 'scale(1.8) rotate(-8deg)'; num.style.opacity = 0; }
+      await wait(1000);
+    }
+    box.classList.add('hidden');
+  }
+
   // ---------- 獎項一覽（控制台面板與 OBS 覆蓋層共用） ----------
   function renderPrizeListRows(container, prizes, { prob = true, stock = true } = {}) {
     const probs = LuckyCore.probabilities(prizes);
@@ -96,5 +110,5 @@
     return theme;
   }
 
-  LW.ui = { $, $$, wait, esc, colorOf, toast, dialog, ask, isFlip, flipTotal, resultCards, scheduleFlipSounds, liveChip, renderPrizeListRows, applyTheme };
+  LW.ui = { $, $$, wait, esc, colorOf, toast, dialog, ask, isFlip, flipTotal, resultCards, scheduleFlipSounds, liveChip, renderPrizeListRows, runCountdown, applyTheme };
 })();

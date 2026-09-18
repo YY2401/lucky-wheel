@@ -394,3 +394,15 @@ body.overlay .prize-list.centered { width: min(820px, 92vw); --pl-size: 30px; z-
 .hub-btn.spinning .hub-ring2 { opacity: 1; border: 3px dashed var(--red); inset: -9px; animation: hubspin 1.2s linear infinite; }
 @keyframes hubspin { to { transform: rotate(360deg); } }
 body.overlay .hub-pos { display: none; }
+
+/* ---------- 抽獎前倒數 ---------- */
+.countdown { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 45; pointer-events: none; }
+.countdown span {
+  font-family: "Bungee", sans-serif; font-size: clamp(120px, 28vmin, 320px); color: var(--yellow); line-height: 1;
+  -webkit-text-stroke: 4px var(--ink); text-shadow: 8px 8px 0 var(--ink); display: inline-block;
+}
+/* ---------- 覆蓋層：轉動中的抽獎者 / 保底提示 ---------- */
+.ov-banner { display: flex; flex-direction: column; align-items: center; gap: 8px; animation: popin .35s cubic-bezier(.2, 1.4, .4, 1); }
+.ov-banner-who { font-size: 30px; font-weight: 900; background: var(--surface); color: var(--ink); border: var(--border-w) solid var(--ink); border-radius: 999px; padding: 8px 26px; box-shadow: 4px 4px 0 var(--shadow); }
+.ov-banner-pity { font-size: 18px; font-weight: 800; background: var(--yellow); color: #141414; border: var(--border-w) solid var(--ink); border-radius: 999px; padding: 4px 16px; }
+.ov-banner-pity:empty { display: none; }

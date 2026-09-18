@@ -10,7 +10,7 @@ if (!H.chromePath()) {
   before(async () => { srv = await H.serve(); browser = await H.launch(); });
   after(async () => { await browser.close(); srv.server.close(); });
 
-  const FAST = { prizes: [
+  const FAST = { countdown: 0, prizes: [
     { id: 'a', name: '特獎', weight: 1, quantity: 1, remaining: 1, pity: true },
     { id: 'b', name: '頭獎', weight: 5, quantity: 3, remaining: 3, pity: true },
     { id: 'c', name: '銘謝惠顧', weight: 94, quantity: -1, remaining: -1 },
@@ -238,6 +238,30 @@ if (!H.chromePath()) {
     // 點在中心以外（扇區上）不會抽
     await page.mouse.click(box.x + 150, box.y + 150); await H.sleep(400);
     assert.equal((await H.readKey(page, 'lw.records')).length, 1);
+  });
+
+  test('抽獎前倒數 + 覆蓋層轉動中橫幅（抽獎者 / 連抽 / 保底）', async (t) => {
+    const page = await fresh(t, { countdown: 2, spinDuration: 600, pityAccum: true, pityAccumN: 5 });
+    await page.evaluate(() => { document.querySelector('#skipAnim').checked = false; document.querySelector('#player').value = '倒數哥'; });
+    const { room, secret } = await H.readKey(page, 'lw.config');
+    const ov = await H.newPage(browser, { width: 1280, height: 720 }); t.after(() => ov.close());
+    await ov.goto(`${srv.url}/?overlay=1&room=${room}&key=${secret}&sync=0&t=${Date.now()}`, { waitUntil: 'networkidle0' }); await H.sleep(400);
+    assert.equal(await ov.$eval('#ovPrizeList', (e) => e.classList.contains('hidden')), true, '沒帶 list=1 就不該出現獎項一覽');
+    await page.bringToFront(); await page.click('.spin-btn[data-count="3"]'); await H.sleep(300);
+    assert.equal(await page.$eval('#countdown', (e) => !e.classList.contains('hidden')), true, '控制台有倒數');
+    assert.equal(await page.$eval('#countdown span', (e) => e.textContent), '2');
+    await ov.bringToFront(); await H.sleep(200);
+    assert.equal(await ov.$eval('#ovBanner', (e) => !e.classList.contains('hidden')), true, '覆蓋層有橫幅');
+    assert.equal(await ov.$eval('#ovWho', (e) => e.textContent), '倒數哥　3連抽');
+    assert.match(await ov.$eval('#ovPity', (e) => e.textContent), /倒數哥：再 5 抽觸發累積保底/);
+    await page.bringToFront(); await page.waitForSelector('#resultModal:not(.hidden)', { timeout: 15000 });
+    assert.equal(await page.$eval('#countdown', (e) => e.classList.contains('hidden')), true, '倒數結束後隱藏');
+    // 勾「跳過動畫」就不倒數
+    await H.closeResult(page); await page.evaluate(() => { document.querySelector('#skipAnim').checked = true; });
+    await page.click('.spin-btn[data-count="1"]'); await H.sleep(150);
+    assert.equal(await page.$eval('#countdown', (e) => e.classList.contains('hidden')), true, '跳過動畫時不倒數');
+    await page.waitForSelector('#resultModal:not(.hidden)', { timeout: 15000 });
+    assert.deepEqual(page.errors, []); assert.deepEqual(ov.errors, []);
   });
 
   test('保底：連抽保底每 5 抽至少一個，40 批全部符合', async (t) => {

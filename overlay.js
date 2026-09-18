@@ -3,7 +3,7 @@
   const LW = (window.LW = window.LW || {});
   const { Wheel, Sfx, Confetti } = LuckyWheel;
   const { DEFAULT_CONFIG, normalizeConfig, normalizePrize } = LuckyCore;
-  const { $, $$, wait, isFlip, flipTotal, resultCards, scheduleFlipSounds, liveChip, renderPrizeListRows, applyTheme } = LW.ui;
+  const { $, $$, wait, isFlip, flipTotal, resultCards, scheduleFlipSounds, liveChip, renderPrizeListRows, runCountdown, applyTheme } = LW.ui;
 
   function startOverlay(params) {
     const { Store, Sync, KEYS } = LW;
@@ -22,7 +22,7 @@
     if (mode === 'spin') stage.classList.add('out');
     const showList = params.get('list') === '1';
     const listOpts = { prob: params.get('lp') !== '0', stock: params.get('ls') !== '0' };
-    if (showList) { const pl = $('#ovPrizeList'); pl.classList.remove('hidden'); const pos = params.get('lpos'); if (pos === 'c') pl.classList.add('centered'); else if (pos === 'tr') pl.classList.add('pos-tr'); }
+    { const pl = $('#ovPrizeList'); pl.classList.toggle('hidden', !showList); const pos = params.get('lpos'); if (pos === 'c') pl.classList.add('centered'); else if (pos === 'tr') pl.classList.add('pos-tr'); }
     const renderList = () => { if (showList) renderPrizeListRows($('#ovPrizeListRows'), config.prizes, listOpts); };
 
     // 先用本機快取的設定畫轉盤（同一瀏覽器直接共用，跨瀏覽器則等控制台回覆）
@@ -49,8 +49,13 @@
       if (!d.results.length) return;
       $('#ovLive').innerHTML = '';
       stage.classList.remove('out');
+      // 轉動中橫幅：誰在抽、抽幾連、保底狀態（觀眾看得到）
+      $('#ovWho').textContent = `${d.player || '匿名'}　${d.batchType || ''}`;
+      $('#ovPity').textContent = d.pity || '';
+      $('#ovBanner').classList.remove('hidden');
       if (window.WheelBG) WheelBG.setSpinning(true);
       await wait(fast ? 0 : mode === 'spin' ? 600 : 50);
+      if (!fast && d.countdown) await runCountdown(d.countdown, { onTick: () => Sfx.tick() });
       const flip = isFlip(d);
       const dur = (ms) => (fast ? 0 : ms);
       if (flip) {
@@ -75,6 +80,7 @@
       await wait(fast ? 2000 : flipTotal(d.results.length, flip) + (hideParam || config.overlayResultSeconds || 8) * 1000);
       $('#ovResultLayer').classList.add('out');
       $('#ovLive').innerHTML = '';
+      $('#ovBanner').classList.add('hidden');
       if (mode === 'spin') stage.classList.add('out');
     }
     async function pump() { if (busy) return; busy = true; while (queue.length) { const d = queue.shift(); try { await play(d, queue.length > 0); } catch (e) { console.error(e); } } busy = false; }

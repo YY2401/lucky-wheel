@@ -3,7 +3,7 @@
   const LW = (window.LW = window.LW || {});
   const { Wheel, Sfx, Confetti } = LuckyWheel;
   const { PALETTE, DEFAULT_CONFIG, randId, formatTime, normalizeConfig, probabilities, suggestWeights, drawsSinceHit, drawBatch, undoBatch } = LuckyCore;
-  const { $, $$, wait, esc, colorOf, toast, dialog, ask, isFlip, resultCards, scheduleFlipSounds, liveChip, renderPrizeListRows, applyTheme } = LW.ui;
+  const { $, $$, wait, esc, colorOf, toast, dialog, ask, isFlip, resultCards, scheduleFlipSounds, liveChip, renderPrizeListRows, runCountdown, applyTheme } = LW.ui;
 
   function startControl() {
     const { Store, Sync, Excel, KEYS } = LW;
@@ -349,7 +349,7 @@
     // ======================================================================
     //  設定頁
     // ======================================================================
-    const SETTING_KEYS = ['segmentMode', 'turns', 'overlayResultSeconds', 'multiMode', 'minSlice', 'pityAccumN', 'pityBatchK', 'pityScope', 'theme', 'room', 'broker', 'overlaySize', 'overlayListPos'];
+    const SETTING_KEYS = ['segmentMode', 'turns', 'countdown', 'overlayResultSeconds', 'multiMode', 'minSlice', 'pityAccumN', 'pityBatchK', 'pityScope', 'theme', 'room', 'broker', 'overlaySize', 'overlayListPos'];
     const SEC_KEYS = ['spinDuration', 'multiSpinDuration']; // 畫面用秒，內部存毫秒
     const BOOL_KEYS = ['sound', 'sync', 'bg3d', 'pityAccum', 'pityBatch', 'overlaySpinOnly', 'overlayMute', 'overlayHideStatus', 'overlayList', 'overlayListProb', 'overlayListStock'];
     function renderSettings() {
@@ -493,21 +493,23 @@
     // ======================================================================
     //  抽獎
     // ======================================================================
-    function renderPityInfo() {
-      const cfg = state.config; const el = $('#pityInfo');
-      const hasPool = cfg.prizes.some((p) => p.pity);
-      if (!(cfg.pityAccum || cfg.pityBatch) || !hasPool) { el.classList.add('hidden'); return; }
-      el.classList.remove('hidden');
-      if (!LuckyCore.pityPool(cfg.prizes).length) { el.textContent = '保底獎已全部抽完，保底不會再觸發'; return; }
+    // 保底提示文字：主畫面顯示、也隨抽獎訊息送給覆蓋層（在抽之前算，才是「這次抽之前」的狀態）
+    function pityText(player) {
+      const cfg = state.config;
+      if (!(cfg.pityAccum || cfg.pityBatch) || !cfg.prizes.some((p) => p.pity)) return '';
+      if (!LuckyCore.pityPool(cfg.prizes).length) return '保底獎已全部抽完，保底不會再觸發';
       const parts = [];
       if (cfg.pityAccum) {
-        const player = $('#player').value.trim();
         const left = Math.max(0, cfg.pityAccumN - drawsSinceHit(state.records, cfg, player));
         const who = cfg.pityScope === 'global' ? '全體' : (player || '匿名');
         parts.push(left === 0 ? `${who}：下一抽必中保底獎` : `${who}：再 ${left} 抽觸發累積保底`);
       }
       if (cfg.pityBatch) parts.push(`每 ${cfg.pityBatchK} 抽至少 1 個保底獎`);
-      el.textContent = parts.join('　｜　');
+      return parts.join('　｜　');
+    }
+    function renderPityInfo() {
+      const el = $('#pityInfo'); const txt = pityText($('#player').value.trim());
+      el.classList.toggle('hidden', !txt); el.textContent = txt;
     }
     $('#player').addEventListener('input', renderPityInfo);
     // 最近用過的抽獎者名字做成選單（最新在前，最多 30 個）
@@ -524,10 +526,11 @@
       $$('.spin-btn').forEach((b) => { b.disabled = v; });
       $('#skipBtn').classList.toggle('hidden', !v);
     }
-    function doSpin(countRaw, player) {
+    function doSpin(countRaw, player, skip) {
+      const pity = pityText(player); // 抽之前的保底狀態
       const { batchId, type, count, results, recs, time } = drawBatch({ cfg: state.config, records: state.records, count: countRaw, player });
       if (recs.length) { state.records.push(...recs); Store.set(KEYS.records, state.records); Store.set(KEYS.config, state.config); }
-      return { type: 'spin', batchId, batchType: type, count, player, results, prizes: state.config.prizes, exhausted: results.length < count, time, reveal: state.config.multiMode };
+      return { type: 'spin', batchId, batchType: type, count, player, results, prizes: state.config.prizes, exhausted: results.length < count, time, reveal: state.config.multiMode, pity, countdown: skip ? 0 : state.config.countdown };
     }
     function forSyncSpin(res) {
       const prizes = forSync(res.prizes);
@@ -540,9 +543,11 @@
       try {
         if (state.dirty && !saveConfig(true)) return;
         if (Excel.handle) await Excel.ensurePermission(); // 需在使用者點擊後立即詢問
-        const res = doSpin(count, $('#player').value.trim());
+        state.skipAll = $('#skipAnim').checked;
+        const res = doSpin(count, $('#player').value.trim(), state.skipAll);
         Sync.send(forSyncSpin(res));
         const excelP = res.results.length ? Excel.writeAll().catch((e) => ({ ok: false, error: e.message })) : Promise.resolve({ ok: false, skipped: true });
+        if (res.results.length && res.countdown) await runCountdown(res.countdown, { onTick: () => Sfx.tick(), shouldStop: () => state.skipAll });
         await playBatch(res);
         res.excel = await excelP;
         if (res.results.length) showResult(res);
@@ -550,7 +555,7 @@
       finally { setSpinning(false); }
     }
     async function playBatch(res) {
-      $('#liveResults').innerHTML = ''; state.skipAll = $('#skipAnim').checked;
+      $('#liveResults').innerHTML = '';
       if (!res.results.length) { toast('沒有可抽的獎項（獎項都抽完或權重為 0）'); return; }
       const cfg = state.config;
       if (isFlip(res)) {

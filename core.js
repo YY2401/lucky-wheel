@@ -12,7 +12,7 @@
   const rand = () => { const a = new Uint32Array(1); cryptoObj.getRandomValues(a); return a[0] / 4294967296; };
 
   const DEFAULT_CONFIG = {
-    title: '幸運轉盤', segmentMode: 'weight', spinDuration: 5000, multiSpinDuration: 1500, turns: 6, sound: true,
+    title: '幸運轉盤', segmentMode: 'weight', spinDuration: 5000, multiSpinDuration: 1500, turns: 6, sound: true, countdown: 3,
     overlayResultSeconds: 8, multiMode: 'flip', minSlice: 4, bg3d: true, theme: 'light', themeChosen: false,
     overlaySize: 520, overlaySpinOnly: false, overlayMute: false, overlayHideStatus: false,
     overlayList: false, overlayListProb: true, overlayListStock: true, overlayListPos: 'tl',
@@ -42,6 +42,7 @@
     cfg.spinDuration = Math.min(30000, Math.max(500, Number(cfg.spinDuration) || 5000));
     cfg.multiSpinDuration = Math.min(30000, Math.max(300, Number(cfg.multiSpinDuration) || 1500));
     cfg.turns = Math.min(20, Math.max(1, Math.trunc(Number(cfg.turns)) || 6));
+    cfg.countdown = Math.min(10, Math.max(0, Number.isFinite(Number(cfg.countdown)) ? Math.trunc(Number(cfg.countdown)) : 3));
     cfg.sound = cfg.sound !== false;
     cfg.sync = cfg.sync === true;
     cfg.overlayResultSeconds = Math.min(120, Math.max(1, Number(cfg.overlayResultSeconds) || 8));
