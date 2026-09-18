@@ -7,7 +7,7 @@
 <script>try { document.documentElement.dataset.theme = localStorage.getItem('lw.theme') || 'light'; } catch (e) { document.documentElement.dataset.theme = 'light'; }</script>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=37">
+<link rel="stylesheet" href="style.css?v=38">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.1/mqtt.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
@@ -249,9 +249,9 @@
       <div class="row-actions" style="margin-top:0">
         <button class="btn primary" id="backupAll">備份全部（設定＋紀錄）</button>
         <button class="btn" id="restoreAll">還原備份</button>
-        <input type="file" id="restoreFile" accept="application/json" hidden>
+        <input type="file" id="restoreFile" accept=".lwbackup,application/json" hidden>
       </div>
-      <p class="hint">所有資料都存在這台電腦的瀏覽器裡，清除瀏覽器資料或換電腦就會不見。備份檔是一個 JSON，包含獎項設定、所有抽獎紀錄與偏好；還原會整份取代目前的資料。建議活動前後各備一次。</p>
+      <p class="hint">所有資料都存在這台電腦的瀏覽器裡，清除瀏覽器資料或換電腦就會不見。「備份全部」會下載一個 <b>.lwbackup</b> 檔（不用打開它，收好就好），裡面有獎項設定、所有抽獎紀錄與偏好；換電腦或資料不見時用「還原備份」選這個檔就整份回來。建議活動前後各備一次。</p>
       <hr style="border:0;border-top:1px solid var(--line);margin:14px 0">
       <div class="row-actions" style="margin-top:0">
         <input id="recordSearch" placeholder="搜尋紀錄：抽獎者、獎項、類型、日期、批次ID…" style="flex:1;min-width:220px">
@@ -340,15 +340,15 @@
 <canvas id="confetti"></canvas>
 <div id="toast"></div>
 
-<script src="core.js?v=37"></script>
-<script src="wheel.js?v=37"></script>
-<script src="ui.js?v=37"></script>
-<script src="store.js?v=37"></script>
-<script src="sync.js?v=37"></script>
-<script src="excel.js?v=37"></script>
-<script src="overlay.js?v=37"></script>
-<script src="control.js?v=37"></script>
-<script src="app.js?v=37"></script>
-<script src="bg.js?v=37"></script>
+<script src="core.js?v=38"></script>
+<script src="wheel.js?v=38"></script>
+<script src="ui.js?v=38"></script>
+<script src="store.js?v=38"></script>
+<script src="sync.js?v=38"></script>
+<script src="excel.js?v=38"></script>
+<script src="overlay.js?v=38"></script>
+<script src="control.js?v=38"></script>
+<script src="app.js?v=38"></script>
+<script src="bg.js?v=38"></script>
 </body>
 </html>

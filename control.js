@@ -302,19 +302,19 @@
     // ---------- 備份 / 還原（設定＋紀錄＋偏好一個檔）----------
     const meta = Object.assign({ lastBackup: null, recordsAtBackup: 0 }, Store.get(KEYS.meta, {}));
     function downloadJson(obj, name) {
-      const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
+      const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/octet-stream' });
       const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     }
     function backupAll() {
       const stamp = formatTime(new Date()).replace(/[-: ]/g, '').slice(0, 12);
-      downloadJson({ kind: 'lucky-wheel-backup', version: 1, exportedAt: new Date().toISOString(), config: state.config, records: state.records, prizeList: plPrefs }, `lucky-wheel-備份_${stamp}.json`);
+      downloadJson({ kind: 'lucky-wheel-backup', version: 1, exportedAt: new Date().toISOString(), config: state.config, records: state.records, prizeList: plPrefs }, `幸運轉盤備份_${stamp}.lwbackup`);
       meta.lastBackup = Date.now(); meta.recordsAtBackup = state.records.length; Store.set(KEYS.meta, meta);
       renderBackupInfo(); toast('已下載備份檔');
     }
     async function restoreAll(file) {
       let data;
-      try { data = JSON.parse(await file.text()); } catch { toast('還原失敗：檔案不是有效的 JSON'); return; }
+      try { data = JSON.parse(await file.text()); } catch { toast('還原失敗：這不是幸運轉盤的備份檔'); return; }
       if (!data || data.kind !== 'lucky-wheel-backup' || !data.config) { toast('這不是完整備份檔（可能只是「匯出設定」的檔案，請到「獎項設定」用「匯入設定」）', 7000); return; }
       const recs = Array.isArray(data.records) ? data.records : [];
       const when = data.exportedAt ? formatTime(new Date(data.exportedAt)) : '未知時間';

@@ -195,7 +195,7 @@ if (!H.chromePath()) {
     await page.click('.open-panel[data-tab="records"]'); await H.sleep(200);
     assert.equal(await page.$eval('#backupInfo', (e) => e.textContent), '還沒備份過');
     await page.click('#backupAll');
-    let file; for (let i = 0; i < 40 && !file; i++) { await H.sleep(100); file = fs.readdirSync(dir).find((f) => f.endsWith('.json')); }
+    let file; for (let i = 0; i < 40 && !file; i++) { await H.sleep(100); file = fs.readdirSync(dir).find((f) => f.endsWith('.lwbackup')); }
     assert.ok(file, '有下載備份檔');
     const backup = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8'));
     assert.equal(backup.kind, 'lucky-wheel-backup');
