@@ -590,14 +590,14 @@
       const A = window.anime;
       let hovering = false;
       const stopAll = () => { if (A) { A.remove(btn); A.remove(ring); A.remove(text); } };
-      const startIdle = () => { if (!A || state.spinning) return; stopAll(); btn.style.transform = ''; A({ targets: btn, scale: [1, 1.06], duration: 1500, direction: 'alternate', loop: true, easing: 'easeInOutSine' }); };
+      const startIdle = () => { if (!A || state.spinning) return; stopAll(); A({ targets: btn, scale: 1, rotate: 0, duration: 250, easing: 'easeOutQuad' }); };
       const rippleLoop = () => { if (!A) return; A.remove(ring); A({ targets: ring, scale: [1, 1.75], opacity: [0.7, 0], duration: 1100, loop: true, easing: 'easeOutCubic' }); };
-      btn.addEventListener('pointerenter', () => { hovering = true; if (state.spinning) return; stopAll(); A && A({ targets: btn, scale: 1.14, rotate: [0, -4, 0], duration: 350, easing: 'easeOutBack' }); rippleLoop(); });
+      btn.addEventListener('pointerenter', () => { hovering = true; if (state.spinning) return; stopAll(); A && A({ targets: btn, scale: 1.3, rotate: [0, -4, 0], duration: 350, easing: 'easeOutBack' }); rippleLoop(); });
       btn.addEventListener('pointerleave', () => { hovering = false; if (state.spinning) return; if (A) { A.remove(ring); A({ targets: ring, opacity: 0, duration: 200, easing: 'linear' }); } startIdle(); });
       btn.addEventListener('pointerdown', () => { if (state.spinning || !A) return; A.remove(btn); A({ targets: btn, scale: 0.88, duration: 90, easing: 'easeOutQuad' }); });
       btn.addEventListener('click', (e) => {
         if (state.spinning) return;
-        if (A) { A.remove(btn); A({ targets: btn, scale: [0.88, 1.25, 1], duration: 650, easing: 'easeOutElastic(1, .5)' }); A.remove(ring); A({ targets: ring, scale: [1, 2.6], opacity: [0.9, 0], duration: 700, easing: 'easeOutCubic' }); }
+        if (A) { A.remove(btn); A({ targets: btn, scale: [0.88, 1.35, 1], duration: 650, easing: 'easeOutElastic(1, .5)' }); A.remove(ring); A({ targets: ring, scale: [1, 2.6], opacity: [0.9, 0], duration: 700, easing: 'easeOutCubic' }); }
         const r = btn.getBoundingClientRect();
         if (window.WheelBG) WheelBG.burstAt(r.left + r.width / 2, r.top + r.height / 2);
         e.preventDefault(); spin(1);

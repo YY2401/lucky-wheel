@@ -379,17 +379,18 @@ body.overlay .prize-list.centered { width: min(820px, 92vw); --pl-size: 30px; z-
 .records-table .f-undo { padding: 3px 8px; font-size: 12px; }
 
 /* ---------- 轉盤中心 GO 按鈕（DOM，讓 anime.js 做動態） ---------- */
-.hub-pos { position: absolute; left: 50%; top: 50%; width: 26%; aspect-ratio: 1; transform: translate(-50%, -50%); z-index: 2; pointer-events: none; }
+.wheel-wrap { container-type: inline-size; }
+.hub-pos { position: absolute; left: 50%; top: 50%; width: 12%; aspect-ratio: 1; transform: translate(-50%, -50%); z-index: 2; pointer-events: none; } /* 與原本畫在轉盤上的中心軸同大小 */
 .hub-btn {
   position: relative; width: 100%; height: 100%; border-radius: 50%; cursor: pointer; pointer-events: auto; padding: 0;
-  background: var(--paper); border: 4px solid var(--yellow); color: var(--ink); font-family: "Bungee", sans-serif; font-size: clamp(16px, 4.2vmin, 34px); letter-spacing: 1px;
-  box-shadow: 0 0 0 3px var(--ink); display: flex; align-items: center; justify-content: center; user-select: none; -webkit-tap-highlight-color: transparent;
+  background: var(--paper); border: 3px solid var(--yellow); color: var(--ink); font-family: "Bungee", sans-serif; font-size: clamp(11px, 3.9cqw, 26px); letter-spacing: .5px;
+  box-shadow: 0 0 0 2px var(--ink); display: flex; align-items: center; justify-content: center; user-select: none; -webkit-tap-highlight-color: transparent;
 }
-[data-theme="light"] .hub-btn { border-color: var(--ink); box-shadow: 0 0 0 3px var(--yellow); }
+[data-theme="light"] .hub-btn { border-color: var(--ink); box-shadow: 0 0 0 2px var(--yellow); }
 .hub-btn:focus-visible { outline: 3px solid var(--red); outline-offset: 4px; }
 .hub-btn .hub-text { position: relative; z-index: 1; }
-.hub-btn .hub-ring { position: absolute; inset: -4px; border-radius: 50%; border: 3px solid var(--yellow); opacity: 0; pointer-events: none; }
+.hub-btn .hub-ring { position: absolute; inset: -3px; border-radius: 50%; border: 2px solid var(--yellow); opacity: 0; pointer-events: none; }
 .hub-btn.spinning { cursor: default; }
-.hub-btn.spinning .hub-ring2 { opacity: 1; border: 4px dashed var(--red); inset: -12px; animation: hubspin 1.2s linear infinite; }
+.hub-btn.spinning .hub-ring2 { opacity: 1; border: 3px dashed var(--red); inset: -9px; animation: hubspin 1.2s linear infinite; }
 @keyframes hubspin { to { transform: rotate(360deg); } }
 body.overlay .hub-pos { display: none; }
