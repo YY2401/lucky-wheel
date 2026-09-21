@@ -200,3 +200,43 @@ test('normalizeConfig：會自動產生金鑰，且只留英數', () => {
   assert.match(c.secret, /^[A-Z0-9]{20}$/);
   assert.equal(core.normalizeConfig({ secret: 'ab-c!d' }).secret, 'abcd');
 });
+
+test('補抽：原紀錄標作廢並加回庫存、新紀錄同批次同第幾抽、標補抽', () => {
+  const c = cfg();
+  const first = core.drawBatch({ cfg: c, records: [], count: 3, random: () => 0 }); // 三抽都落在第一個可抽獎項
+  const records = [...first.recs];
+  assert.equal(c.prizes[0].remaining, 0, '特獎限量 1 抽完');
+  const target = records[0]; // 第 1 抽 = 特獎
+  const out = core.redraw({ cfg: c, records, key: core.recordKey(target), random: () => 0.999 }); // 補抽落在最後一個（銘謝惠顧）
+  records.push(...out.recs);
+  assert.equal(target.void, true);
+  assert.equal(target.note, '被補抽取代');
+  assert.equal(c.prizes[0].remaining, 1, '作廢後特獎庫存加回');
+  assert.equal(out.recs.length, 1);
+  assert.equal(out.recs[0].batchId, target.batchId);
+  assert.equal(out.recs[0].index, 1);
+  assert.equal(out.recs[0].type, '補抽');
+  assert.equal(out.recs[0].redrawOf, core.recordKey(target));
+  assert.equal(out.recs[0].prizeId, 'e');
+  assert.equal(out.results[0].index, 1);
+  assert.equal(out.label, '補抽第 1 抽');
+  assert.throws(() => core.redraw({ cfg: c, records, key: core.recordKey(target) }), /已經作廢/);
+  assert.throws(() => core.redraw({ cfg: c, records, key: 'nope' }), /找不到/);
+});
+
+test('補抽：作廢的紀錄不算保底計數；撤銷整批時作廢的不會再加回庫存', () => {
+  const c = cfg({ pityAccum: true, pityAccumN: 3 });
+  const recs = [{ rid: 'a', player: 'x', hit: false, batchId: 'B', index: 1, prizeId: 'e' }, { rid: 'b', player: 'x', hit: false, batchId: 'B', index: 2, prizeId: 'a' }];
+  assert.equal(core.drawsSinceHit(recs, c, 'x'), 2);
+  recs[1].void = true;
+  assert.equal(core.drawsSinceHit(recs, c, 'x'), 1, '作廢那筆不算');
+  c.prizes[0].remaining = 0; // 假設特獎已被抽走
+  const out = core.undoBatch(recs, c.prizes, 'B');
+  assert.equal(out.records.length, 0);
+  assert.equal(c.prizes[0].remaining, 0, '作廢的特獎紀錄不再加回（補抽時已加過）');
+});
+
+test('舊紀錄沒有 rid：recordKey 用批次＋第幾抽', () => {
+  assert.equal(core.recordKey({ batchId: 'B1', index: 3 }), 'B1-3');
+  assert.equal(core.recordKey({ rid: 'R', batchId: 'B1', index: 3 }), 'R');
+});

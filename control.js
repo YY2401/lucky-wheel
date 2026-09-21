@@ -2,7 +2,7 @@
 (function () {
   const LW = (window.LW = window.LW || {});
   const { Wheel, Sfx, Confetti } = LuckyWheel;
-  const { PALETTE, DEFAULT_CONFIG, randId, formatTime, normalizeConfig, probabilities, suggestWeights, drawsSinceHit, drawBatch, undoBatch } = LuckyCore;
+  const { PALETTE, DEFAULT_CONFIG, randId, formatTime, normalizeConfig, probabilities, suggestWeights, drawsSinceHit, drawBatch, undoBatch, recordKey, redraw } = LuckyCore;
   const { $, $$, wait, esc, colorOf, toast, dialog, ask, isFlip, resultCards, scheduleFlipSounds, liveChip, renderPrizeListRows, runCountdown, applyTheme } = LW.ui;
 
   function startControl() {
@@ -426,15 +426,17 @@
       const seen = new Set();
       $('#recordRows').innerHTML = list.slice(-500).reverse().map((r) => {
         const first = !seen.has(r.batchId); seen.add(r.batchId);
-        return `<tr data-batch="${esc(r.batchId)}">
-        <td>${esc(r.time)}</td><td>${esc(r.player)}</td><td>${esc(r.type)}</td><td>${r.index}</td>
+        const tag = r.void ? '<span class="tag-void">作廢</span>' : r.redrawOf ? '<span class="tag-redraw">補抽</span>' : '';
+        return `<tr data-batch="${esc(r.batchId)}" class="${r.void ? 'void' : ''}">
+        <td>${esc(r.time)}</td><td>${esc(r.player)}</td><td>${esc(r.type)}${tag}</td><td>${r.index}</td>
         <td>${esc(r.prize)}</td><td>${r.remaining === -1 ? '∞' : r.remaining}</td><td>${r.probability}%</td><td>${r.pity ? '<span class="badge-pity inline">保底</span>' : ''}</td>
-        <td>${first ? `<button class="btn icon f-undo" data-batch="${esc(r.batchId)}" title="撤銷這批">撤銷</button>` : ''}</td></tr>`;
+        <td style="white-space:nowrap">${r.void ? '' : `<button class="btn icon f-redraw" data-key="${esc(recordKey(r))}" title="只重抽這一抽">補抽</button> `}${first ? `<button class="btn icon f-undo" data-batch="${esc(r.batchId)}" title="撤銷這批">撤銷</button>` : ''}</td></tr>`;
       }).join('');
     }
-    $('#recordRows').addEventListener('click', (e) => { const b = e.target.closest('.f-undo'); if (b) undoBatchById(b.dataset.batch); });
+    $('#recordRows').addEventListener('click', (e) => { const u = e.target.closest('.f-undo'); if (u) return undoBatchById(u.dataset.batch); const r = e.target.closest('.f-redraw'); if (r) redrawRecord(r.dataset.key); });
     // 統計：每個獎項實際抽出幾次，對照目前設定的機率
     function renderStats(list, filtered) {
+      list = list.filter((r) => !r.void); // 作廢的不算
       const total = list.length;
       const probs = probabilities(state.config.prizes);
       const byId = new Map();
@@ -575,11 +577,49 @@
       Sfx.win(); confetti.burst(res.results.length > 1 ? 260 : 160);
       if (window.WheelBG) WheelBG.burst();
     }
+    // ---------- 補抽：作廢某一抽、轉盤轉一次、把那張卡換成新結果 ----------
+    async function redrawRecord(key) {
+      if (state.spinning) return;
+      const rec = state.records.find((r) => recordKey(r) === key);
+      if (!rec) { toast('找不到這筆紀錄'); return; }
+      if (rec.void) { toast('這筆已經作廢，請對補抽後的那筆操作'); return; }
+      const ok = await ask(`${rec.player ? `抽獎者：${rec.player}　` : ''}第 ${rec.index} 抽：${rec.prize}\n\n這一抽會標成作廢（庫存加回、紀錄保留），並重新抽一次取代它。其他抽不受影響。確定補抽？`, { title: `補抽第 ${rec.index} 抽`, okLabel: '確定補抽' });
+      if (!ok) return;
+      setSpinning(true);
+      try {
+        if (state.dirty && !saveConfig(true)) return;
+        if (Excel.handle) await Excel.ensurePermission();
+        const pity = pityText(rec.player || '');
+        const out = redraw({ cfg: state.config, records: state.records, key });
+        state.records.push(...out.recs); Store.set(KEYS.records, state.records); Store.set(KEYS.config, state.config);
+        const res = { type: 'spin', batchId: out.batchId, batchType: out.label, count: 1, player: rec.player || '', results: out.results, prizes: state.config.prizes, exhausted: false, time: out.recs[0] && out.recs[0].time, reveal: state.config.multiMode, pity, countdown: 0, redrawOf: key };
+        Sync.send(forSyncSpin(res));
+        const excelP = Excel.writeAll().catch((e) => ({ ok: false, error: e.message }));
+        state.skipAll = $('#skipAnim').checked;
+        await playBatch(res);
+        res.excel = await excelP;
+        // 結果視窗開著：只把那一張卡換掉（先蓋牌再翻開），其他卡不動
+        const card = $(`#resultGrid .r-card[data-rid="${key}"]`);
+        if (card && !$('#resultModal').classList.contains('hidden')) {
+          card.outerHTML = resultCards(out.results, true, true, { redraw: true });
+          scheduleFlipSounds(1);
+          const ex = $('#excelStatus'); const e = res.excel || {};
+          ex.textContent = e.ok ? `已補抽並更新 Excel：${e.name}` : e.skipped ? `已補抽第 ${rec.index} 抽` : `已補抽，但 Excel 更新失敗：${e.error}`;
+        } else {
+          showResult(res);
+        }
+        renderRecords();
+        toast(`第 ${rec.index} 抽已補抽：${out.results[0] ? out.results[0].name : '（沒有可抽的獎項）'}`);
+      } catch (e) { toast(`補抽失敗：${e.message}`); console.error(e); }
+      finally { setSpinning(false); }
+    }
+    $('#resultGrid').addEventListener('click', (e) => { const b = e.target.closest('.r-redraw'); if (b) redrawRecord(b.dataset.rid); });
+
     function showResult(res) {
       $('#resultTitle').textContent = res.results.length > 1 ? `${res.batchType}結果` : '恭喜獲得';
       $('#resultSub').textContent = [res.player && `抽獎者：${res.player}`, res.exhausted && '（部分獎項已抽完，實際抽數少於設定）'].filter(Boolean).join('　');
       const flip = isFlip(res);
-      $('#resultGrid').innerHTML = resultCards(res.results, true, flip);
+      $('#resultGrid').innerHTML = resultCards(res.results, true, flip, { redraw: true });
       $('.modal-box', $('#resultModal')).classList.toggle('single', res.results.length === 1);
       if (flip) scheduleFlipSounds(res.results.length);
       const ex = $('#excelStatus'); const e = res.excel || {};

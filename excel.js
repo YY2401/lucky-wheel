@@ -3,8 +3,8 @@
   const LW = (window.LW = window.LW || {});
   const { formatTime } = LuckyCore;
   const SHEET = '抽獎紀錄';
-  const HEADERS = ['時間', '批次ID', '抽獎類型', '第幾抽', '抽獎者/備註', '獎項', '獎項ID', '剩餘數量', '當時機率(%)', '保底'];
-  const COL_WIDTHS = [20, 22, 10, 8, 20, 24, 14, 10, 12, 8];
+  const HEADERS = ['時間', '批次ID', '抽獎類型', '第幾抽', '抽獎者/備註', '獎項', '獎項ID', '剩餘數量', '當時機率(%)', '保底', '狀態', '備註'];
+  const COL_WIDTHS = [20, 22, 10, 8, 20, 24, 14, 10, 12, 8, 8, 18];
 
   const Excel = {
     handle: null,
@@ -37,7 +37,7 @@
       if (p !== 'granted') p = await this.handle.requestPermission({ mode: 'readwrite' });
       return p === 'granted';
     },
-    rows() { return this.getRecords().map((r) => [r.time, r.batchId, r.type, r.index, r.player, r.prize, r.prizeId, r.remaining === -1 ? '無限' : r.remaining, r.probability, r.pity ? '是' : '']); },
+    rows() { return this.getRecords().map((r) => [r.time, r.batchId, r.type, r.index, r.player, r.prize, r.prizeId, r.remaining === -1 ? '無限' : r.remaining, r.probability, r.pity ? '是' : '', r.void ? '作廢' : '正常', r.note || '']); },
     buildWorkbook(existing) {
       let wb = null;
       if (existing) { try { wb = XLSX.read(existing, { type: 'array' }); } catch { wb = null; } }

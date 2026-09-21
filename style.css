@@ -486,3 +486,16 @@ body.overlay .hub-pos { display: none; }
   .stats-table th, .stats-table td { display: table-cell; font-size: 13px; }
   #recordSearch { min-width: 0; width: 100%; }
 }
+
+/* ---------- 補抽 ---------- */
+.r-card .r-redraw { position: absolute; top: 8px; left: 8px; opacity: 0; font-size: 12px; padding: 3px 9px; border-radius: 999px; border: 2px solid var(--ink); background: var(--paper); color: var(--ink); cursor: pointer; transition: opacity .15s; }
+.r-card:hover .r-redraw, .r-card .r-redraw:focus-visible { opacity: 1; }
+.r-card .r-redraw:hover { background: var(--yellow); }
+.badge-redraw { position: absolute; bottom: 8px; right: 8px; font-size: 11px; font-weight: 800; background: var(--blue); color: #fff; border-radius: 999px; padding: 2px 8px; border: 2px solid var(--ink); }
+.records-table tr.void td { opacity: .5; text-decoration: line-through; }
+.records-table tr.void td:last-child { text-decoration: none; }
+.tag-void, .tag-redraw { display: inline-block; font-size: 11px; font-weight: 800; border-radius: 999px; padding: 1px 7px; margin-left: 4px; border: 1.5px solid var(--ink); text-decoration: none; }
+.tag-void { background: var(--surface2); color: var(--muted); }
+.tag-redraw { background: var(--blue); color: #fff; }
+.records-table .f-redraw { padding: 3px 8px; font-size: 12px; }
+@media (max-width: 700px) { .r-card .r-redraw { opacity: 1; } }

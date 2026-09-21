@@ -286,6 +286,49 @@ if (!H.chromePath()) {
     assert.deepEqual(page.errors, []);
   });
 
+  test('補抽：結果卡上補抽某一抽 → 原筆作廢、新筆同批次；紀錄表也能補抽；統計排除作廢', async (t) => {
+    const page = await fresh(t, { prizes: [{ id: 'a', name: '限量', weight: 1, quantity: 5, remaining: 5 }, { id: 'b', name: '不限', weight: 1, quantity: -1, remaining: -1 }] });
+    await page.evaluate(() => { document.querySelector('#player').value = '補抽哥'; });
+    await H.spinOnce(page, 3); await H.sleep(2200); // 等翻牌翻完，補抽鈕在正面
+    const before = await H.readKey(page, 'lw.records');
+    const target = before[1];
+    const stockBefore = (await H.readKey(page, 'lw.config')).prizes[0].remaining;
+    // 結果視窗第 2 張卡的補抽鈕
+    await page.hover(`#resultGrid .r-card[data-rid="${target.rid}"]`);
+    await page.click(`#resultGrid .r-card[data-rid="${target.rid}"] .r-redraw`); await H.sleep(300);
+    assert.equal(await page.$eval('#confirmModal', (e) => !e.classList.contains('hidden')), true, '補抽前有確認');
+    assert.match(await page.$eval('#confirmMsg', (e) => e.textContent), /第 2 抽/);
+    await page.click('#confirmOk'); await H.sleep(1500);
+    const after = await H.readKey(page, 'lw.records');
+    assert.equal(after.length, 4);
+    const voided = after.find((r) => r.rid === target.rid);
+    assert.equal(voided.void, true);
+    const redrawn = after.find((r) => r.redrawOf === target.rid);
+    assert.ok(redrawn, '有補抽紀錄');
+    assert.equal(redrawn.batchId, target.batchId); assert.equal(redrawn.index, 2); assert.equal(redrawn.type, '補抽'); assert.equal(redrawn.player, '補抽哥');
+    // 庫存：作廢加回、補抽扣掉 → 只看落點差異
+    const stockAfter = (await H.readKey(page, 'lw.config')).prizes[0].remaining;
+    const expected = stockBefore + (target.prizeId === 'a' ? 1 : 0) - (redrawn.prizeId === 'a' ? 1 : 0);
+    assert.equal(stockAfter, expected, '庫存正確');
+    // 結果視窗還開著，第 2 張卡換成新結果、仍是 3 張
+    assert.equal(await page.$eval('#resultModal', (e) => e.classList.contains('hidden')), false);
+    assert.equal(await page.$$eval('#resultGrid .r-card', (c) => c.length), 3);
+    assert.equal(await page.$eval(`#resultGrid .r-card[data-rid="${redrawn.rid}"] .r-name`, (e) => e.textContent), redrawn.prize);
+    assert.equal(await page.$eval(`#resultGrid .r-card[data-rid="${redrawn.rid}"] .badge-redraw`, (e) => e.textContent), '補抽');
+    // 紀錄表：作廢列劃線、補抽列有標籤、作廢列沒有補抽鈕；統計只算 3 抽
+    await H.closeResult(page); await page.click('.open-panel[data-tab="records"]'); await H.sleep(300);
+    assert.equal(await page.$$eval('#recordRows tr.void', (r) => r.length), 1);
+    assert.equal(await page.$$eval('#recordRows .tag-redraw', (r) => r.length), 1);
+    assert.equal(await page.$$eval('#recordRows .f-redraw', (r) => r.length), 3, '作廢列沒有補抽鈕');
+    assert.match(await page.$eval('#statsTitle', (e) => e.textContent), /共 3 抽/);
+    // 從紀錄表補抽補抽後的那筆（可以連續補）
+    await page.click(`#recordRows .f-redraw[data-key="${redrawn.rid}"]`); await H.sleep(300); await page.click('#confirmOk'); await H.sleep(800);
+    const again = await H.readKey(page, 'lw.records');
+    assert.equal(again.length, 5);
+    assert.equal(again.filter((r) => r.void).length, 2);
+    assert.deepEqual(page.errors, []);
+  });
+
   test('保底：連抽保底每 5 抽至少一個，40 批全部符合', async (t) => {
     const page = await fresh(t, { pityBatch: true, pityBatchK: 5, prizes: FAST.prizes.map((p) => ({ ...p, quantity: -1, remaining: -1 })) });
     for (let i = 0; i < 40; i++) { await H.spinOnce(page, 5); await H.closeResult(page); }

@@ -115,6 +115,7 @@
     let n = 0;
     for (let i = records.length - 1; i >= 0; i--) {
       const r = records[i];
+      if (r.void) continue; // 被補抽作廢的不算
       if (key !== null && (r.player || '') !== key) continue;
       if (r.hit) break;
       n++;
@@ -142,10 +143,10 @@
       if (p.remaining > 0) p.remaining -= 1;
       const hit = !!p.pity;
       if (hit) { since = 0; hitsInBatch++; } else since++;
-      results.push({ index: i + 1, prizeId: p.id, name: p.name, image: p.image, color: p.color, remaining: p.remaining, probability: Math.round(probs[p.id] * 100) / 100, pity: forced, hit });
+      results.push({ rid: randId(8), index: i + 1, prizeId: p.id, name: p.name, image: p.image, color: p.color, remaining: p.remaining, probability: Math.round(probs[p.id] * 100) / 100, pity: forced, hit });
     }
     const time = formatTime(now);
-    const recs = results.map((r) => ({ time, batchId, type, index: r.index, player, prize: r.name, prizeId: r.prizeId, remaining: r.remaining, probability: r.probability, pity: r.pity, hit: r.hit }));
+    const recs = results.map((r) => ({ rid: r.rid, time, batchId, type, index: r.index, player, prize: r.name, prizeId: r.prizeId, remaining: r.remaining, probability: r.probability, pity: r.pity, hit: r.hit }));
     return { batchId, type, count, results, recs, time };
   }
 
@@ -173,9 +174,27 @@
   // ---------- 撤銷一批：把庫存加回去，回傳移除後的紀錄 ----------
   function undoBatch(records, prizes, batchId) {
     const batch = records.filter((r) => r.batchId === batchId);
-    batch.forEach((r) => { const p = prizes.find((x) => x.id === r.prizeId); if (p && p.quantity !== -1) p.remaining = Math.min(p.quantity, p.remaining + 1); });
+    // 已作廢（被補抽）的那筆庫存早就加回去了，不能再加一次
+    batch.filter((r) => !r.void).forEach((r) => { const p = prizes.find((x) => x.id === r.prizeId); if (p && p.quantity !== -1) p.remaining = Math.min(p.quantity, p.remaining + 1); });
     return { batch, records: records.filter((r) => r.batchId !== batchId) };
   }
 
-  return { PALETTE, DEFAULT_CONFIG, formatTime, randId, rand, normalizePrize, normalizeConfig, pool, pityPool, probabilities, drawOne, suggestWeights, drawsSinceHit, drawBatch, undoBatch, signMessage, verifyMessage, SIG_WINDOW_MS };
+  // ---------- 補抽：把某一抽作廢（留紀錄、庫存加回），再用同樣的人 / 批次 / 第幾抽重抽一次 ----------
+  const recordKey = (r) => r.rid || `${r.batchId}-${r.index}`; // 舊紀錄沒有 rid
+  function redraw({ cfg, records, key, now = new Date(), random = rand }) {
+    const target = records.find((r) => recordKey(r) === key);
+    if (!target) throw new Error('找不到這筆紀錄');
+    if (target.void) throw new Error('這筆已經作廢，請對補抽後的那筆操作');
+    target.void = true;
+    target.note = `被補抽取代`;
+    const p = cfg.prizes.find((x) => x.id === target.prizeId);
+    if (p && p.quantity !== -1) p.remaining = Math.min(p.quantity, p.remaining + 1);
+    const out = drawBatch({ cfg, records, count: 1, player: target.player || '', now, random });
+    const label = `補抽第 ${target.index} 抽`;
+    out.results.forEach((r) => { r.index = target.index; r.redrawOf = key; });
+    out.recs.forEach((r) => { r.batchId = target.batchId; r.type = '補抽'; r.index = target.index; r.redrawOf = key; r.note = label; });
+    return { ...out, batchId: target.batchId, type: '補抽', label, voided: target };
+  }
+
+  return { PALETTE, DEFAULT_CONFIG, formatTime, randId, rand, normalizePrize, normalizeConfig, pool, pityPool, probabilities, drawOne, suggestWeights, drawsSinceHit, drawBatch, undoBatch, recordKey, redraw, signMessage, verifyMessage, SIG_WINDOW_MS };
 });

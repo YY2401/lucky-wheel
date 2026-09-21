@@ -42,13 +42,15 @@
   // 連抽且採翻牌模式時，轉盤只轉一次、結果用翻牌揭曉
   const isFlip = (d) => d.results.length > 1 && d.reveal !== 'each';
   const flipTotal = (n, flip = true) => (flip ? FLIP.start + (n - 1) * FLIP.gap + FLIP.dur : 0);
-  function resultCards(results, showIndex, flip = true) {
+  function resultCards(results, showIndex, flip = true, { redraw = false } = {}) {
     return results.map((r, i) => `
-      <div class="r-card${flip ? '' : ' revealed'}" style="--c:${esc(r.color || '#888')}">
+      <div class="r-card${flip ? '' : ' revealed'}" style="--c:${esc(r.color || '#888')}" data-rid="${esc(r.rid || '')}">
         <div class="flip-inner" style="--d:${FLIP.start + i * FLIP.gap}ms">
           <div class="flip-face flip-back"><span class="q">?</span></div>
           <div class="flip-face flip-front">
             ${r.pity ? '<span class="badge-pity">保底</span>' : ''}
+            ${redraw && r.rid ? `<button type="button" class="r-redraw" data-rid="${esc(r.rid)}" title="只重抽這一抽">補抽</button>` : ''}
+            ${r.redrawOf ? '<span class="badge-redraw">補抽</span>' : ''}
             <div class="r-img">${r.image ? `<img src="${esc(r.image)}" alt="">` : '<span class="r-dot"></span>'}</div>
             <div class="r-name">${esc(r.name)}</div>
             ${showIndex ? `<div class="r-idx">第 ${r.index} 抽</div>` : ''}
