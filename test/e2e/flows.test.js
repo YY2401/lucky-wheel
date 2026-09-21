@@ -20,7 +20,7 @@ if (!H.chromePath()) {
     t.after(() => page.close());
     await page.goto(`${srv.url}/?t=${Date.now()}${query}`, { waitUntil: 'networkidle0' });
     await page.evaluate(() => new Promise((res) => { const r = indexedDB.deleteDatabase('lucky-wheel'); r.onsuccess = r.onerror = r.onblocked = () => res(); }));
-    await H.seed(page, { 'lw.config': { ...FAST, ...extra }, 'lw.records': [], 'lw.skipAnim': true });
+    await H.seed(page, { 'lw.config': { ...FAST, ...extra }, 'lw.records': [], 'lw.skipAnim': true, 'lw.meta': { helpSeen: true } });
     await page.reload({ waitUntil: 'networkidle0' });
     await H.sleep(400);
     return page;
@@ -205,6 +205,7 @@ if (!H.chromePath()) {
     assert.match(await page.$eval('#backupInfo', (e) => e.textContent), /上次備份：/);
     // 清空（模擬換電腦）再還原
     await page.evaluate(() => new Promise((res) => { const r = indexedDB.deleteDatabase('lucky-wheel'); r.onsuccess = r.onerror = r.onblocked = () => res(); }));
+    await H.seed(page, { 'lw.meta': { helpSeen: true } }); // 清空後第一次開會跳說明，測試裡先標成看過
     await page.reload({ waitUntil: 'networkidle0' }); await H.sleep(400);
     assert.equal((await H.readKey(page, 'lw.records') || []).length, 0);
     await page.click('.open-panel[data-tab="records"]'); await H.sleep(200);
@@ -271,7 +272,7 @@ if (!H.chromePath()) {
     await page.emulate({ viewport: { width: 390, height: 844, deviceScaleFactor: 2, isMobile: true, hasTouch: true }, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) Mobile Safari' });
     await page.goto(`${srv.url}/?t=${Date.now()}`, { waitUntil: 'networkidle0' });
     await page.evaluate(() => new Promise((res) => { const r = indexedDB.deleteDatabase('lucky-wheel'); r.onsuccess = r.onerror = r.onblocked = () => res(); }));
-    await H.seed(page, { 'lw.config': FAST, 'lw.records': [] });
+    await H.seed(page, { 'lw.config': FAST, 'lw.records': [], 'lw.meta': { helpSeen: true } });
     await page.reload({ waitUntil: 'networkidle0' }); await H.sleep(500);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 390, '首頁不橫向溢出');
     assert.equal(await page.$eval('#skipAnim', (e) => e.checked), true, '手機預設跳過動畫');
@@ -416,6 +417,38 @@ if (!H.chromePath()) {
     // 轉盤畫得出來、抽得出來
     await H.spinOnce(page, 3);
     assert.equal(await page.$$eval('#resultGrid .r-card', (c) => c.length), 3);
+    assert.deepEqual(page.errors, []);
+  });
+
+  test('說明：第一次開啟自動顯示、關掉後不再跳；版本號顯示；快捷鍵 1/3/5/0', async (t) => {
+    const page = await H.newPage(browser); t.after(() => page.close());
+    await page.goto(`${srv.url}/?t=${Date.now()}`, { waitUntil: 'networkidle0' });
+    await page.evaluate(() => new Promise((res) => { const r = indexedDB.deleteDatabase('lucky-wheel'); r.onsuccess = r.onerror = r.onblocked = () => res(); }));
+    await H.seed(page, { 'lw.config': FAST, 'lw.records': [], 'lw.skipAnim': true });
+    await page.reload({ waitUntil: 'networkidle0' }); await H.sleep(1000);
+    assert.equal(await page.$eval('#helpModal', (e) => e.classList.contains('hidden')), false, '第一次自動顯示說明');
+    assert.match(await page.$eval('#helpVersion', (e) => e.textContent), /版本 #\d+/);
+    await page.click('#closeHelp2'); await H.sleep(200);
+    await page.reload({ waitUntil: 'networkidle0' }); await H.sleep(1000);
+    assert.equal(await page.$eval('#helpModal', (e) => e.classList.contains('hidden')), true, '關掉後不再自動跳');
+    await page.click('#openHelp'); await H.sleep(150);
+    assert.equal(await page.$eval('#helpModal', (e) => e.classList.contains('hidden')), false, '按說明可再打開');
+    await page.keyboard.press('Escape'); await H.sleep(150);
+    assert.equal(await page.$eval('#helpModal', (e) => e.classList.contains('hidden')), true);
+    await page.click('.open-panel[data-tab="settings"]'); await H.sleep(200);
+    assert.match(await page.$eval('#versionLine', (e) => e.textContent), /版本 #\d+/);
+    // 設定視窗開著時快捷鍵不動作
+    await page.keyboard.press('Digit3'); await H.sleep(300);
+    assert.equal((await H.readKey(page, 'lw.records') || []).length, 0);
+    await page.click('#closePanel'); await H.sleep(150);
+    await page.keyboard.press('Digit3'); await page.waitForSelector('#resultModal:not(.hidden)', { timeout: 15000 });
+    assert.equal((await H.readKey(page, 'lw.records')).length, 3, '按 3 = 三連抽');
+    await H.closeResult(page);
+    await page.keyboard.press('Digit0'); await page.waitForSelector('#resultModal:not(.hidden)', { timeout: 15000 });
+    assert.equal((await H.readKey(page, 'lw.records')).length, 13, '按 0 = 十連抽');
+    await H.closeResult(page);
+    await page.focus('#player'); await page.keyboard.press('Digit5'); await H.sleep(300);
+    assert.equal((await H.readKey(page, 'lw.records')).length, 13, '打字中不觸發');
     assert.deepEqual(page.errors, []);
   });
 

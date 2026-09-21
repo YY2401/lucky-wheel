@@ -405,6 +405,15 @@
     $('#restoreAll').addEventListener('click', () => $('#restoreFile').click());
     $('#restoreFile').addEventListener('change', async (e) => { const f = e.target.files[0]; e.target.value = ''; if (f) await restoreAll(f); });
     // 啟動時提醒：紀錄不少卻從沒備份、或上次備份後累積很多
+    // ---------- 說明視窗（第一次開啟自動顯示一次）與版本 ----------
+    const VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || '';
+    $('#versionLine').textContent = `版本 #${VERSION}`; $('#helpVersion').textContent = `版本 #${VERSION}`;
+    const openHelp = () => $('#helpModal').classList.remove('hidden');
+    const closeHelp = () => { $('#helpModal').classList.add('hidden'); if (!meta.helpSeen) { meta.helpSeen = true; Store.set(KEYS.meta, meta); } };
+    $('#openHelp').addEventListener('click', openHelp);
+    $('#closeHelp').addEventListener('click', closeHelp); $('#closeHelp2').addEventListener('click', closeHelp);
+    $('#helpModal').addEventListener('click', (e) => { if (e.target.id === 'helpModal') closeHelp(); });
+    if (!meta.helpSeen) setTimeout(openHelp, 600);
     function backupReminder() {
       const since = state.records.length - meta.recordsAtBackup;
       const weekAgo = Date.now() - 7 * 86400000;
@@ -480,7 +489,7 @@
     $$('.open-panel').forEach((b) => b.addEventListener('click', () => { showTab(b.dataset.tab); $('#panelModal').classList.remove('hidden'); }));
     $('#closePanel').addEventListener('click', () => $('#panelModal').classList.add('hidden'));
     $('#panelModal').addEventListener('click', (e) => { if (e.target.id === 'panelModal') e.target.classList.add('hidden'); });
-    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { $('#panelModal').classList.add('hidden'); $('#resultModal').classList.add('hidden'); } });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { $('#panelModal').classList.add('hidden'); $('#resultModal').classList.add('hidden'); $('#helpModal').classList.add('hidden'); } });
 
     // ======================================================================
     //  紀錄 / 統計 / Excel
@@ -757,8 +766,14 @@
     $('#skipAnim').addEventListener('change', (e) => Store.set(KEYS.skipAnim, e.target.checked));
     $$('.spin-btn[data-count]').forEach((b) => b.addEventListener('click', () => spin(Number(b.dataset.count))));
     $('#customSpin').addEventListener('click', () => spin(Number($('#customCount').value) || 1));
+    // 快捷鍵：空白 / 1 單抽、3 三連、5 五連、0 十連（打字中或設定視窗開著時不動作）
+    const HOTKEYS = { Space: 1, Digit1: 1, Digit3: 3, Digit5: 5, Digit0: 10, Numpad1: 1, Numpad3: 3, Numpad5: 5, Numpad0: 10 };
     document.addEventListener('keydown', (e) => {
-      if (e.code === 'Space' && !['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement.tagName)) { e.preventDefault(); spin(1); }
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+      if (['#panelModal', '#confirmModal', '#lockScreen', '#helpModal', '#suggestModal'].some((s) => { const m = $(s); return m && !m.classList.contains('hidden'); })) return;
+      const n = HOTKEYS[e.code];
+      if (n) { e.preventDefault(); spin(n); }
     });
     $('#closeResult').addEventListener('click', () => $('#resultModal').classList.add('hidden'));
     $('#spinAgain').addEventListener('click', () => { const n = state.lastCount || 1; $('#resultModal').classList.add('hidden'); spin(n); });

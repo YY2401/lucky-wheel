@@ -4,10 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Lucky Wheel</title>
+<meta name="app-version" content="48">
 <script>try { document.documentElement.dataset.theme = localStorage.getItem('lw.theme') || 'light'; } catch (e) { document.documentElement.dataset.theme = 'light'; }</script>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=47">
+<link rel="stylesheet" href="style.css?v=48">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.1/mqtt.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
@@ -30,6 +31,7 @@
     <button class="btn open-panel" data-tab="prizes">獎項設定</button>
     <button class="btn open-panel" data-tab="settings">設定 / OBS</button>
     <button class="btn open-panel" data-tab="records">紀錄 / Excel</button>
+    <button class="btn" id="openHelp" title="使用說明與快捷鍵">說明</button>
   </div>
 </header>
 
@@ -247,6 +249,7 @@
             </p>
           </div>
         </details>
+        <p class="hint version-line" id="versionLine"></p>
       </div>
     </div>
 
@@ -340,6 +343,33 @@
     <div class="modal-actions"><button class="btn" id="suggestCancel">取消</button><button class="btn primary" id="suggestApply">套用到權重</button></div>
   </div>
 </div>
+<div class="modal hidden control-only" id="helpModal">
+  <div class="modal-box help-box">
+    <button class="modal-close" id="closeHelp" title="關閉">✕</button>
+    <h2>怎麼用</h2>
+    <ol class="help-steps">
+      <li><b>設定獎項</b>：右上「獎項設定」→ 輸入名稱、權重（數字越大越容易中，機率自動算）、數量 → 儲存。要抽「人」就按「貼上名單」。</li>
+      <li><b>抽獎</b>：主畫面輸入抽獎者名字（選填），按「單抽」或連抽；點轉盤中央 GO 也是單抽。連抽會先轉一次，再翻牌揭曉每一抽。</li>
+      <li><b>紀錄</b>：「紀錄 / Excel」綁定一個 Excel 檔，之後每次抽獎自動寫入；也能搜尋、看統計、撤銷整批、補抽某一抽。</li>
+      <li><b>OBS 直播</b>：「設定 / OBS」打開「讓 OBS 畫面跟著控制台動」→ 複製網址 → OBS 加一個「瀏覽器」來源貼上。這裡抽，OBS 畫面跟著轉。</li>
+      <li><b>備份</b>：資料存在這台電腦的瀏覽器裡，活動前後到「紀錄 / Excel → 備份全部」存一份。</li>
+    </ol>
+    <h3>其他功能一句話</h3>
+    <ul class="help-list">
+      <li><b>保底</b>：連續 N 抽沒中保底獎就必中；連抽每 K 抽至少一個。在「設定」開，獎項打勾「保底」才算。</li>
+      <li><b>每人限抽</b>：每位抽獎者最多 N 次，依名字計算。</li>
+      <li><b>補抽</b>：結果卡片滑過按「補抽」，只重抽那一抽，原本的標作廢留紀錄。</li>
+      <li><b>獎項一覽</b>：左上角按鈕，可拖曳、可置中放大給大家看；OBS 畫面也能顯示。</li>
+      <li><b>手機</b>：同一個網址用手機開，當遙控器按抽獎，OBS 在電腦上顯示。</li>
+    </ul>
+    <h3>快捷鍵</h3>
+    <div class="help-keys">
+      <span><kbd>空白鍵</kbd> / <kbd>1</kbd> 單抽</span><span><kbd>3</kbd> 三連抽</span><span><kbd>5</kbd> 五連抽</span><span><kbd>0</kbd> 十連抽</span><span><kbd>Esc</kbd> 關閉視窗</span>
+    </div>
+    <p class="hint">快捷鍵在沒有打字、沒有開設定視窗時才有效。</p>
+    <div class="modal-actions"><span class="hint version-line" id="helpVersion"></span><button class="btn primary" id="closeHelp2">開始使用</button></div>
+  </div>
+</div>
 <div class="modal hidden control-only" id="lockScreen">
   <div class="modal-box" style="text-align:center;width:min(520px,100%)">
     <h3 style="margin:0 0 10px;font-size:22px">另一個分頁已經開著控制台</h3>
@@ -363,15 +393,15 @@
 <canvas id="confetti"></canvas>
 <div id="toast"></div>
 
-<script src="core.js?v=47"></script>
-<script src="wheel.js?v=47"></script>
-<script src="ui.js?v=47"></script>
-<script src="store.js?v=47"></script>
-<script src="sync.js?v=47"></script>
-<script src="excel.js?v=47"></script>
-<script src="overlay.js?v=47"></script>
-<script src="control.js?v=47"></script>
-<script src="app.js?v=47"></script>
-<script src="bg.js?v=47"></script>
+<script src="core.js?v=48"></script>
+<script src="wheel.js?v=48"></script>
+<script src="ui.js?v=48"></script>
+<script src="store.js?v=48"></script>
+<script src="sync.js?v=48"></script>
+<script src="excel.js?v=48"></script>
+<script src="overlay.js?v=48"></script>
+<script src="control.js?v=48"></script>
+<script src="app.js?v=48"></script>
+<script src="bg.js?v=48"></script>
 </body>
 </html>
