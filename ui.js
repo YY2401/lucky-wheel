@@ -18,7 +18,8 @@
 
   // 頁內確認 / 輸入視窗：OBS 內建瀏覽器不會顯示原生 confirm，所以自己畫
   // input：單行輸入；textarea：多行輸入（回傳字串，取消回傳 null）
-  function dialog({ title = '確認', message = '', input = null, textarea = null, okLabel = '確定', danger = false }) {
+  // file：{ accept, read(file) → Promise<string> }，多行模式下提供「從檔案匯入」把內容填進 textarea
+  function dialog({ title = '確認', message = '', input = null, textarea = null, okLabel = '確定', danger = false, file = null }) {
     if (textarea !== null) input = textarea;
     return new Promise((resolve) => {
       const m = $('#confirmModal');
@@ -28,10 +29,13 @@
       const inp = textarea !== null ? multi : single;
       single.classList.toggle('hidden', textarea !== null || input === null); multi.classList.toggle('hidden', textarea === null);
       if (input !== null) inp.value = input;
+      const fileBtn = $('#confirmFileBtn'); const fileInp = $('#confirmFile');
+      fileBtn.classList.toggle('hidden', !file);
+      if (file) { fileInp.accept = file.accept || ''; fileBtn.onclick = () => fileInp.click(); fileInp.onchange = async () => { const f = fileInp.files[0]; fileInp.value = ''; if (!f) return; try { const txt = await file.read(f); multi.value = (multi.value.trim() ? `${multi.value.trim()}\n` : '') + txt; } catch (e) { toast(`讀取失敗：${e.message}`); } }; }
       const ok = $('#confirmOk'); ok.textContent = okLabel; ok.className = `btn ${danger ? 'danger' : 'primary'}`;
       m.classList.remove('hidden');
       const cancelValue = input !== null ? null : false;
-      const done = (v) => { m.classList.add('hidden'); ok.onclick = null; $('#confirmCancel').onclick = null; m.onclick = null; document.removeEventListener('keydown', onKey); resolve(v); };
+      const done = (v) => { m.classList.add('hidden'); ok.onclick = null; $('#confirmCancel').onclick = null; m.onclick = null; fileBtn.onclick = null; fileInp.onchange = null; document.removeEventListener('keydown', onKey); resolve(v); };
       const onKey = (e) => { if (e.key === 'Escape') done(cancelValue); if (e.key === 'Enter' && input !== null && textarea === null) done(inp.value); };
       ok.onclick = () => done(input !== null ? inp.value : true);
       $('#confirmCancel').onclick = () => done(cancelValue);
@@ -89,6 +93,7 @@
 
   // ---------- 獎項一覽（控制台面板與 OBS 覆蓋層共用） ----------
   function renderPrizeListRows(container, prizes, { prob = true, stock = true } = {}) {
+    const panel = container.closest('.prize-list'); if (panel) panel.classList.toggle('many', prizes.length > 14);
     const probs = LuckyCore.probabilities(prizes);
     container.innerHTML = prizes.map((p, i) => {
       const pr = probs[p.id]; const soldOut = p.remaining === 0;

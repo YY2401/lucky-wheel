@@ -120,9 +120,40 @@
       rows.forEach((tr) => tr.remove()); // 已刪除的獎項
       syncPrizeRows();
     }
+    // 拖曳把手換順序（HTML5 drag & drop；手機用上下箭頭）
+    (() => {
+      const tb = $('#prizeRows'); let dragId = null;
+      tb.addEventListener('dragstart', (e) => {
+        const h = e.target.closest('.drag-handle'); if (!h) { e.preventDefault(); return; }
+        dragId = h.closest('tr').dataset.id; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', dragId);
+        h.closest('tr').classList.add('dragging');
+      });
+      tb.addEventListener('dragover', (e) => {
+        if (!dragId) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move';
+        const tr = e.target.closest('tr'); $$('tr', tb).forEach((r) => r.classList.remove('drop-before', 'drop-after'));
+        if (!tr || tr.dataset.id === dragId) return;
+        const r = tr.getBoundingClientRect(); tr.classList.add(e.clientY < r.top + r.height / 2 ? 'drop-before' : 'drop-after');
+      });
+      tb.addEventListener('drop', (e) => {
+        if (!dragId) return; e.preventDefault();
+        const tr = e.target.closest('tr'); const a = state.config.prizes;
+        const from = a.findIndex((p) => p.id === dragId);
+        if (tr && tr.dataset.id !== dragId && from >= 0) {
+          const before = tr.classList.contains('drop-before');
+          const [moved] = a.splice(from, 1);
+          let to = a.findIndex((p) => p.id === tr.dataset.id); if (!before) to += 1;
+          a.splice(to, 0, moved);
+          markDirty(); renderPrizeRows(); updateWheel();
+        }
+        cleanup();
+      });
+      const cleanup = () => { dragId = null; $$('tr', tb).forEach((r) => r.classList.remove('dragging', 'drop-before', 'drop-after')); };
+      tb.addEventListener('dragend', cleanup);
+    })();
     function createPrizeRow(id) {
       const tr = document.createElement('tr'); tr.dataset.id = id;
       tr.innerHTML = `
+        <td class="row-drag" title="按住拖曳可換順序"><span class="drag-handle" draggable="true">⋮⋮</span></td>
         <td data-label="圖片"><div style="display:flex;gap:6px;align-items:center">
           <div class="thumb" title="點擊上傳圖片（支援 GIF 動圖）"></div>
           <div class="thumb-actions"><button class="f-url">網址</button><button class="f-clearimg">清除</button></div>
@@ -243,7 +274,10 @@
     }
     $('#savePrizes').addEventListener('click', () => saveConfig());
     $('#pasteNames').addEventListener('click', async () => {
-      const text = await dialog({ title: '貼上名單（抽人）', message: '一行一個名字（也可用逗號分隔），重複的會自動合併。每個人會變成一格、數量 1，抽到就退出轉盤。', textarea: '', okLabel: '下一步' });
+      const text = await dialog({
+        title: '貼上名單（抽人）', message: '一行一個名字（也可用逗號分隔），重複的會自動合併。每個人會變成一格、數量 1，抽到就退出轉盤。', textarea: '', okLabel: '下一步',
+        file: { accept: '.xlsx,.xls,.csv,.txt', read: readNamesFile },
+      });
       if (text === null) return;
       const list = prizesFromNames(text);
       if (!list.length) { toast('沒有讀到任何名字'); return; }
@@ -256,6 +290,23 @@
       }
       markDirty(); renderPrizeRows(); updateWheel();
       toast(`已加入 ${list.length} 個名字，記得按「儲存設定」`);
+    });
+    // 從 Excel / CSV / 文字檔讀名單：取第一個工作表的第一欄（標題列若不像名字會一起進來，使用者可自行刪）
+    async function readNamesFile(file) {
+      if (/\.txt$/i.test(file.name)) return file.text();
+      const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]]; if (!ws) return '';
+      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false });
+      return rows.map((r) => (r[0] == null ? '' : String(r[0]).trim())).filter(Boolean).join('\n');
+    }
+    // 下載目前獎項 / 名單與抽出狀況
+    $('#exportNames').addEventListener('click', () => {
+      const counts = new Map(); const last = new Map();
+      state.records.filter((r) => !r.void).forEach((r) => { counts.set(r.prizeId, (counts.get(r.prizeId) || 0) + 1); last.set(r.prizeId, r.time); });
+      const rows = state.config.prizes.map((p) => ({ '名稱': p.name, '數量': p.quantity === -1 ? '不限' : p.quantity, '剩餘': p.quantity === -1 ? '不限' : p.remaining, '狀態': p.remaining === 0 ? '已抽出' : '未抽出', '抽出次數': counts.get(p.id) || 0, '最近抽出時間': last.get(p.id) || '' }));
+      const ws = XLSX.utils.json_to_sheet(rows); ws['!cols'] = [{ wch: 24 }, { wch: 8 }, { wch: 8 }, { wch: 10 }, { wch: 10 }, { wch: 20 }];
+      const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, '名單');
+      XLSX.writeFile(wb, `名單_${formatTime(new Date()).replace(/[-: ]/g, '').slice(0, 12)}.xlsx`);
     });
     $('#addPrize').addEventListener('click', () => {
       const n = state.config.prizes.length;

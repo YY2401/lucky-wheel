@@ -374,9 +374,49 @@ if (!H.chromePath()) {
     assert.equal(await page.$eval('#s-volume', (e) => e.value), '70');
     await page.evaluate(() => { const s = document.querySelector('#s-volume'); s.value = '30'; s.dispatchEvent(new Event('input')); });
     assert.equal(await page.$eval('#volumeVal', (e) => e.textContent), '30%');
-    assert.equal(await page.evaluate(() => LuckyWheel.Sfx.volume), 0.3);
+    assert.equal(await page.evaluate(() => window.LuckyWheel.Sfx.volume), 0.3);
     await page.click('#saveSettings'); await H.sleep(200);
     assert.equal((await H.readKey(page, 'lw.config')).volume, 30);
+  });
+
+  test('多人名單：40 人轉盤可畫、一覽自動分欄；獎項可拖曳換順序；名單可從 Excel 匯入', async (t) => {
+    const fs = require('node:fs'); const os = require('node:os'); const path = require('node:path');
+    const page = await fresh(t);
+    await page.click('.open-panel[data-tab="prizes"]'); await H.sleep(200);
+    // 用 SheetJS（頁面已載入）在瀏覽器端產生一個 40 人的 xlsx，寫到暫存檔再用檔案匯入
+    const b64 = await page.evaluate(() => { const rows = [['名字'], ...Array.from({ length: 40 }, (_, i) => [`觀眾${i + 1}`])]; const wb = window.XLSX.utils.book_new(); window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.aoa_to_sheet(rows), 'S'); return window.XLSX.write(wb, { type: 'base64', bookType: 'xlsx' }); });
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lw-names-')); const xlsx = path.join(dir, 'names.xlsx'); fs.writeFileSync(xlsx, Buffer.from(b64, 'base64'));
+    await page.click('#pasteNames'); await H.sleep(300);
+    const fi = await page.$('#confirmFile'); await fi.uploadFile(xlsx); await H.sleep(400);
+    const txt = await page.$eval('#confirmTextarea', (e) => e.value);
+    assert.equal(txt.split('\n').length, 41, '第一欄全部讀進來（含標題列，可自行刪）');
+    await page.click('#confirmOk'); await H.sleep(300); await page.click('#confirmOk'); await H.sleep(400); // 取代
+    assert.equal(await page.$$eval('#prizeRows tr', (r) => r.length), 41);
+    // 拖曳：把第 3 列拖到第 1 列前面
+    const ids = await page.$$eval('#prizeRows tr', (rs) => rs.map((r) => r.dataset.id));
+    // 無頭 Chrome 不會真的發原生拖曳事件，直接對把手 / 目標列派送 DragEvent 來測我們的處理邏輯
+    await page.evaluate((from, to) => {
+      const dt = new DataTransfer();
+      const handle = document.querySelector(`#prizeRows tr[data-id="${from}"] .drag-handle`);
+      const target = document.querySelector(`#prizeRows tr[data-id="${to}"]`);
+      handle.dispatchEvent(new DragEvent('dragstart', { bubbles: true, dataTransfer: dt }));
+      const r = target.getBoundingClientRect();
+      target.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: dt, clientY: r.top + 2 }));
+      target.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt, clientY: r.top + 2 }));
+      handle.dispatchEvent(new DragEvent('dragend', { bubbles: true, dataTransfer: dt }));
+    }, ids[2], ids[0]); await H.sleep(300);
+    const after = await page.$$eval('#prizeRows tr', (rs) => rs.map((r) => r.dataset.id));
+    assert.equal(after[0], ids[2], '第 3 列拖到最前面');
+    assert.equal(after.length, 41);
+    await page.click('#savePrizes'); await H.sleep(200); await page.click('#closePanel');
+    // 一覽：超過 14 個自動分欄
+    await page.click('#togglePrizeList'); await H.sleep(200);
+    assert.equal(await page.$eval('#prizeList', (e) => e.classList.contains('many')), true);
+    assert.equal(await page.$$eval('#prizeListRows li', (l) => l.length), 41);
+    // 轉盤畫得出來、抽得出來
+    await H.spinOnce(page, 3);
+    assert.equal(await page.$$eval('#resultGrid .r-card', (c) => c.length), 3);
+    assert.deepEqual(page.errors, []);
   });
 
   test('保底：連抽保底每 5 抽至少一個，40 批全部符合', async (t) => {

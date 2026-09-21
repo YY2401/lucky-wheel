@@ -183,8 +183,8 @@
         const color = seg.soldOut ? '#4a4a55' : (seg.prize.color || PALETTE[i % PALETTE.length]);
         ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, R, seg.start, seg.end); ctx.closePath();
         ctx.fillStyle = color; ctx.fill();
-        if (this.highlight === seg) { ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.fill(); }
-        ctx.lineWidth = 2.5 * k; ctx.strokeStyle = T.sliceStroke; ctx.stroke();
+        if (this.highlight === seg) { ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.fill(); if (seg.span < 0.16) { ctx.lineWidth = 3 * k; ctx.strokeStyle = '#ffffff'; ctx.stroke(); } }
+        ctx.lineWidth = (seg.span < 0.12 ? 1 : 2.5) * k; ctx.strokeStyle = T.sliceStroke; ctx.stroke(); // 格子很細時邊線變細，不然全是黑線
 
         // 扇區內容：圖片在外側、文字沿半徑排
         ctx.save();
@@ -206,14 +206,19 @@
           ctx.restore();
           textEnd = R * 0.72 - imgSize / 2 - 6 * k;
         }
-        const textStart = R * 0.17;
+        // 文字沿半徑排，能用的長度很夠；限制在於格子的「厚度」（弦長）。人數多時字縮小、起點往內移，最小 8px；
+        // 再細（約 90 格以上）就不畫字，靠獎項一覽和停下時的打亮 / 結果卡
+        const dense = seg.span < 0.16;
+        const fs = Math.max(8, Math.min(S * 0.036, chord * (dense ? 0.72 : 0.45)));
+        if (chord * 0.72 < 7) { ctx.restore(); return; }
+        // 靠近圓心格子太窄會跟鄰居疊在一起：起點推到「格子厚度 ≥ 字高」的半徑
+        const rMin = (fs * 1.25) / (2 * Math.sin(Math.min(seg.span, Math.PI) / 2));
+        const textStart = Math.max(R * 0.17, Math.min(R * 0.6, rMin));
         const textMax = Math.max(10, textEnd - textStart);
-        const fs = Math.max(9, Math.min(S * 0.036, chord * 0.45));
-        if (chord * 0.45 < 7) { ctx.restore(); return; } // 扇區太細，文字畫了也看不清
-        ctx.font = `bold ${fs}px "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif`;
+        ctx.font = `${dense ? '600' : 'bold'} ${fs}px "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif`;
         ctx.textBaseline = 'middle';
-        ctx.lineJoin = 'round'; ctx.lineWidth = 3 * k; ctx.strokeStyle = T.textStroke;
-        const label = seg.soldOut ? `${seg.prize.name}（已抽完）` : seg.prize.name;
+        ctx.lineJoin = 'round'; ctx.lineWidth = (dense ? 2 : 3) * k; ctx.strokeStyle = T.textStroke;
+        const label = seg.soldOut ? (dense ? seg.prize.name : `${seg.prize.name}（已抽完）`) : seg.prize.name;
         // 左半邊的扇區把文字翻 180°，改成由外往內讀，這樣任何角度都不會上下顛倒
         const flip = screenAngle > Math.PI / 2 && screenAngle < Math.PI * 1.5;
         let tx = textStart;

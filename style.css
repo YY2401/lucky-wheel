@@ -502,3 +502,20 @@ body.overlay .hub-pos { display: none; }
 
 #confirmTextarea { width: 100%; min-height: 200px; margin-bottom: 18px; font: inherit; padding: 10px 12px; border: var(--border-w) solid var(--ink); border-radius: 8px; background: var(--paper); color: var(--text); resize: vertical; }
 input[type=range] { width: 100%; accent-color: var(--red); }
+
+/* 名單很多時，獎項一覽自動分欄、面板加寬、可捲動 */
+.prize-list.many { width: min(760px, calc(100vw - 44px)); }
+.prize-list.many ul { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); column-gap: 18px; }
+.prize-list.many li { font-size: calc(var(--pl-size) * .9); }
+.prize-list.many.centered { width: min(1100px, 94vw); }
+body.overlay .prize-list { max-height: calc(100vh - 44px); overflow: auto; }
+body.overlay .prize-list.many { width: min(900px, 70vw); }
+
+/* 獎項拖曳排序 */
+.row-drag { width: 22px; }
+.drag-handle { cursor: grab; color: var(--muted); font-size: 16px; letter-spacing: -2px; user-select: none; padding: 4px 2px; }
+.drag-handle:active { cursor: grabbing; }
+tr.dragging { opacity: .4; }
+tr.drop-before td { box-shadow: 0 -3px 0 var(--red) inset; }
+tr.drop-after td { box-shadow: 0 3px 0 var(--red) inset; }
+@media (max-width: 700px) { .prize-table td.row-drag { display: none; } }

@@ -7,7 +7,7 @@
 <script>try { document.documentElement.dataset.theme = localStorage.getItem('lw.theme') || 'light'; } catch (e) { document.documentElement.dataset.theme = 'light'; }</script>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=46">
+<link rel="stylesheet" href="style.css?v=47">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.1/mqtt.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
@@ -90,13 +90,14 @@
       <div class="prob-bar" id="probBar"></div>
       <div class="table-scroll">
         <table class="prize-table">
-          <thead><tr><th>圖片</th><th>名稱</th><th title="數字越大越容易抽到">權重</th><th>機率</th><th>數量</th><th>剩餘</th><th>顏色</th><th title="勾選的獎項算保底獎">保底</th><th></th></tr></thead>
+          <thead><tr><th></th><th>圖片</th><th>名稱</th><th title="數字越大越容易抽到">權重</th><th>機率</th><th>數量</th><th>剩餘</th><th>顏色</th><th title="勾選的獎項算保底獎">保底</th><th></th></tr></thead>
           <tbody id="prizeRows"></tbody>
         </table>
       </div>
       <div class="row-actions">
         <button class="btn" id="addPrize">新增獎項</button>
         <button class="btn" id="pasteNames" title="抽人用：貼上名單，一行一個名字，每人一格、抽到就退出">貼上名單（抽人）</button>
+        <button class="btn" id="exportNames" title="下載目前獎項 / 名單與抽出狀況">下載名單 Excel</button>
         <button class="btn" id="suggestWeights" title="依數量算出每個獎項該給多少機率">建議機率</button>
         <button class="btn" id="resetStock">重置庫存</button>
         <span class="spacer"></span>
@@ -352,6 +353,8 @@
     <p class="msg" id="confirmMsg"></p>
     <input id="confirmInput" class="hidden">
     <textarea id="confirmTextarea" class="hidden" rows="10" placeholder="一行一個名字"></textarea>
+    <div class="row-actions hidden" id="confirmFileBtn" style="margin:-8px 0 14px;justify-content:flex-start"><button class="btn" type="button">從檔案匯入（Excel / CSV / 文字檔）…</button><span class="hint">讀第一個工作表的第一欄</span></div>
+    <input type="file" id="confirmFile" hidden>
     <div class="modal-actions"><button class="btn" id="confirmCancel">取消</button><button class="btn primary" id="confirmOk">確定</button></div>
   </div>
 </div>
@@ -360,15 +363,15 @@
 <canvas id="confetti"></canvas>
 <div id="toast"></div>
 
-<script src="core.js?v=46"></script>
-<script src="wheel.js?v=46"></script>
-<script src="ui.js?v=46"></script>
-<script src="store.js?v=46"></script>
-<script src="sync.js?v=46"></script>
-<script src="excel.js?v=46"></script>
-<script src="overlay.js?v=46"></script>
-<script src="control.js?v=46"></script>
-<script src="app.js?v=46"></script>
-<script src="bg.js?v=46"></script>
+<script src="core.js?v=47"></script>
+<script src="wheel.js?v=47"></script>
+<script src="ui.js?v=47"></script>
+<script src="store.js?v=47"></script>
+<script src="sync.js?v=47"></script>
+<script src="excel.js?v=47"></script>
+<script src="overlay.js?v=47"></script>
+<script src="control.js?v=47"></script>
+<script src="app.js?v=47"></script>
+<script src="bg.js?v=47"></script>
 </body>
 </html>
