@@ -34,7 +34,7 @@
     function applyConfig(c) {
       config = normalizeConfig(c);
       Store.set(KEYS.overlayConfig, config);
-      Sfx.enabled = soundParam === '0' ? false : !!config.sound;
+      Sfx.enabled = soundParam === '0' ? false : !!config.sound; Sfx.volume = config.volume / 100;
       try { localStorage.setItem('lw.bg3d', config.bg3d ? '1' : '0'); } catch { /* ignore */ }
       applyTheme(params.get('theme') || config.theme, wheel);
       wheel.setPrizes(config.prizes, config.segmentMode, config.minSlice / 100);

@@ -12,7 +12,8 @@
   const rand = () => { const a = new Uint32Array(1); cryptoObj.getRandomValues(a); return a[0] / 4294967296; };
 
   const DEFAULT_CONFIG = {
-    title: '幸運轉盤', segmentMode: 'weight', spinDuration: 5000, multiSpinDuration: 1500, turns: 6, sound: true, countdown: 3,
+    title: '幸運轉盤', segmentMode: 'weight', spinDuration: 5000, multiSpinDuration: 1500, turns: 6, sound: true, volume: 70, countdown: 3,
+    limitPerPlayer: 0, limitPeriod: 'all',
     overlayResultSeconds: 8, multiMode: 'flip', minSlice: 4, bg3d: true, theme: 'light', themeChosen: false,
     overlaySize: 520, overlaySpinOnly: false, overlayMute: false, overlayHideStatus: false,
     overlayList: false, overlayListProb: true, overlayListStock: true, overlayListPos: 'tl',
@@ -43,6 +44,9 @@
     cfg.multiSpinDuration = Math.min(30000, Math.max(300, Number(cfg.multiSpinDuration) || 1500));
     cfg.turns = Math.min(20, Math.max(1, Math.trunc(Number(cfg.turns)) || 6));
     cfg.countdown = Math.min(10, Math.max(0, Number.isFinite(Number(cfg.countdown)) ? Math.trunc(Number(cfg.countdown)) : 3));
+    cfg.volume = Math.min(100, Math.max(0, Number.isFinite(Number(cfg.volume)) ? Math.round(Number(cfg.volume)) : 70));
+    cfg.limitPerPlayer = Math.min(1000, Math.max(0, Math.trunc(Number(cfg.limitPerPlayer)) || 0));
+    cfg.limitPeriod = cfg.limitPeriod === 'day' ? 'day' : 'all';
     cfg.sound = cfg.sound !== false;
     cfg.sync = cfg.sync === true;
     cfg.overlayResultSeconds = Math.min(120, Math.max(1, Number(cfg.overlayResultSeconds) || 8));
@@ -171,6 +175,24 @@
     return diff === 0;
   }
 
+  // ---------- 每人限抽：某人已經抽了幾次（作廢不算；每天重置時只算今天） ----------
+  function drawsUsed(records, player, period = 'all', now = new Date()) {
+    const name = (player || '').trim();
+    if (!name) return 0; // 沒填名字無法辨識，不限制
+    const today = formatTime(now).slice(0, 10);
+    return records.filter((r) => !r.void && (r.player || '').trim() === name && (period !== 'day' || String(r.time || '').slice(0, 10) === today)).length;
+  }
+
+  // ---------- 名單 → 獎項：一行一個名字，去重去空白，每人數量 1、權重相同 ----------
+  function prizesFromNames(text, { weight = 1 } = {}) {
+    const seen = new Set(); const out = [];
+    String(text || '').split(/\r?\n|,|，|、/).map((s) => s.trim()).filter(Boolean).forEach((name, i) => {
+      if (seen.has(name)) return; seen.add(name);
+      out.push({ id: `n_${randId(8)}`, name: name.slice(0, 60), weight, quantity: 1, remaining: 1, image: '', color: PALETTE[i % PALETTE.length], pity: false });
+    });
+    return out;
+  }
+
   // ---------- 撤銷一批：把庫存加回去，回傳移除後的紀錄 ----------
   function undoBatch(records, prizes, batchId) {
     const batch = records.filter((r) => r.batchId === batchId);
@@ -196,5 +218,5 @@
     return { ...out, batchId: target.batchId, type: '補抽', label, voided: target };
   }
 
-  return { PALETTE, DEFAULT_CONFIG, formatTime, randId, rand, normalizePrize, normalizeConfig, pool, pityPool, probabilities, drawOne, suggestWeights, drawsSinceHit, drawBatch, undoBatch, recordKey, redraw, signMessage, verifyMessage, SIG_WINDOW_MS };
+  return { PALETTE, DEFAULT_CONFIG, formatTime, randId, rand, normalizePrize, normalizeConfig, pool, pityPool, probabilities, drawOne, suggestWeights, drawsSinceHit, drawsUsed, prizesFromNames, drawBatch, undoBatch, recordKey, redraw, signMessage, verifyMessage, SIG_WINDOW_MS };
 });

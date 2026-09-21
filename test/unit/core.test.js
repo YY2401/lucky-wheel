@@ -240,3 +240,28 @@ test('舊紀錄沒有 rid：recordKey 用批次＋第幾抽', () => {
   assert.equal(core.recordKey({ batchId: 'B1', index: 3 }), 'B1-3');
   assert.equal(core.recordKey({ rid: 'R', batchId: 'B1', index: 3 }), 'R');
 });
+
+test('每人限抽：作廢不算、空白名字不限、每天模式只算今天', () => {
+  const today = core.formatTime(new Date()).slice(0, 10);
+  const recs = [
+    { player: '小明', time: `${today} 10:00:00` }, { player: '小明', time: `${today} 10:01:00`, void: true },
+    { player: '小明 ', time: '2020-01-01 00:00:00' }, { player: '阿花', time: `${today} 11:00:00` }, { player: '', time: `${today} 12:00:00` },
+  ];
+  assert.equal(core.drawsUsed(recs, '小明', 'all'), 2, '含 trim 後同名的舊紀錄，不含作廢');
+  assert.equal(core.drawsUsed(recs, '小明', 'day'), 1);
+  assert.equal(core.drawsUsed(recs, '', 'all'), 0);
+  assert.equal(core.drawsUsed(recs, '阿花', 'day'), 1);
+});
+
+test('名單 → 獎項：換行 / 逗號分隔、去重去空白、每人數量 1', () => {
+  const list = core.prizesFromNames(' 小明 \n阿花,小明\n\n大雄、阿花 ，靜香');
+  assert.deepEqual(list.map((p) => p.name), ['小明', '阿花', '大雄', '靜香']);
+  assert.ok(list.every((p) => p.quantity === 1 && p.remaining === 1 && p.weight === 1 && /^n_/.test(p.id)));
+  assert.deepEqual(core.prizesFromNames(''), []);
+});
+
+test('normalizeConfig：音量與限抽欄位範圍', () => {
+  const c = core.normalizeConfig({ volume: 250, limitPerPlayer: -3, limitPeriod: 'week' });
+  assert.equal(c.volume, 100); assert.equal(c.limitPerPlayer, 0); assert.equal(c.limitPeriod, 'all');
+  assert.equal(core.normalizeConfig({}).volume, 70);
+});

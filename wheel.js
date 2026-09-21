@@ -301,6 +301,7 @@
   // ---------- 音效（WebAudio 合成，無需音檔） ----------
   const Sfx = {
     enabled: true,
+    volume: 0.7, // 0～1，設定頁的音量滑桿
     ctx: null,
     _ctx() {
       if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -312,8 +313,9 @@
       const o = c.createOscillator(); const g = c.createGain();
       o.type = type; o.frequency.value = freq;
       const t = c.currentTime + at;
-      g.gain.setValueAtTime(vol, t);
-      g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      const v = Math.max(0.0005, vol * this.volume);
+      g.gain.setValueAtTime(v, t);
+      g.gain.exponentialRampToValueAtTime(0.0005, t + dur);
       o.connect(g).connect(c.destination);
       o.start(t); o.stop(t + dur);
     },

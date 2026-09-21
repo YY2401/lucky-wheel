@@ -7,7 +7,7 @@
 <script>try { document.documentElement.dataset.theme = localStorage.getItem('lw.theme') || 'light'; } catch (e) { document.documentElement.dataset.theme = 'light'; }</script>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=45">
+<link rel="stylesheet" href="style.css?v=46">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.1/mqtt.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
@@ -96,6 +96,7 @@
       </div>
       <div class="row-actions">
         <button class="btn" id="addPrize">新增獎項</button>
+        <button class="btn" id="pasteNames" title="抽人用：貼上名單，一行一個名字，每人一格、抽到就退出">貼上名單（抽人）</button>
         <button class="btn" id="suggestWeights" title="依數量算出每個獎項該給多少機率">建議機率</button>
         <button class="btn" id="resetStock">重置庫存</button>
         <span class="spacer"></span>
@@ -107,6 +108,7 @@
         <b>不知道權重怎麼設？</b>按「建議機率」，會依每個獎項的數量算好（數量少的大獎機率低、抽完剛好用完）。<br>
         <b>數量</b>勾「無限」就是不限量；<b>剩餘</b>可以手動改。<b>保底</b>打勾的獎項會在保底時被抽出（要到「設定」把保底規則打開才有作用）。<br>
         <b>圖片</b>可以上傳 GIF 動圖（2 MB 內）或貼 GIF 網址，結果卡、獎項一覽、轉盤上都會動。<br>
+        <b>要抽「人」而不是抽獎品？</b>按「貼上名單」，一行一個名字，每個人會變成一格、數量 1，抽到就退出轉盤；要再抽一輪按「重置庫存」。<br>
         按抽獎前會自動幫你儲存。設定存在這台電腦的瀏覽器裡，換電腦請用「匯出設定」帶走。
       </p>
       <div class="row-actions">
@@ -184,6 +186,17 @@
           <label class="switch"><input type="checkbox" id="s-sound"><span class="track"></span><span class="switch-label">開啟音效（轉盤滴答聲、翻牌聲、中獎音）</span></label>
           <button class="btn" id="testSound" type="button">試聽</button>
         </div>
+        <label>音量 <span id="volumeVal" style="font-family:'Bungee',sans-serif;font-size:13px"></span>
+          <input type="range" id="s-volume" min="0" max="100" step="5">
+        </label>
+
+        <h3>每人限抽</h3>
+        <div class="switch-row">
+          <label class="switch"><input type="checkbox" id="s-limitOn"><span class="track"></span><span class="switch-label">每位抽獎者最多</span></label>
+          <input type="number" id="s-limitPerPlayer" min="1" max="1000" style="width:90px"> <span>次</span>
+          <select id="s-limitPeriod" style="width:auto"><option value="all">整個活動累計</option><option value="day">每天重新計算</option></select>
+        </div>
+        <p class="hint">依主畫面輸入的名字計算（沒填名字的不限制；作廢的不算）。連抽會被擋成剩餘次數，例如上限 3、已抽 2，按十連抽只會抽 1 次並提示。</p>
 
         <h3>OBS 直播畫面</h3>
         <p class="hint">OBS 直播畫面是一個透明背景的網頁，只有轉盤和結果，沒有任何按鈕。你在這裡按抽獎，OBS 那邊會跟著轉。</p>
@@ -289,7 +302,7 @@
     <p class="sub" id="resultSub"></p>
     <div class="result-grid" id="resultGrid"></div>
     <p class="excel-status" id="excelStatus"></p>
-    <div class="modal-actions"><button class="btn ghost" id="undoThis">撤銷這次抽獎</button><button class="btn primary" id="closeResult">關閉</button></div>
+    <div class="modal-actions"><button class="btn ghost" id="undoThis">撤銷這次抽獎</button><button class="btn" id="spinAgain">再抽一次</button><button class="btn primary" id="closeResult">關閉</button></div>
   </div>
 </div>
 
@@ -338,6 +351,7 @@
     <h3 id="confirmTitle">確認</h3>
     <p class="msg" id="confirmMsg"></p>
     <input id="confirmInput" class="hidden">
+    <textarea id="confirmTextarea" class="hidden" rows="10" placeholder="一行一個名字"></textarea>
     <div class="modal-actions"><button class="btn" id="confirmCancel">取消</button><button class="btn primary" id="confirmOk">確定</button></div>
   </div>
 </div>
@@ -346,15 +360,15 @@
 <canvas id="confetti"></canvas>
 <div id="toast"></div>
 
-<script src="core.js?v=45"></script>
-<script src="wheel.js?v=45"></script>
-<script src="ui.js?v=45"></script>
-<script src="store.js?v=45"></script>
-<script src="sync.js?v=45"></script>
-<script src="excel.js?v=45"></script>
-<script src="overlay.js?v=45"></script>
-<script src="control.js?v=45"></script>
-<script src="app.js?v=45"></script>
-<script src="bg.js?v=45"></script>
+<script src="core.js?v=46"></script>
+<script src="wheel.js?v=46"></script>
+<script src="ui.js?v=46"></script>
+<script src="store.js?v=46"></script>
+<script src="sync.js?v=46"></script>
+<script src="excel.js?v=46"></script>
+<script src="overlay.js?v=46"></script>
+<script src="control.js?v=46"></script>
+<script src="app.js?v=46"></script>
+<script src="bg.js?v=46"></script>
 </body>
 </html>

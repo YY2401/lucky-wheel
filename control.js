@@ -2,7 +2,7 @@
 (function () {
   const LW = (window.LW = window.LW || {});
   const { Wheel, Sfx, Confetti } = LuckyWheel;
-  const { PALETTE, DEFAULT_CONFIG, randId, formatTime, normalizeConfig, probabilities, suggestWeights, drawsSinceHit, drawBatch, undoBatch, recordKey, redraw } = LuckyCore;
+  const { PALETTE, DEFAULT_CONFIG, randId, formatTime, normalizeConfig, probabilities, suggestWeights, drawsSinceHit, drawsUsed, prizesFromNames, drawBatch, undoBatch, recordKey, redraw } = LuckyCore;
   const { $, $$, wait, esc, colorOf, toast, dialog, ask, isFlip, resultCards, scheduleFlipSounds, liveChip, renderPrizeListRows, runCountdown, applyTheme } = LW.ui;
 
   function startControl() {
@@ -53,7 +53,7 @@
       wheel.setPrizes(state.config.prizes, state.config.segmentMode, state.config.minSlice / 100);
       renderProbBar(); refreshComputed(); renderPrizeList();
       if (window.WheelBG) WheelBG.setEnabled(state.config.bg3d && !IS_PHONE); // 手機當遙控器用，省電不畫 3D
-      Sfx.enabled = !!state.config.sound;
+      Sfx.enabled = !!state.config.sound; Sfx.volume = state.config.volume / 100;
     }
 
     // ======================================================================
@@ -242,6 +242,21 @@
       });
     }
     $('#savePrizes').addEventListener('click', () => saveConfig());
+    $('#pasteNames').addEventListener('click', async () => {
+      const text = await dialog({ title: '貼上名單（抽人）', message: '一行一個名字（也可用逗號分隔），重複的會自動合併。每個人會變成一格、數量 1，抽到就退出轉盤。', textarea: '', okLabel: '下一步' });
+      if (text === null) return;
+      const list = prizesFromNames(text);
+      if (!list.length) { toast('沒有讀到任何名字'); return; }
+      const replace = await ask(`讀到 ${list.length} 個名字。要「取代」目前的獎項，還是「加在後面」？\n（取代會清掉現有獎項；抽獎紀錄不受影響）`, { title: '加入名單', okLabel: `取代成這 ${list.length} 人` });
+      if (replace) state.config.prizes = list;
+      else {
+        const keep = await ask(`要把這 ${list.length} 人加在目前獎項後面嗎？`, { title: '加入名單', okLabel: '加在後面' });
+        if (!keep) return;
+        state.config.prizes.push(...list);
+      }
+      markDirty(); renderPrizeRows(); updateWheel();
+      toast(`已加入 ${list.length} 個名字，記得按「儲存設定」`);
+    });
     $('#addPrize').addEventListener('click', () => {
       const n = state.config.prizes.length;
       state.config.prizes.push({ id: `p_${randId(8)}`, name: `獎項 ${n + 1}`, weight: 10, quantity: -1, remaining: -1, image: '', color: PALETTE[n % PALETTE.length] });
@@ -350,7 +365,7 @@
     // ======================================================================
     //  設定頁
     // ======================================================================
-    const SETTING_KEYS = ['segmentMode', 'turns', 'countdown', 'overlayResultSeconds', 'multiMode', 'minSlice', 'pityAccumN', 'pityBatchK', 'pityScope', 'theme', 'room', 'broker', 'overlaySize', 'overlayListPos'];
+    const SETTING_KEYS = ['segmentMode', 'turns', 'countdown', 'overlayResultSeconds', 'multiMode', 'minSlice', 'pityAccumN', 'pityBatchK', 'pityScope', 'theme', 'room', 'broker', 'overlaySize', 'overlayListPos', 'volume', 'limitPeriod'];
     const SEC_KEYS = ['spinDuration', 'multiSpinDuration']; // 畫面用秒，內部存毫秒
     const BOOL_KEYS = ['sound', 'sync', 'bg3d', 'pityAccum', 'pityBatch', 'overlaySpinOnly', 'overlayMute', 'overlayHideStatus', 'overlayList', 'overlayListProb', 'overlayListStock'];
     function renderSettings() {
@@ -358,6 +373,8 @@
       SETTING_KEYS.forEach((k) => { $(`#s-${k}`).value = c[k]; });
       SEC_KEYS.forEach((k) => { $(`#s-${k}`).value = Math.round(c[k] / 100) / 10; });
       BOOL_KEYS.forEach((k) => { $(`#s-${k}`).checked = !!c[k]; });
+      $('#volumeVal').textContent = `${c.volume}%`;
+      $('#s-limitOn').checked = c.limitPerPlayer > 0; $('#s-limitPerPlayer').value = c.limitPerPlayer || 3;
       $('#overlayUrl').textContent = overlayUrl();
       $('#openOverlay').href = overlayUrl();
     }
@@ -367,12 +384,15 @@
       SETTING_KEYS.forEach((k) => { c[k] = $(`#s-${k}`).value; });
       SEC_KEYS.forEach((k) => { c[k] = Math.round(Number($(`#s-${k}`).value) * 1000); });
       BOOL_KEYS.forEach((k) => { c[k] = $(`#s-${k}`).checked; });
+      c.limitPerPlayer = $('#s-limitOn').checked ? Number($('#s-limitPerPlayer').value) || 3 : 0;
       c.themeChosen = true;
       if (!saveConfig()) return;
       const c2 = state.config; // saveConfig 會重新 normalize
       if (before !== `${c2.room}|${c2.sync}|${c2.broker}|${c2.secret}`) Sync.start(c2.room, c2);
     });
     $('#newRoom').addEventListener('click', () => { $('#s-room').value = randId(); state.config.secret = randId(20); });
+    $('#s-volume').addEventListener('input', (e) => { $('#volumeVal').textContent = `${e.target.value}%`; Sfx.volume = Number(e.target.value) / 100; });
+    $('#s-volume').addEventListener('change', () => { if ($('#s-sound').checked) { const was = Sfx.enabled; Sfx.enabled = true; Sfx.pop(); Sfx.enabled = was; } });
     $$('.theme-toggle button').forEach((b) => b.addEventListener('click', () => {
       state.config.theme = b.dataset.theme; state.config.themeChosen = true; $('#s-theme').value = b.dataset.theme;
       Store.set(KEYS.config, state.config); applyTheme(b.dataset.theme, wheel);
@@ -510,8 +530,16 @@
       if (cfg.pityBatch) parts.push(`每 ${cfg.pityBatchK} 抽至少 1 個保底獎`);
       return parts.join('　｜　');
     }
+    function limitText(player) {
+      const cfg = state.config; const name = (player || '').trim();
+      if (!cfg.limitPerPlayer || !name) return '';
+      const used = drawsUsed(state.records, name, cfg.limitPeriod);
+      const left = Math.max(0, cfg.limitPerPlayer - used);
+      return left ? `${name}：${cfg.limitPeriod === 'day' ? '今天' : ''}還可抽 ${left} 次` : `${name}：${cfg.limitPeriod === 'day' ? '今天' : ''}已達上限 ${cfg.limitPerPlayer} 次`;
+    }
     function renderPityInfo() {
-      const el = $('#pityInfo'); const txt = pityText($('#player').value.trim());
+      const el = $('#pityInfo'); const player = $('#player').value.trim();
+      const txt = [pityText(player), limitText(player)].filter(Boolean).join('　｜　');
       el.classList.toggle('hidden', !txt); el.textContent = txt;
     }
     $('#player').addEventListener('input', renderPityInfo);
@@ -543,6 +571,18 @@
     // opts.noCountdown：GO 按鈕直接轉，不倒數
     async function spin(count, opts = {}) {
       if (state.spinning) return;
+      // 每人限抽：超過就擋，不夠就縮成剩餘次數
+      const cfg = state.config; const who = $('#player').value.trim();
+      if (cfg.limitPerPlayer && who) {
+        const left = cfg.limitPerPlayer - drawsUsed(state.records, who, cfg.limitPeriod);
+        const when = cfg.limitPeriod === 'day' ? '今天' : '';
+        if (left <= 0) { toast(`${who}${when}已抽滿 ${cfg.limitPerPlayer} 次，不能再抽`, 5000); return; }
+        if (count > left) {
+          const ok = await ask(`${who}${when}只剩 ${left} 次可抽（上限 ${cfg.limitPerPlayer} 次）。改成抽 ${left} 次？`, { title: '已接近限抽上限', okLabel: `抽 ${left} 次` });
+          if (!ok) return;
+          count = left;
+        }
+      }
       setSpinning(true);
       try {
         if (state.dirty && !saveConfig(true)) return;
@@ -616,6 +656,8 @@
     $('#resultGrid').addEventListener('click', (e) => { const b = e.target.closest('.r-redraw'); if (b) redrawRecord(b.dataset.rid); });
 
     function showResult(res) {
+      state.lastCount = res.redrawOf ? state.lastCount || 1 : res.count;
+      $('#spinAgain').textContent = state.lastCount > 1 ? `再抽一次（${state.lastCount} 連抽）` : '再抽一次';
       $('#resultTitle').textContent = res.results.length > 1 ? `${res.batchType}結果` : '恭喜獲得';
       $('#resultSub').textContent = [res.player && `抽獎者：${res.player}`, res.exhausted && '（部分獎項已抽完，實際抽數少於設定）'].filter(Boolean).join('　');
       const flip = isFlip(res);
@@ -668,6 +710,7 @@
       if (e.code === 'Space' && !['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement.tagName)) { e.preventDefault(); spin(1); }
     });
     $('#closeResult').addEventListener('click', () => $('#resultModal').classList.add('hidden'));
+    $('#spinAgain').addEventListener('click', () => { const n = state.lastCount || 1; $('#resultModal').classList.add('hidden'); spin(n); });
     $('#resultModal').addEventListener('click', (e) => { if (e.target.id === 'resultModal') e.target.classList.add('hidden'); });
 
     // ======================================================================

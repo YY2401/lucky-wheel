@@ -329,6 +329,56 @@ if (!H.chromePath()) {
     assert.deepEqual(page.errors, []);
   });
 
+  test('貼上名單：名字變成獎項（數量 1）、取代或加在後面', async (t) => {
+    const page = await fresh(t);
+    await page.click('.open-panel[data-tab="prizes"]'); await H.sleep(200);
+    await page.click('#pasteNames'); await H.sleep(300);
+    assert.equal(await page.$eval('#confirmTextarea', (e) => !e.classList.contains('hidden')), true, '多行輸入框');
+    await page.type('#confirmTextarea', '小明\n阿花\n小明\n大雄');
+    await page.click('#confirmOk'); await H.sleep(300);
+    await page.click('#confirmOk'); await H.sleep(300); // 取代
+    assert.deepEqual(await page.$$eval('#prizeRows .f-name', (els) => els.map((e) => e.value)), ['小明', '阿花', '大雄']);
+    assert.deepEqual(await page.$$eval('#prizeRows .f-quantity', (els) => els.map((e) => e.value)), ['1', '1', '1']);
+    await page.click('#savePrizes'); await H.sleep(200); await page.click('#closePanel');
+    await H.spinOnce(page, 3); await H.closeResult(page); await H.sleep(200);
+    const cfg = await H.readKey(page, 'lw.config');
+    assert.deepEqual(cfg.prizes.map((p) => p.remaining), [0, 0, 0], '三個人都抽到一次後全部退出');
+  });
+
+  test('每人限抽：超過縮成剩餘次數、抽滿擋下；結果視窗「再抽一次」', async (t) => {
+    const page = await fresh(t, { limitPerPlayer: 3, limitPeriod: 'all', prizes: [{ id: 'x', name: '不限', weight: 1, quantity: -1, remaining: -1 }] });
+    await page.type('#player', '小明'); await H.sleep(100);
+    assert.match(await page.$eval('#pityInfo', (e) => e.textContent), /小明：還可抽 3 次/);
+    await H.spinOnce(page, 1);
+    assert.equal(await page.$eval('#spinAgain', (e) => e.textContent), '再抽一次');
+    await page.click('#spinAgain'); await page.waitForSelector('#resultModal:not(.hidden)'); await H.closeResult(page); await H.sleep(150);
+    assert.equal((await H.readKey(page, 'lw.records')).length, 2);
+    assert.match(await page.$eval('#pityInfo', (e) => e.textContent), /還可抽 1 次/);
+    await page.click('.spin-btn[data-count="5"]'); await H.sleep(300);
+    assert.match(await page.$eval('#confirmMsg', (e) => e.textContent), /只剩 1 次可抽/);
+    await page.click('#confirmOk'); await page.waitForSelector('#resultModal:not(.hidden)'); await H.closeResult(page); await H.sleep(150);
+    assert.equal((await H.readKey(page, 'lw.records')).length, 3);
+    await page.click('.spin-btn[data-count="1"]'); await H.sleep(300);
+    assert.match(await page.$eval('#toast', (e) => e.textContent), /已抽滿 3 次/);
+    assert.equal((await H.readKey(page, 'lw.records')).length, 3, '抽滿後不再新增');
+    // 沒填名字不受限
+    await page.evaluate(() => { document.querySelector('#player').value = ''; });
+    await H.spinOnce(page, 1); await H.closeResult(page);
+    assert.equal((await H.readKey(page, 'lw.records')).length, 4);
+    assert.deepEqual(page.errors, []);
+  });
+
+  test('音量：設定頁滑桿存到設定，Sfx.volume 跟著變', async (t) => {
+    const page = await fresh(t);
+    await page.click('.open-panel[data-tab="settings"]'); await H.sleep(200);
+    assert.equal(await page.$eval('#s-volume', (e) => e.value), '70');
+    await page.evaluate(() => { const s = document.querySelector('#s-volume'); s.value = '30'; s.dispatchEvent(new Event('input')); });
+    assert.equal(await page.$eval('#volumeVal', (e) => e.textContent), '30%');
+    assert.equal(await page.evaluate(() => LuckyWheel.Sfx.volume), 0.3);
+    await page.click('#saveSettings'); await H.sleep(200);
+    assert.equal((await H.readKey(page, 'lw.config')).volume, 30);
+  });
+
   test('保底：連抽保底每 5 抽至少一個，40 批全部符合', async (t) => {
     const page = await fresh(t, { pityBatch: true, pityBatchK: 5, prizes: FAST.prizes.map((p) => ({ ...p, quantity: -1, remaining: -1 })) });
     for (let i = 0; i < 40; i++) { await H.spinOnce(page, 5); await H.closeResult(page); }

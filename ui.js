@@ -17,17 +17,22 @@
   }
 
   // 頁內確認 / 輸入視窗：OBS 內建瀏覽器不會顯示原生 confirm，所以自己畫
-  function dialog({ title = '確認', message = '', input = null, okLabel = '確定', danger = false }) {
+  // input：單行輸入；textarea：多行輸入（回傳字串，取消回傳 null）
+  function dialog({ title = '確認', message = '', input = null, textarea = null, okLabel = '確定', danger = false }) {
+    if (textarea !== null) input = textarea;
     return new Promise((resolve) => {
       const m = $('#confirmModal');
       if (!m) { resolve(input !== null ? window.prompt(message, input) : window.confirm(message)); return; }
       $('#confirmTitle').textContent = title; $('#confirmMsg').textContent = message;
-      const inp = $('#confirmInput'); inp.classList.toggle('hidden', input === null); if (input !== null) inp.value = input;
+      const single = $('#confirmInput'); const multi = $('#confirmTextarea');
+      const inp = textarea !== null ? multi : single;
+      single.classList.toggle('hidden', textarea !== null || input === null); multi.classList.toggle('hidden', textarea === null);
+      if (input !== null) inp.value = input;
       const ok = $('#confirmOk'); ok.textContent = okLabel; ok.className = `btn ${danger ? 'danger' : 'primary'}`;
       m.classList.remove('hidden');
       const cancelValue = input !== null ? null : false;
       const done = (v) => { m.classList.add('hidden'); ok.onclick = null; $('#confirmCancel').onclick = null; m.onclick = null; document.removeEventListener('keydown', onKey); resolve(v); };
-      const onKey = (e) => { if (e.key === 'Escape') done(cancelValue); if (e.key === 'Enter' && input !== null) done(inp.value); };
+      const onKey = (e) => { if (e.key === 'Escape') done(cancelValue); if (e.key === 'Enter' && input !== null && textarea === null) done(inp.value); };
       ok.onclick = () => done(input !== null ? inp.value : true);
       $('#confirmCancel').onclick = () => done(cancelValue);
       m.onclick = (e) => { if (e.target === m) done(cancelValue); };

@@ -499,3 +499,6 @@ body.overlay .hub-pos { display: none; }
 .tag-redraw { background: var(--blue); color: #fff; }
 .records-table .f-redraw { padding: 3px 8px; font-size: 12px; }
 @media (max-width: 700px) { .r-card .r-redraw { opacity: 1; } }
+
+#confirmTextarea { width: 100%; min-height: 200px; margin-bottom: 18px; font: inherit; padding: 10px 12px; border: var(--border-w) solid var(--ink); border-radius: 8px; background: var(--paper); color: var(--text); resize: vertical; }
+input[type=range] { width: 100%; accent-color: var(--red); }
