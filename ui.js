@@ -53,10 +53,11 @@
   const flipTotal = (n, flip = true) => (flip ? FLIP.start + (n - 1) * FLIP.gap + FLIP.dur : 0);
   function resultCards(results, showIndex, flip = true, { redraw = false } = {}) {
     return results.map((r, i) => `
-      <div class="r-card${flip ? '' : ' revealed'}" style="--c:${esc(r.color || '#888')}" data-rid="${esc(r.rid || '')}">
+      <div class="r-card${flip ? '' : ' revealed'} tier-${esc(r.tier || 'normal')}" style="--c:${esc(r.color || '#888')}" data-rid="${esc(r.rid || '')}">
         <div class="flip-inner" style="--d:${FLIP.start + i * FLIP.gap}ms">
-          <div class="flip-face flip-back"><span class="q">?</span></div>
+          <div class="flip-face flip-back${flip && r.tier === 'big' ? ' tease' : ''}"><span class="q">?</span></div>
           <div class="flip-face flip-front">
+            ${r.tier === 'big' ? '<span class="ribbon">★ 大獎 ★</span><span class="stamp">中了！</span>' : r.tier === 'miss' ? '<span class="sticker">再接再厲</span>' : ''}
             ${r.pity ? '<span class="badge-pity">保底</span>' : ''}
             ${redraw && r.rid ? `<button type="button" class="r-redraw" data-rid="${esc(r.rid)}" title="只重抽這一抽">補抽</button>` : ''}
             ${r.redrawOf ? '<span class="badge-redraw">補抽</span>' : ''}
@@ -107,6 +108,27 @@
     }).join('') || '<li class="hint">還沒有獎項</li>';
   }
 
+  // ---------- 落地反應：依等級決定閃光、彩帶、音效、搖頭 ----------
+  const reduceMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function celebrate(tier, { wheel, confetti, count = 1 } = {}) {
+    if (wheel) wheel.focus(tier === 'big' ? 2000 : 1400);
+    if (tier === 'miss') { Sfx.sad(); return; }
+    if (tier === 'big') {
+      Sfx.fanfare();
+      if (!reduceMotion()) {
+        const f = $('#flash'); if (f) { f.classList.remove('go'); void f.offsetWidth; f.classList.add('go'); }
+        if (wheel) wheel.strobe(1200);
+        if (window.WheelBG) { WheelBG.burst(); const b = document.body.getBoundingClientRect(); WheelBG.burstAt(b.width / 2, b.height / 2, 160); }
+      }
+      if (confetti) { confetti.burst(420, ['#ffcf33', '#ffffff', '#e63b3b', '#141414']); setTimeout(() => confetti.burst(260, ['#ffcf33', '#ffffff']), 500); }
+      return;
+    }
+    Sfx.win();
+    if (confetti) confetti.burst(count > 1 ? 260 : 160);
+    if (window.WheelBG) WheelBG.burst();
+  }
+  function shakeResultBox(el) { if (!el || reduceMotion()) return; el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); }
+
   // ---------- 主題 ----------
   const WHEEL_THEMES = {
     dark: { ring: '#1c1c1c', ringStroke: '#ffcf33', ledOn: '#ffcf33', ledOff: '#4a4a4a', hubBg: '#f4efe4', hubText: '#141414', hubStroke: '#ffcf33', pointer: '#e63b3b', pointerStroke: '#f4efe4', sliceStroke: '#141414', textFill: '#ffffff', textStroke: 'rgba(0,0,0,0.55)' },
@@ -122,5 +144,5 @@
     return theme;
   }
 
-  LW.ui = { $, $$, wait, esc, colorOf, toast, dialog, ask, isFlip, flipTotal, resultCards, scheduleFlipSounds, liveChip, renderPrizeListRows, runCountdown, applyTheme };
+  LW.ui = { $, $$, wait, esc, colorOf, toast, dialog, ask, isFlip, flipTotal, resultCards, scheduleFlipSounds, liveChip, renderPrizeListRows, runCountdown, celebrate, shakeResultBox, applyTheme };
 })();

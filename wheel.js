@@ -159,7 +159,8 @@
       const leds = 28;
       for (let i = 0; i < leds; i++) {
         const a = (i / leds) * TAU;
-        const on = (i + this.ledPhase) % 2 === 0;
+        const strobing = this.strobeUntil && performance.now() < this.strobeUntil;
+        const on = strobing ? Math.floor(performance.now() / 70) % 2 === 0 : (i + this.ledPhase) % 2 === 0; // 大獎時整圈跑馬燈快閃
         ctx.beginPath(); ctx.arc(Math.cos(a) * (R + 7 * k), Math.sin(a) * (R + 7 * k), 3.2 * k, 0, TAU);
         ctx.fillStyle = on ? T.ledOn : T.ledOff;
         ctx.shadowBlur = on ? 8 : 0; ctx.shadowColor = T.ledOn;
@@ -183,7 +184,11 @@
         const color = seg.soldOut ? '#4a4a55' : (seg.prize.color || PALETTE[i % PALETTE.length]);
         ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, R, seg.start, seg.end); ctx.closePath();
         ctx.fillStyle = color; ctx.fill();
-        if (this.highlight === seg) { ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.fill(); if (seg.span < 0.16) { ctx.lineWidth = 3 * k; ctx.strokeStyle = '#ffffff'; ctx.stroke(); } }
+        const focusing = this.focusUntil && performance.now() < this.focusUntil;
+        if (this.highlight === seg) {
+          const pulse = focusing ? 0.25 + 0.35 * Math.abs(Math.sin((performance.now() - (this.focusUntil - 1400)) / 1400 * Math.PI * 3)) : 0.45;
+          ctx.fillStyle = `rgba(255,255,255,${pulse})`; ctx.fill(); if (seg.span < 0.16 || focusing) { ctx.lineWidth = 3 * k; ctx.strokeStyle = '#ffffff'; ctx.stroke(); }
+        } else if (focusing) { ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fill(); }
         ctx.lineWidth = (seg.span < 0.12 ? 1 : 2.5) * k; ctx.strokeStyle = T.sliceStroke; ctx.stroke(); // 格子很細時邊線變細，不然全是黑線
 
         // 扇區內容：圖片在外側、文字沿半徑排
@@ -267,27 +272,36 @@
         const seg = this.segments.find((s) => s.prize.id === prizeId);
         if (!seg) { resolve(null); return; }
         if (this._raf) cancelAnimationFrame(this._raf);
-        const offset = (Math.random() - 0.5) * seg.span * 0.7;
+        // 落點在格子中段 ±25%，尾段會多衝過去一點再彈回（真轉盤的橡膠擋片感），衝過的量最多 20% 格寬，
+        // 加起來不會越過格子邊界（落點測試驗證離邊界至少 15%）
+        const offset = (Math.random() - 0.5) * seg.span * 0.5;
         const target = seg.start + seg.span / 2 + offset;     // 轉盤座標上要停在指針下的角度
         const want = norm(this.opts.pointerAngle - target);   // 最終 rotation（mod 2π）
         const delta = norm(want - norm(this.rotation));
         const total = turns * TAU + delta;
+        const over = duration > 0 ? Math.min(seg.span * 0.2, 0.06) : 0;
+        const SPLIT = 0.86; // 前 86% 時間衝到（終點＋衝過量），剩下時間彈回終點
         const start = this.rotation;
         const t0 = performance.now();
-        this.spinning = true; this.highlight = null; this.skipRequested = false;
-        let lastSeg = this.currentSegment();
+        this.spinning = true; this.highlight = null; this.skipRequested = false; this.focusUntil = 0;
+        let lastSeg = this.currentSegment(); let lastRot = start; let lastNow = t0;
         const step = (now) => {
           let t = duration <= 0 ? 1 : Math.min(1, (now - t0) / duration);
           if (this.skipRequested) t = 1;
-          const e = 1 - Math.pow(1 - t, 4);
+          let e;
+          if (t < SPLIT) { const u = t / SPLIT; e = (1 - Math.pow(1 - u, 3)) * (total + over) / total; }
+          else { const u = (t - SPLIT) / (1 - SPLIT); e = (total + over * Math.cos(u * Math.PI / 2) * (1 - u * 0.15)) / total; }
+          if (t >= 1) e = 1;
           this.rotation = start + total * e;
+          const dt = Math.max(1, now - lastNow); const speed = Math.abs(this.rotation - lastRot) / dt * 1000; // rad/s
+          lastRot = this.rotation; lastNow = now;
           const segNow = this.currentSegment();
           if (segNow !== lastSeg) {
-            lastSeg = segNow; this.pointerKick = 1;
-            if (this.opts.onTick) this.opts.onTick();
+            lastSeg = segNow; this.pointerKick = Math.min(1.6, 0.7 + 0.9 / Math.max(0.3, speed)); // 越慢踢越大
+            if (this.opts.onTick) this.opts.onTick(speed);
           }
           this.pointerKick *= 0.82;
-          this.ledPhase = Math.floor(now / (60 + 300 * e));
+          this.ledPhase = Math.floor(now / (60 + 300 * Math.min(1, e)));
           this.draw();
           if (t < 1) { this._raf = requestAnimationFrame(step); return; }
           this._raf = null; this.spinning = false; this.pointerKick = 0;
@@ -301,6 +315,16 @@
     }
 
     skip() { this.skipRequested = true; }
+
+    strobe(ms = 1200) { this.strobeUntil = performance.now() + ms; const loop = (now) => { if (now >= this.strobeUntil) { this.strobeUntil = 0; this.draw(); return; } this.draw(); requestAnimationFrame(loop); }; requestAnimationFrame(loop); }
+
+    // 停下後聚焦 1.4 秒：其他格子暗下去、中獎格脈動打亮三次（OBS 小畫面也找得到停在哪）
+    focus(ms = 1400) {
+      if (!this.highlight) return;
+      const t0 = performance.now(); this.focusUntil = t0 + ms;
+      const loop = (now) => { if (this.spinning || now >= this.focusUntil) { this.focusUntil = 0; this.draw(); return; } this.draw(); requestAnimationFrame(loop); };
+      requestAnimationFrame(loop);
+    }
   }
 
   // ---------- 音效（WebAudio 合成，無需音檔） ----------
@@ -324,7 +348,10 @@
       o.connect(g).connect(c.destination);
       o.start(t); o.stop(t + dur);
     },
-    tick() { if (!this.enabled) return; try { this._tone(900, 0.05); } catch (e) { /* ignore */ } },
+    // speed：rad/s。快的時候高而短、慢下來低而長，光聽就知道快停了
+    tick(speed) { if (!this.enabled) return; try { const s = Math.min(1, (speed || 6) / 12); this._tone(550 + 550 * s, 0.045 + 0.06 * (1 - s), 'square', 0.08); } catch (e) { /* ignore */ } },
+    fanfare() { if (!this.enabled) return; try { [[523, 0], [523, 0.12], [523, 0.24], [659, 0.36], [784, 0.6], [659, 0.84], [784, 0.96], [1046, 1.2]].forEach(([f, at]) => this._tone(f, 0.28, 'square', 0.14, at)); [[262, 0.6], [330, 0.96], [392, 1.2]].forEach(([f, at]) => this._tone(f, 0.5, 'triangle', 0.12, at)); } catch (e) { /* ignore */ } },
+    sad() { if (!this.enabled) return; try { this._tone(330, 0.35, 'sawtooth', 0.09); this._tone(262, 0.5, 'sawtooth', 0.09, 0.3); } catch (e) { /* ignore */ } },
     pop() { if (!this.enabled) return; try { this._tone(600, 0.12, 'triangle', 0.15); this._tone(900, 0.1, 'triangle', 0.12, 0.06); } catch (e) { /* ignore */ } },
     win() {
       if (!this.enabled) return;
@@ -335,7 +362,7 @@
   // ---------- 彩帶 ----------
   class Confetti {
     constructor(canvas) { this.canvas = canvas; this.ctx = canvas.getContext('2d'); this.parts = []; this._raf = null; }
-    burst(n = 160) {
+    burst(n = 160, colors = PALETTE) {
       const W = (this.canvas.width = this.canvas.clientWidth || window.innerWidth);
       const H = (this.canvas.height = this.canvas.clientHeight || window.innerHeight);
       if (this.parts.length > 400) this.parts = this.parts.slice(-200); // 連續抽獎時避免彩帶堆積
@@ -345,7 +372,7 @@
           vx: (Math.random() - 0.5) * 16, vy: -Math.random() * 16 - 5,
           w: 6 + Math.random() * 7, h: 4 + Math.random() * 5,
           rot: Math.random() * TAU, vr: (Math.random() - 0.5) * 0.35,
-          color: PALETTE[Math.floor(Math.random() * PALETTE.length)], life: 90 + Math.random() * 70,
+          color: colors[Math.floor(Math.random() * colors.length)], life: 90 + Math.random() * 70,
         });
       }
       if (!this._raf) this._loop();

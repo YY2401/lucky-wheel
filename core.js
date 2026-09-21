@@ -34,6 +34,7 @@
       weight: Math.max(0, Number(p.weight) || 0), quantity, remaining,
       image: String(p.image || ''), color: /^#[0-9a-f]{6}$/i.test(p.color || '') ? p.color : '',
       pity: p.pity === true,
+      tier: ['auto', 'big', 'normal', 'miss'].includes(p.tier) ? p.tier : 'auto', // 特效等級
     };
   }
   function normalizeConfig(c) {
@@ -147,7 +148,8 @@
       if (p.remaining > 0) p.remaining -= 1;
       const hit = !!p.pity;
       if (hit) { since = 0; hitsInBatch++; } else since++;
-      results.push({ rid: randId(8), index: i + 1, prizeId: p.id, name: p.name, image: p.image, color: p.color, remaining: p.remaining, probability: Math.round(probs[p.id] * 100) / 100, pity: forced, hit });
+      const probability = Math.round(probs[p.id] * 100) / 100;
+      results.push({ rid: randId(8), index: i + 1, prizeId: p.id, name: p.name, image: p.image, color: p.color, remaining: p.remaining, probability, pity: forced, hit, tier: tierOf(p, probs[p.id]) });
     }
     const time = formatTime(now);
     const recs = results.map((r) => ({ rid: r.rid, time, batchId, type, index: r.index, player, prize: r.name, prizeId: r.prizeId, remaining: r.remaining, probability: r.probability, pity: r.pity, hit: r.hit }));
@@ -173,6 +175,22 @@
     if (expected.length !== msg.sig.length) return false;
     let diff = 0; for (let i = 0; i < expected.length; i++) diff |= expected.charCodeAt(i) ^ msg.sig.charCodeAt(i);
     return diff === 0;
+  }
+
+  // ---------- 特效等級：大獎 / 一般 / 銘謝惠顧。auto = 機率 < 5% 或勾保底算大獎，名字像「銘謝惠顧」算落空 ----------
+  const MISS_RE = /銘謝|謝謝|再接再厲|沒中|槓龜|落空|安慰|下次|thanks|miss/i;
+  function tierOf(prize, probability) {
+    if (prize.tier && prize.tier !== 'auto') return prize.tier;
+    if (MISS_RE.test(prize.name || '')) return 'miss';
+    if (prize.pity || (probability != null && probability < 5)) return 'big';
+    return 'normal';
+  }
+  // 一批的整體反應：有任何大獎就大獎；全部落空就落空；其他一般
+  function batchTier(results) {
+    if (!results.length) return 'normal';
+    if (results.some((r) => r.tier === 'big')) return 'big';
+    if (results.every((r) => r.tier === 'miss')) return 'miss';
+    return 'normal';
   }
 
   // ---------- 每人限抽：某人已經抽了幾次（作廢不算；每天重置時只算今天） ----------
@@ -218,5 +236,5 @@
     return { ...out, batchId: target.batchId, type: '補抽', label, voided: target };
   }
 
-  return { PALETTE, DEFAULT_CONFIG, formatTime, randId, rand, normalizePrize, normalizeConfig, pool, pityPool, probabilities, drawOne, suggestWeights, drawsSinceHit, drawsUsed, prizesFromNames, drawBatch, undoBatch, recordKey, redraw, signMessage, verifyMessage, SIG_WINDOW_MS };
+  return { PALETTE, DEFAULT_CONFIG, formatTime, randId, rand, normalizePrize, normalizeConfig, pool, pityPool, probabilities, drawOne, suggestWeights, drawsSinceHit, drawsUsed, prizesFromNames, tierOf, batchTier, drawBatch, undoBatch, recordKey, redraw, signMessage, verifyMessage, SIG_WINDOW_MS };
 });

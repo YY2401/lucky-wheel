@@ -4,11 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Lucky Wheel</title>
-<meta name="app-version" content="49">
+<meta name="app-version" content="50">
 <script>try { document.documentElement.dataset.theme = localStorage.getItem('lw.theme') || 'light'; } catch (e) { document.documentElement.dataset.theme = 'light'; }</script>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=49">
+<link rel="stylesheet" href="style.css?v=50">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.1/mqtt.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
@@ -92,7 +92,7 @@
       <div class="prob-bar" id="probBar"></div>
       <div class="table-scroll">
         <table class="prize-table">
-          <thead><tr><th></th><th>圖片</th><th>名稱</th><th title="數字越大越容易抽到">權重</th><th>機率</th><th>數量</th><th>剩餘</th><th>顏色</th><th title="勾選的獎項算保底獎">保底</th><th></th></tr></thead>
+          <thead><tr><th></th><th>圖片</th><th>名稱</th><th title="數字越大越容易抽到">權重</th><th>機率</th><th>數量</th><th>剩餘</th><th>顏色</th><th title="勾選的獎項算保底獎">保底</th><th title="停下時的反應">特效</th><th></th></tr></thead>
           <tbody id="prizeRows"></tbody>
         </table>
       </div>
@@ -111,6 +111,7 @@
         <b>不知道權重怎麼設？</b>按「建議機率」，會依每個獎項的數量算好（數量少的大獎機率低、抽完剛好用完）。<br>
         <b>數量</b>勾「無限」就是不限量；<b>剩餘</b>可以手動改。<b>保底</b>打勾的獎項會在保底時被抽出（要到「設定」把保底規則打開才有作用）。<br>
         <b>圖片</b>可以上傳 GIF 動圖（2 MB 內）或貼 GIF 網址，結果卡、獎項一覽、轉盤上都會動。<br>
+        <b>特效</b>決定停下時的反應：大獎會有跑馬燈快閃、金色彩帶、號角聲和「中了！」印章；落空（銘謝惠顧）不放彩帶、卡片搖頭。「自動」＝機率低於 5% 或勾保底的算大獎、名字像「銘謝惠顧」算落空。<br>
         <b>要抽「人」而不是抽獎品？</b>按「貼上名單」，一行一個名字，每個人會變成一格、數量 1，抽到就退出轉盤；要再抽一輪按「重置庫存」。<br>
         按抽獎前會自動幫你儲存。設定存在這台電腦的瀏覽器裡，換電腦請用「匯出設定」帶走。
       </p>
@@ -390,18 +391,19 @@
 </div>
 <div class="ov-status overlay-only hidden" id="ovStatus" title="同步狀態"></div>
 <div id="countdown" class="countdown hidden"><span>3</span></div>
+<div id="flash" class="flash"></div>
 <canvas id="confetti"></canvas>
 <div id="toast"></div>
 
-<script src="core.js?v=49"></script>
-<script src="wheel.js?v=49"></script>
-<script src="ui.js?v=49"></script>
-<script src="store.js?v=49"></script>
-<script src="sync.js?v=49"></script>
-<script src="excel.js?v=49"></script>
-<script src="overlay.js?v=49"></script>
-<script src="control.js?v=49"></script>
-<script src="app.js?v=49"></script>
-<script src="bg.js?v=49"></script>
+<script src="core.js?v=50"></script>
+<script src="wheel.js?v=50"></script>
+<script src="ui.js?v=50"></script>
+<script src="store.js?v=50"></script>
+<script src="sync.js?v=50"></script>
+<script src="excel.js?v=50"></script>
+<script src="overlay.js?v=50"></script>
+<script src="control.js?v=50"></script>
+<script src="app.js?v=50"></script>
+<script src="bg.js?v=50"></script>
 </body>
 </html>

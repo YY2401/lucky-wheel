@@ -536,3 +536,35 @@ kbd { display: inline-block; font-family: ui-monospace, Menlo, monospace; font-s
   #helpModal h3:last-of-type, .help-keys, .help-keys + .hint { display: none; } /* 手機沒鍵盤，不顯示快捷鍵 */
   .topbar-right .btn { padding: 10px 4px; font-size: 13px; }
 }
+
+/* ---------- 落地反應（依獎項等級） ---------- */
+.flash { position: fixed; inset: 0; background: var(--yellow); opacity: 0; pointer-events: none; z-index: 44; }
+.flash.go { animation: flashgo .5s steps(1) forwards; }
+@keyframes flashgo { 0% { opacity: .85; } 12% { opacity: 0; } 24% { opacity: .6; } 36% { opacity: 0; } 100% { opacity: 0; } }
+/* 大獎卡：黃黑跑馬燈邊框、緞帶、印章 */
+.r-card.tier-big .flip-front { border-color: var(--yellow); outline: 3px dashed var(--ink); outline-offset: -8px; animation: marquee .6s steps(2) infinite; }
+@keyframes marquee { 0% { outline-color: var(--ink); border-color: var(--yellow); } 50% { outline-color: var(--yellow); border-color: var(--ink); } }
+.r-card .ribbon {
+  position: absolute; top: -2px; left: 50%; transform: translateX(-50%); padding: 3px 12px; font-size: 12px; font-weight: 900; letter-spacing: 1px; color: #141414; white-space: nowrap;
+  background: var(--yellow); border: 2px solid var(--ink); border-top: 0; border-radius: 0 0 8px 8px; z-index: 2;
+  box-shadow: 0 4px 0 0 var(--ink), 0 6px 0 0 var(--yellow); /* 底下一條黑一條黃，像票根撕邊 */
+}
+.r-card .stamp {
+  position: absolute; right: 6px; top: 30px; padding: 3px 9px; font-size: 16px; font-weight: 900; color: var(--red); border: 3px solid var(--red); border-radius: 6px;
+  transform: rotate(-14deg); opacity: .92; z-index: 2; background: rgba(255, 253, 247, .6); animation: stampin .5s cubic-bezier(.2, 1.6, .4, 1) both; animation-delay: calc(var(--d, 0ms) + 900ms);
+}
+@keyframes stampin { from { transform: rotate(-14deg) scale(3); opacity: 0; } to { transform: rotate(-14deg) scale(1); opacity: .92; } }
+.r-card.revealed .stamp { animation-delay: 150ms; }
+/* 落空卡：灰一點、貼紙 */
+.r-card.tier-miss .flip-front { filter: saturate(.55); }
+.r-card .sticker { position: absolute; right: 8px; top: 8px; font-size: 11px; font-weight: 800; color: var(--muted); border: 2px solid var(--ink-soft); border-radius: 999px; padding: 2px 8px; transform: rotate(8deg); background: var(--surface2); z-index: 2; }
+/* 大獎卡背預告：翻開前條紋反相閃兩下 */
+.flip-back.tease { animation: teaseblink .18s steps(1) 4; animation-delay: calc(var(--d, 0ms) - 720ms); }
+@keyframes teaseblink { 0% { filter: invert(0); } 50% { filter: invert(1); } }
+.flip-inner .flip-back.tease { animation-fill-mode: none; }
+/* 落空：結果卡搖頭 */
+.shake { animation: shakehead .55s cubic-bezier(.36, .07, .19, .97) both; }
+@keyframes shakehead { 10%, 90% { transform: translateX(-2px); } 20%, 80% { transform: translateX(4px); } 30%, 50%, 70% { transform: translateX(-7px); } 40%, 60% { transform: translateX(7px); } }
+.result-card.single .stamp { font-size: 28px; right: 16px; top: 44px; }
+.result-card.single .ribbon { font-size: 16px; padding: 5px 22px; }
+@media (prefers-reduced-motion: reduce) { .r-card.tier-big .flip-front, .flip-back.tease, .flash.go, .shake { animation: none; } }

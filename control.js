@@ -2,8 +2,8 @@
 (function () {
   const LW = (window.LW = window.LW || {});
   const { Wheel, Sfx, Confetti } = LuckyWheel;
-  const { PALETTE, DEFAULT_CONFIG, randId, formatTime, normalizeConfig, probabilities, suggestWeights, drawsSinceHit, drawsUsed, prizesFromNames, drawBatch, undoBatch, recordKey, redraw } = LuckyCore;
-  const { $, $$, wait, esc, colorOf, toast, dialog, ask, isFlip, resultCards, scheduleFlipSounds, liveChip, renderPrizeListRows, runCountdown, applyTheme } = LW.ui;
+  const { PALETTE, DEFAULT_CONFIG, randId, formatTime, normalizeConfig, probabilities, suggestWeights, drawsSinceHit, drawsUsed, prizesFromNames, batchTier, drawBatch, undoBatch, recordKey, redraw } = LuckyCore;
+  const { $, $$, wait, esc, colorOf, toast, dialog, ask, isFlip, resultCards, scheduleFlipSounds, liveChip, renderPrizeListRows, runCountdown, celebrate, shakeResultBox, applyTheme } = LW.ui;
 
   function startControl() {
     const { Store, Sync, Excel, KEYS } = LW;
@@ -169,6 +169,7 @@
         <td data-label="剩餘"><input type="number" class="f-remaining" min="0"></td>
         <td data-label="顏色"><input type="color" class="f-color"></td>
         <td data-label="保底" style="text-align:center"><input type="checkbox" class="f-pity" title="勾選＝算保底獎"></td>
+        <td data-label="特效"><select class="f-tier" title="停下時的反應：自動＝機率低於 5% 或保底獎算大獎、名字像「銘謝惠顧」算落空"><option value="auto">自動</option><option value="big">大獎</option><option value="normal">一般</option><option value="miss">落空</option></select></td>
         <td class="row-tools" style="white-space:nowrap">
           <button class="btn icon f-up" title="上移">↑</button>
           <button class="btn icon f-down" title="下移">↓</button>
@@ -191,6 +192,7 @@
       on('.f-unlimited', 'change', (e, p) => { if (e.target.checked) { p.quantity = -1; p.remaining = -1; } else { p.quantity = 10; p.remaining = 10; } touched(); });
       on('.f-color', 'input', (e, p) => { p.color = e.target.value; touched(); });
       on('.f-pity', 'change', (e, p) => { p.pity = e.target.checked; markDirty(); renderPityInfo(); });
+      on('.f-tier', 'change', (e, p) => { p.tier = e.target.value; markDirty(); });
       on('.f-del', 'click', async (e, p) => { if (await ask(`刪除獎項「${p.name}」？`, { title: '刪除獎項', okLabel: '刪除', danger: true })) { state.config.prizes.splice(index(), 1); restructure(); } });
       on('.f-up', 'click', () => { const i = index(); if (i <= 0) return; const a = state.config.prizes; [a[i - 1], a[i]] = [a[i], a[i - 1]]; restructure(); });
       on('.f-down', 'click', () => { const i = index(); const a = state.config.prizes; if (i < 0 || i >= a.length - 1) return; [a[i + 1], a[i]] = [a[i], a[i + 1]]; restructure(); });
@@ -225,6 +227,7 @@
         $('.f-unlimited', tr).checked = unlimited;
         setVal($('.f-color', tr), colorOf(p, i));
         $('.f-pity', tr).checked = !!p.pity;
+        setVal($('.f-tier', tr), p.tier || 'auto');
         const pr = probs[p.id];
         $('.prob', tr).textContent = pr == null ? (p.remaining === 0 ? '已抽完' : '0%') : `${pr.toFixed(2)}%`;
         tr.classList.toggle('tr-soldout', pr == null);
@@ -674,8 +677,9 @@
         }
       }
       updateWheel(); renderPrizeRows(); renderPityInfo(); renderPlayerNames();
-      Sfx.win(); confetti.burst(res.results.length > 1 ? 260 : 160);
-      if (window.WheelBG) WheelBG.burst();
+      // 落地反應：翻牌模式下慶祝等翻完再放（不然還沒翻就爆雷）；否則轉盤停下就放
+      const tier = batchTier(res.results);
+      if (isFlip(res)) { wheel.focus(1200); res.celebrateLater = tier; } else celebrate(tier, { wheel, confetti, count: res.results.length });
     }
     // ---------- 補抽：作廢某一抽、轉盤轉一次、把那張卡換成新結果 ----------
     async function redrawRecord(key) {
@@ -728,6 +732,8 @@
       ex.textContent = e.ok ? `已寫入 Excel：${e.name}` : e.skipped ? '（未綁定 Excel 檔案；可在「紀錄 / Excel」綁定或下載）' : `Excel 寫入失敗：${e.error}（紀錄仍保存在瀏覽器，可稍後「立即寫入」或下載）`;
       ex.classList.toggle('bad', !e.ok && !e.skipped);
       $('#resultModal').classList.remove('hidden');
+      if (res.celebrateLater) { const tier = res.celebrateLater; res.celebrateLater = null; setTimeout(() => { celebrate(tier, { wheel: null, confetti, count: res.results.length }); if (tier === 'miss') shakeResultBox($('.modal-box', $('#resultModal'))); }, LW.ui.flipTotal(res.results.length, true) - 300); }
+      else if (batchTier(res.results) === 'miss') shakeResultBox($('.modal-box', $('#resultModal')));
       if (window.anime) {
         anime({ targets: '#resultGrid .r-card', translateY: [40, 0], opacity: [0, 1], scale: [0.7, 1], delay: anime.stagger(60, { start: 80 }), duration: 600, easing: 'easeOutBack' });
         anime({ targets: '#resultTitle', scale: [0.6, 1], opacity: [0, 1], duration: 600, easing: 'easeOutBack' });

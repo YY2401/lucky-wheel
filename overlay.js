@@ -2,8 +2,8 @@
 (function () {
   const LW = (window.LW = window.LW || {});
   const { Wheel, Sfx, Confetti } = LuckyWheel;
-  const { DEFAULT_CONFIG, normalizeConfig, normalizePrize } = LuckyCore;
-  const { $, $$, wait, isFlip, flipTotal, resultCards, scheduleFlipSounds, liveChip, renderPrizeListRows, runCountdown, applyTheme } = LW.ui;
+  const { DEFAULT_CONFIG, normalizeConfig, normalizePrize, batchTier } = LuckyCore;
+  const { $, $$, wait, isFlip, flipTotal, resultCards, scheduleFlipSounds, liveChip, renderPrizeListRows, runCountdown, celebrate, shakeResultBox, applyTheme } = LW.ui;
 
   function startOverlay(params) {
     const { Store, Sync, KEYS } = LW;
@@ -68,8 +68,10 @@
         }
       }
       if (d.prizes) { config.prizes = d.prizes.map(normalizePrize); Store.set(KEYS.overlayConfig, config); wheel.setPrizes(config.prizes, config.segmentMode, config.minSlice / 100); renderList(); }
-      Sfx.win(); confetti.burst(d.results.length > 1 ? 260 : 160);
-      if (window.WheelBG) { WheelBG.setSpinning(false); WheelBG.burst(); }
+      const tier = batchTier(d.results);
+      if (window.WheelBG) WheelBG.setSpinning(false);
+      if (flip && !fast) { wheel.focus(1200); setTimeout(() => { celebrate(tier, { wheel: null, confetti, count: d.results.length }); if (tier === 'miss') shakeResultBox($('#ovResultCard')); }, flipTotal(d.results.length, true) - 300); }
+      else { celebrate(tier, { wheel, confetti, count: d.results.length }); if (tier === 'miss') shakeResultBox($('#ovResultCard')); }
       $('#ovResultCard').classList.toggle('single', d.results.length === 1);
       $('#ovTitle').textContent = d.results.length > 1 ? `${d.batchType}結果` : '恭喜獲得';
       $('#ovPlayer').textContent = d.player ? d.player : '';

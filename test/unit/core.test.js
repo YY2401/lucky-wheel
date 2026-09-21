@@ -265,3 +265,19 @@ test('normalizeConfig：音量與限抽欄位範圍', () => {
   assert.equal(c.volume, 100); assert.equal(c.limitPerPlayer, 0); assert.equal(c.limitPeriod, 'all');
   assert.equal(core.normalizeConfig({}).volume, 70);
 });
+
+test('特效等級：自動判定（機率 < 5% 或保底＝大獎、名字像銘謝惠顧＝落空）、手動指定優先；整批反應', () => {
+  assert.equal(core.tierOf({ name: '特獎', pity: true }, 30), 'big');
+  assert.equal(core.tierOf({ name: '頭獎' }, 4.9), 'big');
+  assert.equal(core.tierOf({ name: '二獎' }, 15), 'normal');
+  assert.equal(core.tierOf({ name: '銘謝惠顧' }, 60), 'miss');
+  assert.equal(core.tierOf({ name: '謝謝參加' }, 60), 'miss');
+  assert.equal(core.tierOf({ name: '銘謝惠顧', tier: 'normal' }, 60), 'normal', '手動指定優先');
+  assert.equal(core.tierOf({ name: 'x', tier: 'big' }, 90), 'big');
+  assert.equal(core.batchTier([{ tier: 'miss' }, { tier: 'big' }]), 'big');
+  assert.equal(core.batchTier([{ tier: 'miss' }, { tier: 'miss' }]), 'miss');
+  assert.equal(core.batchTier([{ tier: 'miss' }, { tier: 'normal' }]), 'normal');
+  const c = cfg(); const out = core.drawBatch({ cfg: c, records: [], count: 2, random: () => 0 });
+  assert.equal(out.results[0].tier, 'big', '抽獎結果帶等級');
+  assert.equal(core.normalizeConfig({ prizes: [{ name: 'a', tier: 'weird' }] }).prizes[0].tier, 'auto');
+});

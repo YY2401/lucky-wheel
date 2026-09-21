@@ -453,8 +453,9 @@ if (!H.chromePath()) {
   });
 
   test('保底：連抽保底每 5 抽至少一個，40 批全部符合', async (t) => {
-    const page = await fresh(t, { pityBatch: true, pityBatchK: 5, prizes: FAST.prizes.map((p) => ({ ...p, quantity: -1, remaining: -1 })) });
-    for (let i = 0; i < 40; i++) { await H.spinOnce(page, 5); await H.closeResult(page); }
+    // 40 批連續大獎慶祝（彩帶 + 3D 粒子）在無頭軟體 GPU 下很吃資源，這個統計測試關掉背景、批與批之間喘一下
+    const page = await fresh(t, { pityBatch: true, pityBatchK: 5, bg3d: false, prizes: FAST.prizes.map((p) => ({ ...p, quantity: -1, remaining: -1 })) });
+    for (let i = 0; i < 40; i++) { await H.spinOnce(page, 5); await H.closeResult(page); await H.sleep(120); }
     const recs = await H.readKey(page, 'lw.records');
     const batches = {}; recs.forEach((r) => { (batches[r.batchId] ||= []).push(r); });
     assert.equal(Object.keys(batches).length, 40);
