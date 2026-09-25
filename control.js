@@ -207,11 +207,18 @@
       on('.f-clearimg', 'click', (e, p) => { p.image = ''; touched(); });
       return tr;
     }
-    // 把資料同步到每一列的欄位；正在打字的欄位不動
+    // 把資料同步到每一列的欄位。
+    // 「正在打字的欄位不動」不能只看有沒有焦點：欄位一旦停在過期或被夾掉的數字，之後任何一次輸入
+    // （打字、上下鍵、滾輪）都是從那個假數字算起，會把錯的值寫回設定 —— 庫存就是這樣被改掉的。
+    // 改成比對 dataset.sync（上次程式寫進去的值）：使用者沒動過的欄位照常跟著資料更新，真的改到一半才不碰。
     function syncPrizeRows() {
       const probs = probabilities(state.config.prizes);
-      const active = document.activeElement;
-      const setVal = (el, v) => { if (el !== active && String(el.value) !== String(v)) el.value = v; };
+      const setVal = (el, v) => {
+        const next = String(v);
+        if (el.value === next) { el.dataset.sync = next; return; }
+        if (el === document.activeElement && el.value !== (el.dataset.sync || '')) return; // 使用者改到一半
+        el.value = next; el.dataset.sync = next;
+      };
       $$('#prizeRows tr').forEach((tr) => {
         const i = state.config.prizes.findIndex((x) => x.id === tr.dataset.id); if (i < 0) return;
         const p = state.config.prizes[i]; const unlimited = p.quantity === -1;
@@ -236,6 +243,13 @@
       });
     }
     const refreshComputed = syncPrizeRows;
+    // 離開欄位時再對帳一次：輸入被夾住（例如剩餘打超過數量）的話，畫面才不會留著無效的數字
+    $('#prizeRows').addEventListener('focusout', () => setTimeout(syncPrizeRows, 0));
+    // Chrome 會讓滾輪直接改「有焦點的數字欄位」—— 捲頁面時很容易誤改權重或庫存，所以滾到數字欄位上先讓它失焦
+    document.addEventListener('wheel', (e) => {
+      const el = document.activeElement;
+      if (el && el.type === 'number' && el === e.target) el.blur();
+    }, { passive: true });
     function renderProbBar() {
       const probs = probabilities(state.config.prizes);
       const bar = $('#probBar'); bar.innerHTML = '';

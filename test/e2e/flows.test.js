@@ -562,4 +562,50 @@ if (!H.chromePath()) {
     assert.ok(seen.length >= 3, `1.7 秒內至少應看到 3 種格子顏色，實際：${seen.join(' / ')}`);
     assert.deepEqual(page.errors, []);
   });
+
+  // 2026-09-20 的實際活動中，某個獎項的剩餘被「還原」了四次（送出 41 份 vs 庫存 30）。
+  // 查下來最可能的可觸發路徑是 Chrome 的「滾輪會改有焦點的數字欄位」：點過剩餘欄後捲動面板就會加減庫存。
+  test('滑鼠滾輪不會改到數字欄位（捲面板時誤改權重 / 庫存）', async (t) => {
+    const page = await fresh(t, { prizes: [{ id: 's', name: '甜點券', weight: 10, quantity: 14, remaining: 14 }] });
+    await page.click('.open-panel[data-tab="prizes"]'); await H.sleep(300);
+    for (const sel of ['.f-remaining', '.f-quantity', '.f-weight']) {
+      const el = await page.$(`#prizeRows tr ${sel}`);
+      await el.focus();
+      const before = await page.$eval(`#prizeRows tr ${sel}`, (e) => e.value);
+      const box = await el.boundingBox();
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+      await page.mouse.wheel({ deltaY: -200 }); await H.sleep(150);
+      assert.equal(await page.$eval(`#prizeRows tr ${sel}`, (e) => e.value), before, `${sel} 不該被滾輪改到`);
+    }
+    const p0 = (await H.readKey(page, 'lw.config')).prizes[0];
+    assert.equal(p0.remaining, 14); assert.equal(p0.quantity, 14); assert.equal(p0.weight, 10);
+    assert.deepEqual(page.errors, []);
+  });
+
+  // 欄位停在被夾掉的數字時，之後的任何一次輸入都會從那個假數字算起，所以離開欄位一定要對帳回真實值
+  test('剩餘欄位輸入被夾住時，離開欄位會回到真實數字', async (t) => {
+    const page = await fresh(t, { prizes: [{ id: 's', name: '甜點券', weight: 100, quantity: 14, remaining: 14 }] });
+    await page.click('.open-panel[data-tab="prizes"]'); await H.sleep(300);
+    await page.click('#prizeRows tr .f-remaining', { clickCount: 3 });
+    await page.type('#prizeRows tr .f-remaining', '999'); await H.sleep(150);
+    assert.equal((await H.readKey(page, 'lw.config')).prizes[0].remaining, 14, '剩餘不能超過數量');
+    await page.click('#prizeRows tr .f-name'); await H.sleep(200);
+    assert.equal(await page.$eval('#prizeRows tr .f-remaining', (e) => e.value), '14', '離開欄位後畫面要回到真實值');
+    await page.keyboard.press('Tab'); await H.sleep(100);
+    assert.deepEqual(page.errors, []);
+  });
+
+  // 打字中的欄位不能被背景重畫蓋掉，否則邊打邊被改會輸入不了
+  test('正在打字的欄位不會被背景重畫蓋掉', async (t) => {
+    const page = await fresh(t, { prizes: [{ id: 's', name: '甜點券', weight: 10, quantity: 14, remaining: 14 }, { id: 'c', name: '銘謝惠顧', weight: 30, quantity: -1, remaining: -1 }] });
+    await page.click('.open-panel[data-tab="prizes"]'); await H.sleep(300);
+    await page.click('#prizeRows tr:nth-child(1) .f-weight', { clickCount: 3 });
+    await page.type('#prizeRows tr:nth-child(1) .f-weight', '2.5', { delay: 60 });
+    assert.equal(await page.$eval('#prizeRows tr:nth-child(1) .f-weight', (e) => e.value), '2.5', '打到一半不能被重畫蓋掉');
+    assert.equal(await page.evaluate(() => document.activeElement.classList.contains('f-weight')), true, '打字途中不能失焦');
+    assert.equal(await page.$eval('#prizeRows tr:nth-child(1) .prob', (e) => e.textContent), '7.69%', '每個按鍵都要即時重算機率');
+    await page.click('#savePrizes'); await H.sleep(300);
+    assert.equal((await H.readKey(page, 'lw.config')).prizes[0].weight, 2.5);
+    assert.deepEqual(page.errors, []);
+  });
 }
