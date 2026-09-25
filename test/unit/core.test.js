@@ -309,6 +309,8 @@ test('diffStock：切換無限用「無限」表示，不會算出假的增減',
   assert.equal(core.stockNum(log[0].remTo), '無限');
   assert.equal(core.stockDelta(log[0]), '', '有一邊是無限時不顯示增減');
   assert.equal(core.stockNum(null), '—');
+  assert.strictEqual(core.stockNum(0), 0, '一般數字要回數字，Excel 才排得了序');
+  assert.strictEqual(core.stockNum(30), 30);
 });
 
 test('diffStock：沒有變化就不產生紀錄（抽獎前後拍快照不會被誤記）', () => {

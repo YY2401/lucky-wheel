@@ -229,8 +229,8 @@
     was.forEach((b) => out.push({ time, reason, kind: 'remove', prizeId: b.id, prize: b.name, qtyFrom: b.quantity, qtyTo: null, remFrom: b.remaining, remTo: null }));
     return out;
   }
-  // 供畫面與 Excel 共用的文字：-1 是「無限」、null 是「不存在」
-  const stockNum = (v) => (v === null || v === undefined ? '—' : v === -1 ? '無限' : String(v));
+  // 供畫面與 Excel 共用：一般數字就回數字（Excel 裡才排得了序、加得了總），-1 是「無限」、null 是「不存在」
+  const stockNum = (v) => (v === null || v === undefined ? '—' : v === -1 ? '無限' : Number(v));
   function stockDelta(e) {
     if (e.kind === 'add') return '新增獎項';
     if (e.kind === 'remove') return '刪除獎項';
