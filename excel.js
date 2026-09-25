@@ -1,10 +1,14 @@
-/* Excel：用 File System Access API 綁定一個 .xlsx，每次抽獎把完整紀錄重寫進「抽獎紀錄」工作表（其他工作表保留） */
+/* Excel：用 File System Access API 綁定一個 .xlsx，每次抽獎把完整紀錄重寫進「抽獎紀錄」與「庫存異動」工作表（其他工作表保留） */
 (function () {
   const LW = (window.LW = window.LW || {});
-  const { formatTime } = LuckyCore;
+  const { formatTime, stockNum, stockDelta } = LuckyCore;
   const SHEET = '抽獎紀錄';
   const HEADERS = ['時間', '批次ID', '抽獎類型', '第幾抽', '抽獎者/備註', '獎項', '獎項ID', '剩餘數量', '當時機率(%)', '保底', '狀態', '備註'];
   const COL_WIDTHS = [20, 22, 10, 8, 20, 24, 14, 10, 12, 8, 8, 18];
+  // 抽獎以外的庫存變化另開一張工作表，對帳時才看得出「少掉的庫存是抽走的還是被改掉的」
+  const STOCK_SHEET = '庫存異動';
+  const STOCK_HEADERS = ['時間', '獎項', '獎項ID', '原因', '數量（改前）', '數量（改後）', '剩餘（改前）', '剩餘（改後）', '增減'];
+  const STOCK_WIDTHS = [20, 24, 14, 14, 14, 14, 14, 14, 8];
 
   const Excel = {
     handle: null,
@@ -12,10 +16,11 @@
     supported: typeof window.showSaveFilePicker === 'function',
     types: [{ description: 'Excel 活頁簿', accept: { 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'] } }],
     getRecords: () => [],
+    getStockLog: () => [],
     onChange: null, // 綁定 / 寫入後通知頁面更新顯示
 
-    async init({ getRecords, onChange }) {
-      this.getRecords = getRecords; this.onChange = onChange;
+    async init({ getRecords, getStockLog, onChange }) {
+      this.getRecords = getRecords; if (getStockLog) this.getStockLog = getStockLog; this.onChange = onChange;
       try { this.handle = (await LW.idb.get(LW.KEYS.excelHandle)) || null; } catch { this.handle = null; }
       this._changed();
     },
@@ -38,6 +43,7 @@
       return p === 'granted';
     },
     rows() { return this.getRecords().map((r) => [r.time, r.batchId, r.type, r.index, r.player, r.prize, r.prizeId, r.remaining === -1 ? '無限' : r.remaining, r.probability, r.pity ? '是' : '', r.void ? '作廢' : '正常', r.note || '']); },
+    stockRows() { return this.getStockLog().map((e) => [e.time, e.prize, e.prizeId, e.reason, stockNum(e.qtyFrom), stockNum(e.qtyTo), stockNum(e.remFrom), stockNum(e.remTo), stockDelta(e)]); },
     buildWorkbook(existing) {
       let wb = null;
       if (existing) { try { wb = XLSX.read(existing, { type: 'array' }); } catch { wb = null; } }
@@ -45,6 +51,12 @@
       const ws = XLSX.utils.aoa_to_sheet([HEADERS, ...this.rows()]);
       ws['!cols'] = COL_WIDTHS.map((wch) => ({ wch }));
       if (wb.SheetNames.includes(SHEET)) wb.Sheets[SHEET] = ws; else XLSX.utils.book_append_sheet(wb, ws, SHEET);
+      const log = this.stockRows();
+      if (log.length || wb.SheetNames.includes(STOCK_SHEET)) {
+        const ws2 = XLSX.utils.aoa_to_sheet([STOCK_HEADERS, ...log]);
+        ws2['!cols'] = STOCK_WIDTHS.map((wch) => ({ wch }));
+        if (wb.SheetNames.includes(STOCK_SHEET)) wb.Sheets[STOCK_SHEET] = ws2; else XLSX.utils.book_append_sheet(wb, ws2, STOCK_SHEET);
+      }
       return wb;
     },
     async writeAll() {

@@ -1,4 +1,4 @@
-/* 純邏輯：設定正規化、機率、建議機率、抽獎、保底。不碰 DOM，瀏覽器與 Node 都能用（Node 端用來跑測試） */
+/* 純邏輯：設定正規化、機率、建議機率、抽獎、保底、庫存異動。不碰 DOM，瀏覽器與 Node 都能用（Node 端用來跑測試） */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
   else root.LuckyCore = factory();
@@ -211,6 +211,34 @@
     return out;
   }
 
+  // ---------- 庫存異動紀錄：抽獎以外的庫存變化（手改、重置、匯入、新增 / 刪除獎項）都留下痕跡 ----------
+  // 用法：動之前先 stockSnapshot(prizes)，動完 diffStock(before, prizes, {...}) 取得要寫進紀錄的列。
+  // 只比對數量與剩餘，改名 / 改權重不算庫存異動。
+  const stockSnapshot = (prizes) => (prizes || []).map((p) => ({ id: p.id, name: p.name, quantity: p.quantity, remaining: p.remaining }));
+  function diffStock(before, prizes, { reason = '手動修改', now = new Date() } = {}) {
+    const time = formatTime(now);
+    const was = new Map((before || []).map((p) => [p.id, p]));
+    const out = [];
+    (prizes || []).forEach((p) => {
+      const b = was.get(p.id);
+      was.delete(p.id);
+      if (!b) { out.push({ time, reason, kind: 'add', prizeId: p.id, prize: p.name, qtyFrom: null, qtyTo: p.quantity, remFrom: null, remTo: p.remaining }); return; }
+      if (b.quantity === p.quantity && b.remaining === p.remaining) return;
+      out.push({ time, reason, kind: 'change', prizeId: p.id, prize: p.name, qtyFrom: b.quantity, qtyTo: p.quantity, remFrom: b.remaining, remTo: p.remaining });
+    });
+    was.forEach((b) => out.push({ time, reason, kind: 'remove', prizeId: b.id, prize: b.name, qtyFrom: b.quantity, qtyTo: null, remFrom: b.remaining, remTo: null }));
+    return out;
+  }
+  // 供畫面與 Excel 共用的文字：-1 是「無限」、null 是「不存在」
+  const stockNum = (v) => (v === null || v === undefined ? '—' : v === -1 ? '無限' : String(v));
+  function stockDelta(e) {
+    if (e.kind === 'add') return '新增獎項';
+    if (e.kind === 'remove') return '刪除獎項';
+    if (typeof e.remFrom !== 'number' || typeof e.remTo !== 'number' || e.remFrom === -1 || e.remTo === -1) return '';
+    const d = e.remTo - e.remFrom;
+    return d === 0 ? '' : `${d > 0 ? '+' : ''}${d}`;
+  }
+
   // ---------- 撤銷一批：把庫存加回去，回傳移除後的紀錄 ----------
   function undoBatch(records, prizes, batchId) {
     const batch = records.filter((r) => r.batchId === batchId);
@@ -236,5 +264,5 @@
     return { ...out, batchId: target.batchId, type: '補抽', label, voided: target };
   }
 
-  return { PALETTE, DEFAULT_CONFIG, formatTime, randId, rand, normalizePrize, normalizeConfig, pool, pityPool, probabilities, drawOne, suggestWeights, drawsSinceHit, drawsUsed, prizesFromNames, tierOf, batchTier, drawBatch, undoBatch, recordKey, redraw, signMessage, verifyMessage, SIG_WINDOW_MS };
+  return { PALETTE, DEFAULT_CONFIG, formatTime, randId, rand, normalizePrize, normalizeConfig, pool, pityPool, probabilities, drawOne, suggestWeights, drawsSinceHit, drawsUsed, prizesFromNames, tierOf, batchTier, drawBatch, undoBatch, stockSnapshot, diffStock, stockNum, stockDelta, recordKey, redraw, signMessage, verifyMessage, SIG_WINDOW_MS };
 });

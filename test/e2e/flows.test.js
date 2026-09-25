@@ -608,4 +608,99 @@ if (!H.chromePath()) {
     assert.equal((await H.readKey(page, 'lw.config')).prizes[0].weight, 2.5);
     assert.deepEqual(page.errors, []);
   });
+
+  test('庫存異動：手改剩餘 / 重置庫存 / 切換無限都會留下紀錄，抽獎扣庫存不會', async (t) => {
+    const page = await fresh(t, { prizes: [{ id: 's', name: '甜點券', weight: 100, quantity: 14, remaining: 14 }, { id: 'c', name: '銘謝惠顧', weight: 1, quantity: -1, remaining: -1 }] });
+    // 先抽幾次：抽獎造成的扣庫存不該進庫存異動
+    await H.spinOnce(page, 3); await H.closeResult(page); await H.sleep(300);
+    assert.equal((await H.readKey(page, 'lw.stockLog')) || undefined, undefined, '抽獎不該產生庫存異動');
+
+    await page.click('.open-panel[data-tab="prizes"]'); await H.sleep(300);
+    // 手改剩餘：11 → 5
+    await page.click('#prizeRows tr:nth-child(1) .f-remaining', { clickCount: 3 });
+    await page.type('#prizeRows tr:nth-child(1) .f-remaining', '5');
+    await page.click('#prizeRows tr:nth-child(1) .f-name'); await H.sleep(300);
+    let log = await H.readKey(page, 'lw.stockLog');
+    assert.equal(log.length, 1, '一次編輯只記一筆（不是每個按鍵一筆）');
+    assert.equal(log[0].reason, '手動修改');
+    assert.equal(log[0].prize, '甜點券');
+    assert.equal(log[0].remFrom, 11); assert.equal(log[0].remTo, 5);
+
+    await page.click('#prizeRows tr:nth-child(1) .f-unlimited'); await H.sleep(300);
+    log = await H.readKey(page, 'lw.stockLog');
+    assert.equal(log.length, 2); assert.equal(log[1].reason, '切換無限'); assert.equal(log[1].remTo, -1);
+    await page.click('#prizeRows tr:nth-child(1) .f-unlimited'); await H.sleep(300); // 切回限量（數量 10 / 剩餘 10）
+
+    await page.click('#resetStock'); await H.sleep(200); await page.click('#confirmOk'); await H.sleep(400);
+    assert.equal((await H.readKey(page, 'lw.stockLog')).length, 3, '剩餘本來就等於數量，重置沒動到東西就不記');
+    await page.click('#prizeRows tr:nth-child(1) .f-remaining', { clickCount: 3 });
+    await page.type('#prizeRows tr:nth-child(1) .f-remaining', '3');
+    await page.click('#prizeRows tr:nth-child(1) .f-name'); await H.sleep(300);
+    await page.click('#resetStock'); await H.sleep(200); await page.click('#confirmOk'); await H.sleep(400);
+    log = await H.readKey(page, 'lw.stockLog');
+    assert.equal(log[log.length - 1].reason, '重置庫存');
+    assert.equal(log[log.length - 1].remFrom, 3); assert.equal(log[log.length - 1].remTo, 10);
+
+    await page.click('#addPrize'); await H.sleep(300);
+    log = await H.readKey(page, 'lw.stockLog');
+    assert.equal(log[log.length - 1].reason, '新增獎項');
+    assert.equal(log[log.length - 1].kind, 'add');
+
+    // 表格看得到，且抽獎不會再多記
+    await page.click('.tabs button[data-tab="records"]'); await H.sleep(300);
+    const shown = await page.$$eval('#stockLogRows tr', (rs) => rs.length);
+    assert.equal(shown, log.length);
+    assert.match(await page.$eval('#stockLogTitle', (e) => e.textContent), new RegExp(`${log.length} 筆`));
+    assert.deepEqual(page.errors, []);
+  });
+
+  test('庫存異動：備份帶得走、還原回得來', async (t) => {
+    const fs = require('node:fs'); const os = require('node:os'); const path = require('node:path');
+    const page = await fresh(t, { prizes: [{ id: 's', name: '甜點券', weight: 100, quantity: 14, remaining: 14 }] });
+    await page.click('.open-panel[data-tab="prizes"]'); await H.sleep(300);
+    await page.click('#prizeRows tr .f-remaining', { clickCount: 3 });
+    await page.type('#prizeRows tr .f-remaining', '9');
+    await page.click('#prizeRows tr .f-name'); await H.sleep(300);
+    assert.equal((await H.readKey(page, 'lw.stockLog')).length, 1);
+    await page.click('#savePrizes'); await H.sleep(300); // 存檔，重整才不會被「未儲存」攔下
+
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lw-stock-'));
+    const cdp = await page.createCDPSession();
+    await cdp.send('Browser.setDownloadBehavior', { behavior: 'allow', downloadPath: dir, eventsEnabled: true });
+    await page.click('.tabs button[data-tab="records"]'); await H.sleep(200);
+    await page.click('#backupAll');
+    let file; for (let i = 0; i < 40 && !file; i++) { await H.sleep(100); file = fs.readdirSync(dir).find((f) => f.endsWith('.lwbackup')); }
+    assert.ok(file, '有下載備份檔');
+    const backup = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8'));
+    assert.equal(backup.stockLog.length, 1, '備份檔要含庫存異動');
+    assert.equal(backup.stockLog[0].remFrom, 14); assert.equal(backup.stockLog[0].remTo, 9);
+
+    // 清空（模擬換電腦）再還原
+    await page.evaluate(() => new Promise((res) => { const r = indexedDB.deleteDatabase('lucky-wheel'); r.onsuccess = r.onerror = r.onblocked = () => res(); }));
+    await H.seed(page, { 'lw.meta': { helpSeen: true } });
+    await page.reload({ waitUntil: 'networkidle0' }); await H.sleep(400);
+    assert.equal((await H.readKey(page, 'lw.stockLog') || []).length, 0);
+    await page.click('.open-panel[data-tab="records"]'); await H.sleep(200);
+    const input = await page.$('#restoreFile'); await input.uploadFile(path.join(dir, file)); await H.sleep(400);
+    await page.click('#confirmOk'); await H.sleep(500);
+    const log = await H.readKey(page, 'lw.stockLog');
+    assert.ok(log.length >= 1, '還原後庫存異動要回來');
+    assert.equal(log[0].remFrom, 14); assert.equal(log[0].remTo, 9);
+    assert.deepEqual(page.errors, []);
+  });
+
+  test('清除紀錄會一併清掉庫存異動，並在確認視窗說明', async (t) => {
+    const page = await fresh(t, { prizes: [{ id: 's', name: '甜點券', weight: 100, quantity: 14, remaining: 14 }] });
+    await page.click('.open-panel[data-tab="prizes"]'); await H.sleep(300);
+    await page.click('#prizeRows tr .f-remaining', { clickCount: 3 });
+    await page.type('#prizeRows tr .f-remaining', '9');
+    await page.click('#prizeRows tr .f-name'); await H.sleep(300);
+    await page.click('.tabs button[data-tab="records"]'); await H.sleep(200);
+    await page.click('#clearRecords'); await H.sleep(200);
+    assert.match(await page.$eval('#confirmMsg', (e) => e.textContent), /庫存異動紀錄（1 筆）/);
+    await page.click('#confirmOk'); await H.sleep(300);
+    assert.equal((await H.readKey(page, 'lw.stockLog')).length, 0);
+    assert.match(await page.$eval('#stockLogTitle', (e) => e.textContent), /0 筆/);
+    assert.deepEqual(page.errors, []);
+  });
 }

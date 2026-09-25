@@ -2,7 +2,7 @@
 (async () => {
   const { Store, KEYS, ui } = window.LW;
   Store.onError = (e) => ui.toast(`儲存失敗：${e.message}`, 6000);
-  await Store.init([KEYS.config, KEYS.records, KEYS.overlayConfig, KEYS.skipAnim, KEYS.prizeList, KEYS.meta]);
+  await Store.init([KEYS.config, KEYS.records, KEYS.stockLog, KEYS.overlayConfig, KEYS.skipAnim, KEYS.prizeList, KEYS.meta]);
 
   const params = new URLSearchParams(location.search);
   if (params.get('overlay') === '1') LW.startOverlay(params);

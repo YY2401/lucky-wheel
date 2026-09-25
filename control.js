@@ -2,13 +2,13 @@
 (function () {
   const LW = (window.LW = window.LW || {});
   const { Wheel, Sfx, Confetti } = LuckyWheel;
-  const { PALETTE, DEFAULT_CONFIG, randId, formatTime, normalizeConfig, probabilities, suggestWeights, drawsSinceHit, drawsUsed, prizesFromNames, batchTier, drawBatch, undoBatch, recordKey, redraw } = LuckyCore;
+  const { PALETTE, DEFAULT_CONFIG, randId, formatTime, normalizeConfig, probabilities, suggestWeights, drawsSinceHit, drawsUsed, prizesFromNames, batchTier, drawBatch, undoBatch, stockSnapshot, diffStock, stockNum, stockDelta, recordKey, redraw } = LuckyCore;
   const { $, $$, wait, esc, colorOf, toast, dialog, ask, isFlip, resultCards, scheduleFlipSounds, liveChip, renderPrizeListRows, runCountdown, celebrate, shakeResultBox, applyTheme } = LW.ui;
 
   function startControl() {
     const { Store, Sync, Excel, KEYS } = LW;
     const IS_PHONE = window.matchMedia('(max-width: 700px)').matches;
-    const state = { config: null, records: [], dirty: false, spinning: false, skipAll: false, pongs: 0 };
+    const state = { config: null, records: [], stockLog: [], dirty: false, spinning: false, skipAll: false, pongs: 0 };
     const wheel = new Wheel($('#wheel'), { onTick: () => Sfx.tick(), hubDom: true }); // 中心由 #hubBtn 負責（點一下 = 單抽）
     const confetti = new Confetti($('#confetti'));
 
@@ -106,6 +106,33 @@
     // ======================================================================
     //  獎項表格
     // ======================================================================
+    // ======================================================================
+    //  庫存異動紀錄：抽獎以外的庫存變化（手改、重置、匯入、還原、新增 / 刪除獎項）都留下痕跡。
+    //  對帳時才分得出「少掉的庫存是被抽走的，還是被誰改掉的」。
+    // ======================================================================
+    function logStock(before, reason) {
+      const entries = diffStock(before, state.config.prizes, { reason });
+      if (!entries.length) return 0;
+      state.stockLog.push(...entries);
+      Store.set(KEYS.stockLog, state.stockLog);
+      renderStockLog();
+      Excel.writeAll().catch(() => {});
+      return entries.length;
+    }
+    // 獎項面板裡的數量 / 剩餘欄位：進欄位時拍快照，離開時才記一筆（不然每按一個鍵就記一次）
+    (function watchStockFields() {
+      const FIELDS = '.f-quantity, .f-remaining';
+      let pending = null;
+      const tb = $('#prizeRows');
+      tb.addEventListener('focusin', (e) => { if (e.target.matches(FIELDS) && !pending) pending = stockSnapshot(state.config.prizes); });
+      tb.addEventListener('focusout', (e) => {
+        if (!e.target.matches(FIELDS) || !pending) return;
+        const before = pending;
+        // 先讓 focusout 的對帳跑完（欄位被夾住時值還會再修一次），再比對
+        setTimeout(() => { if (pending === before) { pending = null; logStock(before, '手動修改'); } }, 10);
+      });
+    })();
+
     // 表格用「對帳」方式更新：列以獎項 id 為鍵重複使用，只有新增 / 刪除 / 換順序才動 DOM 結構，
     // 打字、抽獎、儲存都只改欄位值，不會失去焦點或捲動位置
     function renderPrizeRows() {
@@ -189,11 +216,19 @@
         p.quantity = q; touched();
       });
       on('.f-remaining', 'input', (e, p) => { p.remaining = Math.min(p.quantity, Math.max(0, Math.trunc(Number(e.target.value)) || 0)); touched(); });
-      on('.f-unlimited', 'change', (e, p) => { if (e.target.checked) { p.quantity = -1; p.remaining = -1; } else { p.quantity = 10; p.remaining = 10; } touched(); });
+      on('.f-unlimited', 'change', (e, p) => {
+        const before = stockSnapshot(state.config.prizes);
+        if (e.target.checked) { p.quantity = -1; p.remaining = -1; } else { p.quantity = 10; p.remaining = 10; }
+        touched(); logStock(before, '切換無限');
+      });
       on('.f-color', 'input', (e, p) => { p.color = e.target.value; touched(); });
       on('.f-pity', 'change', (e, p) => { p.pity = e.target.checked; markDirty(); renderPityInfo(); });
       on('.f-tier', 'change', (e, p) => { p.tier = e.target.value; markDirty(); });
-      on('.f-del', 'click', async (e, p) => { if (await ask(`刪除獎項「${p.name}」？`, { title: '刪除獎項', okLabel: '刪除', danger: true })) { state.config.prizes.splice(index(), 1); restructure(); } });
+      on('.f-del', 'click', async (e, p) => {
+        if (!(await ask(`刪除獎項「${p.name}」？`, { title: '刪除獎項', okLabel: '刪除', danger: true }))) return;
+        const before = stockSnapshot(state.config.prizes);
+        state.config.prizes.splice(index(), 1); restructure(); logStock(before, '刪除獎項');
+      });
       on('.f-up', 'click', () => { const i = index(); if (i <= 0) return; const a = state.config.prizes; [a[i - 1], a[i]] = [a[i], a[i - 1]]; restructure(); });
       on('.f-down', 'click', () => { const i = index(); const a = state.config.prizes; if (i < 0 || i >= a.length - 1) return; [a[i + 1], a[i]] = [a[i], a[i + 1]]; restructure(); });
       on('.thumb', 'click', () => $('.f-file', tr).click());
@@ -326,9 +361,10 @@
       XLSX.writeFile(wb, `名單_${formatTime(new Date()).replace(/[-: ]/g, '').slice(0, 12)}.xlsx`);
     });
     $('#addPrize').addEventListener('click', () => {
+      const before = stockSnapshot(state.config.prizes);
       const n = state.config.prizes.length;
       state.config.prizes.push({ id: `p_${randId(8)}`, name: `獎項 ${n + 1}`, weight: 10, quantity: -1, remaining: -1, image: '', color: PALETTE[n % PALETTE.length] });
-      markDirty(); renderPrizeRows(); updateWheel();
+      markDirty(); renderPrizeRows(); updateWheel(); logStock(before, '新增獎項');
     });
     // 建議機率：依數量反推權重，先在視窗裡預覽，套用後才寫進權重欄（仍需儲存）
     $('#suggestWeights').addEventListener('click', () => {
@@ -364,8 +400,9 @@
     });
     $('#resetStock').addEventListener('click', async () => {
       if (!(await ask('把所有獎項的剩餘數量重置為原始數量？', { title: '重置庫存', okLabel: '重置' }))) return;
+      const before = stockSnapshot(state.config.prizes);
       state.config.prizes.forEach((p) => { p.remaining = p.quantity; });
-      saveConfig(true); toast('庫存已重置');
+      saveConfig(true); logStock(before, '重置庫存'); toast('庫存已重置');
     });
     $('#exportConfig').addEventListener('click', () => {
       const blob = new Blob([JSON.stringify(state.config, null, 2)], { type: 'application/json' });
@@ -378,7 +415,9 @@
       try {
         const data = JSON.parse(await f.text());
         if (data && data.kind === 'lucky-wheel-backup') { toast('這是完整備份檔，請到「紀錄 / Excel」用「還原備份」', 6000); return; }
+        const before = stockSnapshot(state.config.prizes);
         state.config = normalizeConfig(data); saveConfig(); Sync.start(state.config.room, state.config);
+        logStock(before, '匯入設定');
       } catch { toast('匯入失敗：不是有效的設定檔'); }
       finally { e.target.value = ''; }
     });
@@ -392,7 +431,7 @@
     }
     function backupAll() {
       const stamp = formatTime(new Date()).replace(/[-: ]/g, '').slice(0, 12);
-      downloadJson({ kind: 'lucky-wheel-backup', version: 1, exportedAt: new Date().toISOString(), config: state.config, records: state.records, prizeList: plPrefs }, `幸運轉盤備份_${stamp}.lwbackup`);
+      downloadJson({ kind: 'lucky-wheel-backup', version: 1, exportedAt: new Date().toISOString(), config: state.config, records: state.records, stockLog: state.stockLog, prizeList: plPrefs }, `幸運轉盤備份_${stamp}.lwbackup`);
       meta.lastBackup = Date.now(); meta.recordsAtBackup = state.records.length; Store.set(KEYS.meta, meta);
       renderBackupInfo(); toast('已下載備份檔');
     }
@@ -402,13 +441,16 @@
       if (!data || data.kind !== 'lucky-wheel-backup' || !data.config) { toast('這不是完整備份檔（可能只是「匯出設定」的檔案，請到「獎項設定」用「匯入設定」）', 7000); return; }
       const recs = Array.isArray(data.records) ? data.records : [];
       const when = data.exportedAt ? formatTime(new Date(data.exportedAt)) : '未知時間';
-      const ok = await ask(`備份時間：${when}\n獎項 ${Array.isArray(data.config.prizes) ? data.config.prizes.length : 0} 個、抽獎紀錄 ${recs.length} 筆\n\n會整份取代目前的設定與 ${state.records.length} 筆紀錄。確定還原？`, { title: '還原備份', okLabel: '確定還原', danger: true });
+      const ok = await ask(`備份時間：${when}\n獎項 ${Array.isArray(data.config.prizes) ? data.config.prizes.length : 0} 個、抽獎紀錄 ${recs.length} 筆、庫存異動 ${Array.isArray(data.stockLog) ? data.stockLog.length : 0} 筆\n\n會整份取代目前的設定與 ${state.records.length} 筆紀錄。確定還原？`, { title: '還原備份', okLabel: '確定還原', danger: true });
       if (!ok) return;
+      const before = stockSnapshot(state.config.prizes);
       state.config = normalizeConfig(data.config);
       state.records = recs.filter((r) => r && typeof r === 'object');
       Store.set(KEYS.records, state.records);
+      if (Array.isArray(data.stockLog)) { state.stockLog = data.stockLog.filter((x) => x && typeof x === 'object'); Store.set(KEYS.stockLog, state.stockLog); }
       if (data.prizeList) { Object.assign(plPrefs, data.prizeList); savePlPrefs(); }
       saveConfig(true); Sync.start(state.config.room, state.config); renderRecords();
+      logStock(before, '還原備份');
       Excel.writeAll().catch(() => {});
       toast(`已還原：${state.records.length} 筆紀錄`);
     }
@@ -518,7 +560,7 @@
         ? state.records.filter((r) => { const hay = `${r.time} ${r.player} ${r.type} ${r.prize} ${r.batchId} ${r.pity ? '保底' : ''}`.toLowerCase(); return terms.every((t) => hay.includes(t)); })
         : state.records;
       $('#recordCount').textContent = terms.length ? `符合 ${list.length} / ${state.records.length} 筆` : `共 ${state.records.length} 筆`;
-      renderStats(list, terms.length > 0); renderBackupInfo();
+      renderStats(list, terms.length > 0); renderBackupInfo(); renderStockLog();
       // 每批只在最新的那一列放撤銷按鈕（列表是倒序，所以是該批第一次出現時）
       const seen = new Set();
       $('#recordRows').innerHTML = list.slice(-500).reverse().map((r) => {
@@ -529,6 +571,19 @@
         <td>${esc(r.prize)}</td><td>${r.remaining === -1 ? '∞' : r.remaining}</td><td>${r.probability}%</td><td>${r.pity ? '<span class="badge-pity inline">保底</span>' : ''}</td>
         <td style="white-space:nowrap">${r.void ? '' : `<button class="btn icon f-redraw" data-key="${esc(recordKey(r))}" title="只重抽這一抽">補抽</button> `}${first ? `<button class="btn icon f-undo" data-batch="${esc(r.batchId)}" title="撤銷這批">撤銷</button>` : ''}</td></tr>`;
       }).join('');
+    }
+    // 庫存異動表：最新在上，含原因與增減
+    function renderStockLog() {
+      const log = state.stockLog;
+      $('#stockLogTitle').textContent = `庫存異動（${log.length} 筆）`;
+      $('#stockLogBox').classList.toggle('has-log', log.length > 0);
+      $('#stockLogRows').innerHTML = log.length ? log.slice(-300).reverse().map((e) => {
+        const d = stockDelta(e);
+        const cls = d.startsWith('+') ? ' class="up"' : d.startsWith('-') ? ' class="down"' : '';
+        const arrow = (a, b) => (a === b ? stockNum(a) : `${stockNum(a)} → ${stockNum(b)}`);
+        return `<tr><td>${esc(e.time)}</td><td>${esc(e.prize)}</td><td>${esc(e.reason)}</td>
+        <td>${arrow(e.qtyFrom, e.qtyTo)}</td><td>${arrow(e.remFrom, e.remTo)}</td><td${cls}>${esc(d)}</td></tr>`;
+      }).join('') : '<tr><td colspan="6" class="hint">還沒有庫存異動（抽獎造成的扣庫存不算）</td></tr>';
     }
     $('#recordRows').addEventListener('click', (e) => { const u = e.target.closest('.f-undo'); if (u) return undoBatchById(u.dataset.batch); const r = e.target.closest('.f-redraw'); if (r) redrawRecord(r.dataset.key); });
     // 統計：每個獎項實際抽出幾次，對照目前設定的機率
@@ -575,8 +630,11 @@
     $('#undoLast').addEventListener('click', undoLastBatch);
     $('#undoThis').addEventListener('click', async () => { if (await undoLastBatch()) $('#resultModal').classList.add('hidden'); });
     $('#clearRecords').addEventListener('click', async () => {
-      if (!(await ask('清除瀏覽器裡的所有抽獎紀錄？（已綁定的 Excel 檔不會被改動，直到下次寫入）', { title: '清除紀錄', okLabel: '清除', danger: true }))) return;
-      state.records = []; Store.set(KEYS.records, state.records); renderRecords();
+      if (!(await ask(`清除瀏覽器裡的所有抽獎紀錄（${state.records.length} 筆）與庫存異動紀錄（${state.stockLog.length} 筆）？
+（已綁定的 Excel 檔不會被改動，直到下次寫入）`, { title: '清除紀錄', okLabel: '清除', danger: true }))) return;
+      state.records = []; Store.set(KEYS.records, state.records);
+      state.stockLog = []; Store.set(KEYS.stockLog, state.stockLog);
+      renderRecords();
     });
     const excelAction = (fn) => async () => { try { const r = await fn(); if (r && r.ok) toast(`已寫入 ${r.name}`); } catch (e) { if (e.name !== 'AbortError') toast(`Excel 失敗：${e.message}`, 5000); } };
     $('#excelCreate').addEventListener('click', excelAction(() => Excel.create()));
@@ -804,9 +862,10 @@
     // ======================================================================
     state.config = normalizeConfig(Store.get(KEYS.config, DEFAULT_CONFIG));
     state.records = Store.get(KEYS.records, []);
+    state.stockLog = Store.get(KEYS.stockLog, []);
     Store.set(KEYS.config, state.config);
     renderAll(); markDirty(false);
-    Excel.init({ getRecords: () => state.records, onChange: renderExcel });
+    Excel.init({ getRecords: () => state.records, getStockLog: () => state.stockLog, onChange: renderExcel });
     setTimeout(backupReminder, 1500);
     if (window.anime) {
       anime({ targets: '.wheel-wrap', scale: [0.6, 1], opacity: [0, 1], rotate: [-40, 0], duration: 1100, easing: 'easeOutElastic(1, .6)' });

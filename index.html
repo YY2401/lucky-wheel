@@ -4,11 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Lucky Wheel</title>
-<meta name="app-version" content="50">
+<meta name="app-version" content="51">
 <script>try { document.documentElement.dataset.theme = localStorage.getItem('lw.theme') || 'light'; } catch (e) { document.documentElement.dataset.theme = 'light'; }</script>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=50">
+<link rel="stylesheet" href="style.css?v=51">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.1/mqtt.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
@@ -290,6 +290,16 @@
           </table>
         </div>
       </details>
+      <details class="adv stats" id="stockLogBox">
+        <summary id="stockLogTitle">庫存異動</summary>
+        <p class="hint" style="margin:8px 0 0">抽獎以外的庫存變化都會記在這裡（手動改數量 / 剩餘、重置庫存、切換無限、新增或刪除獎項、匯入設定、還原備份）。對帳時才分得出「少掉的庫存是被抽走的，還是被改掉的」。同一份資料也會寫進 Excel 的「庫存異動」工作表。</p>
+        <div class="table-scroll" style="max-height:40vh;margin-top:8px">
+          <table class="records-table stock-table">
+            <thead><tr><th>時間</th><th>獎項</th><th>原因</th><th>數量</th><th>剩餘</th><th>增減</th></tr></thead>
+            <tbody id="stockLogRows"></tbody>
+          </table>
+        </div>
+      </details>
       <div class="table-scroll">
         <table class="records-table">
           <thead><tr><th>時間</th><th>抽獎者</th><th>類型</th><th>#</th><th>獎項</th><th>剩餘</th><th>機率</th><th>保底</th><th></th></tr></thead>
@@ -395,15 +405,15 @@
 <canvas id="confetti"></canvas>
 <div id="toast"></div>
 
-<script src="core.js?v=50"></script>
-<script src="wheel.js?v=50"></script>
-<script src="ui.js?v=50"></script>
-<script src="store.js?v=50"></script>
-<script src="sync.js?v=50"></script>
-<script src="excel.js?v=50"></script>
-<script src="overlay.js?v=50"></script>
-<script src="control.js?v=50"></script>
-<script src="app.js?v=50"></script>
-<script src="bg.js?v=50"></script>
+<script src="core.js?v=51"></script>
+<script src="wheel.js?v=51"></script>
+<script src="ui.js?v=51"></script>
+<script src="store.js?v=51"></script>
+<script src="sync.js?v=51"></script>
+<script src="excel.js?v=51"></script>
+<script src="overlay.js?v=51"></script>
+<script src="control.js?v=51"></script>
+<script src="app.js?v=51"></script>
+<script src="bg.js?v=51"></script>
 </body>
 </html>

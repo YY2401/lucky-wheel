@@ -234,6 +234,9 @@ code, .code { background: var(--surface2); border: 1px solid var(--ink-soft); pa
 .modal-close:hover { background: var(--red); color: #fff; }
 .modal-box h2 { margin: 0 0 6px; text-align: center; font-size: 30px; font-weight: 900; }
 .modal-box .sub { text-align: center; color: var(--muted); margin: 0 0 18px; }
+.stock-table td.up { color: var(--green); font-weight: 800; }
+.stock-table td.down { color: var(--red); font-weight: 800; }
+#stockLogBox.has-log > summary { color: var(--accent); }
 .suggest-box { width: min(760px, 100%); }
 .suggest-box .msg { color: var(--muted); font-size: 14px; line-height: 1.7; }
 .suggest-draws { display: flex; align-items: center; gap: 10px; font-weight: 700; margin: 12px 0; flex-wrap: wrap; }

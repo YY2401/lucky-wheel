@@ -281,3 +281,38 @@ test('特效等級：自動判定（機率 < 5% 或保底＝大獎、名字像�
   assert.equal(out.results[0].tier, 'big', '抽獎結果帶等級');
   assert.equal(core.normalizeConfig({ prizes: [{ name: 'a', tier: 'weird' }] }).prizes[0].tier, 'auto');
 });
+
+test('diffStock：只有數量 / 剩餘變了才記，改名改權重不算', () => {
+  const before = core.stockSnapshot([{ id: 'a', name: '甜點券', quantity: 30, remaining: 9 }, { id: 'b', name: '小卡', quantity: 5, remaining: 5 }]);
+  const after = [{ id: 'a', name: '甜點券', quantity: 30, remaining: 14 }, { id: 'b', name: '小卡改名', weight: 99, quantity: 5, remaining: 5 }];
+  const log = core.diffStock(before, after, { reason: '手動修改' });
+  assert.equal(log.length, 1);
+  assert.deepEqual({ ...log[0], time: 'x' }, { time: 'x', reason: '手動修改', kind: 'change', prizeId: 'a', prize: '甜點券', qtyFrom: 30, qtyTo: 30, remFrom: 9, remTo: 14 });
+  assert.equal(core.stockDelta(log[0]), '+5');
+});
+
+test('diffStock：新增與刪除獎項各記一筆，方向正確', () => {
+  const before = core.stockSnapshot([{ id: 'a', name: '舊獎', quantity: 3, remaining: 2 }]);
+  const log = core.diffStock(before, [{ id: 'n', name: '新獎', quantity: 4, remaining: 4 }], { reason: '匯入設定' });
+  const add = log.find((e) => e.kind === 'add'); const rm = log.find((e) => e.kind === 'remove');
+  assert.equal(add.prize, '新獎'); assert.equal(add.remFrom, null); assert.equal(add.remTo, 4);
+  assert.equal(rm.prize, '舊獎'); assert.equal(rm.remFrom, 2); assert.equal(rm.remTo, null);
+  assert.equal(core.stockDelta(add), '新增獎項');
+  assert.equal(core.stockDelta(rm), '刪除獎項');
+  assert.ok(log.every((e) => e.reason === '匯入設定'));
+});
+
+test('diffStock：切換無限用「無限」表示，不會算出假的增減', () => {
+  const before = core.stockSnapshot([{ id: 'a', name: '小卡', quantity: 10, remaining: 4 }]);
+  const log = core.diffStock(before, [{ id: 'a', name: '小卡', quantity: -1, remaining: -1 }], { reason: '切換無限' });
+  assert.equal(log.length, 1);
+  assert.equal(core.stockNum(log[0].remTo), '無限');
+  assert.equal(core.stockDelta(log[0]), '', '有一邊是無限時不顯示增減');
+  assert.equal(core.stockNum(null), '—');
+});
+
+test('diffStock：沒有變化就不產生紀錄（抽獎前後拍快照不會被誤記）', () => {
+  const ps = [{ id: 'a', name: 'x', quantity: 5, remaining: 5 }];
+  assert.deepEqual(core.diffStock(core.stockSnapshot(ps), ps), []);
+  assert.deepEqual(core.diffStock(core.stockSnapshot(ps), core.stockSnapshot(ps)), []);
+});
