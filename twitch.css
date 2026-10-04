@@ -85,7 +85,7 @@ body.tw { --twitch: #9146ff; }
 /* ---------- 直播畫面 ---------- */
 .tw-live { position: relative; z-index: 1; display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 22px; padding: 22px; align-items: start; }
 .tw-stage { display: flex; flex-direction: column; align-items: center; gap: 18px; }
-.tw-stage .wheel-wrap { width: min(100%, 600px, calc(100vh - 300px)); min-width: 260px; }
+.tw-stage .wheel-wrap { width: min(100%, 600px, calc(100vh - 340px)); min-width: 260px; margin: 6% 0; } /* 外圈條紋凸出 7%，留位置免得壓到上下的字 */
 .tw-now {
   min-height: 52px; display: flex; align-items: center; gap: 12px; padding: 8px 20px; border-radius: 999px;
   border: var(--border-w) solid var(--ink); background: var(--surface); font-size: 18px; max-width: 100%;

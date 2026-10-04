@@ -25,7 +25,7 @@ module.exports = [
     languageOptions: { globals: { ...globals.browser, ...globals.node } },
   },
   {
-    files: ['eslint.config.js', 'test/**/*.js'],
+    files: ['eslint.config.js', 'test/**/*.js', 'docs/**/*.js'],
     languageOptions: { ecmaVersion: 2022, sourceType: 'commonjs', globals: { ...globals.node, ...globals.browser } },
     rules: { 'no-empty': ['error', { allowEmptyCatch: true }] },
   },
