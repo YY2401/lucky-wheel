@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>忠誠點轉盤</title>
-<meta name="app-version" content="54">
+<meta name="app-version" content="55">
 <script>try { document.documentElement.dataset.theme = localStorage.getItem('tw.theme') || 'light'; } catch (e) { document.documentElement.dataset.theme = 'light'; }</script>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=54">
-<link rel="stylesheet" href="twitch.css?v=54">
+<link rel="stylesheet" href="style.css?v=55">
+<link rel="stylesheet" href="twitch.css?v=55">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.1/mqtt.min.js"></script>
 </head>
 <body class="tw">
@@ -27,6 +27,7 @@
     <button class="tw-pill" id="pillObs" data-step="5" title="OBS 畫面連線狀態，點一下到設定"><i></i><span>OBS</span></button>
     <button class="btn" id="toLive">直播畫面</button>
     <button class="btn" id="toSetup">設定</button>
+    <a class="btn" id="openGuide" href="docs/%E5%BF%A0%E8%AA%A0%E9%BB%9E%E8%BD%89%E7%9B%A4%E4%BD%BF%E7%94%A8%E8%AA%AA%E6%98%8E.pdf" target="_blank" rel="noopener" title="圖文使用說明書（PDF，另開分頁）">說明書</a>
   </div>
 </header>
 
@@ -37,6 +38,7 @@
   <div class="tw-setup-head">
     <h1>3 個步驟就能開始</h1>
     <p class="hint">設定只要做一次，之後打開這個網頁就會自動連線。資料存在這台電腦的瀏覽器裡。</p>
+    <p class="tw-guide-link">看不懂哪一步？<a href="docs/%E5%BF%A0%E8%AA%A0%E9%BB%9E%E8%BD%89%E7%9B%A4%E4%BD%BF%E7%94%A8%E8%AA%AA%E6%98%8E.pdf" target="_blank" rel="noopener">📖 打開圖文說明書</a>（每一步都有截圖）</p>
   </div>
 
   <section class="tw-step" id="step1">
@@ -188,12 +190,12 @@
 </div>
 <div id="toast"></div>
 
-<script src="core.js?v=54"></script>
-<script src="twitch-core.js?v=54"></script>
-<script src="wheel.js?v=54"></script>
-<script src="ui.js?v=54"></script>
-<script src="store.js?v=54"></script>
-<script src="sync.js?v=54"></script>
-<script src="twitch.js?v=54"></script>
+<script src="core.js?v=55"></script>
+<script src="twitch-core.js?v=55"></script>
+<script src="wheel.js?v=55"></script>
+<script src="ui.js?v=55"></script>
+<script src="store.js?v=55"></script>
+<script src="sync.js?v=55"></script>
+<script src="twitch.js?v=55"></script>
 </body>
 </html>

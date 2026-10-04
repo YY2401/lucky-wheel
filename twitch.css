@@ -28,6 +28,9 @@ body.tw { --twitch: #9146ff; }
 .tw-setup { position: relative; z-index: 1; max-width: 880px; margin: 0 auto; padding: 28px 18px 60px; }
 .tw-setup-head h1 { margin: 0 0 4px; font-size: 30px; font-weight: 900; }
 .tw-setup-head { margin-bottom: 18px; }
+.tw-guide-link { margin: 6px 0 0; font-weight: 700; }
+.tw-guide-link a { text-decoration: underline; text-underline-offset: 3px; }
+a.btn { display: inline-flex; align-items: center; justify-content: center; }
 .tw-step {
   display: flex; gap: 18px; background: var(--surface); border: var(--border-w) solid var(--ink); border-radius: var(--radius);
   padding: 20px 22px; margin-bottom: 16px; box-shadow: 4px 4px 0 var(--shadow); scroll-margin-top: 90px;
@@ -131,7 +134,7 @@ body.tw { --twitch: #9146ff; }
 }
 @media (max-width: 700px) {
   .tw .topbar-right { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .tw .topbar-right .btn { grid-column: 1 / -1; }
+  .tw .topbar-right .btn:not(#openGuide) { grid-column: span 2; }
   .tw-pill { justify-content: center; padding: 6px 6px; font-size: 12px; white-space: normal; text-align: center; line-height: 1.2; }
 }
 @media (max-width: 600px) {

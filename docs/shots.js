@@ -62,7 +62,7 @@ const BASE = { clientId: 'cid', sync: false, spinDuration: 2600, resultSeconds: 
   await shot('step5', '#step5');
   await shot('finish', '.tw-setup-foot', 20);
   await page.evaluate(() => window.scrollTo(0, 0));
-  await page.screenshot({ path: path.join(OUT, 'pills-ok.png'), clip: { x: 560, y: 0, width: 540, height: 62 } });
+  await page.screenshot({ path: path.join(OUT, 'pills-ok.png'), clip: { x: 470, y: 0, width: 630, height: 62 } });
 
   // 4. 直播畫面：有人兌換、轉盤中、紀錄
   const now = Date.now();
