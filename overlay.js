@@ -56,6 +56,10 @@
       if (window.WheelBG) WheelBG.setSpinning(true);
       await wait(fast ? 0 : mode === 'spin' ? 600 : 50);
       if (!fast && d.countdown) await runCountdown(d.countdown, { onTick: () => Sfx.tick() });
+      // 還沒收到控制台設定（OBS 比控制台晚開）：先用訊息附帶的獎項畫轉盤，不然找不到格子會空轉
+      if (d.prizes && d.results.some((r) => !config.prizes.some((p) => p.id === r.prizeId))) {
+        config.prizes = d.prizes.map(normalizePrize); await wheel.setPrizes(config.prizes, config.segmentMode, config.minSlice / 100); renderList();
+      }
       const flip = isFlip(d);
       const dur = (ms) => (fast ? 0 : ms);
       if (flip) {

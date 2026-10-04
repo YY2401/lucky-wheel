@@ -3,7 +3,7 @@ const js = require('@eslint/js');
 const globals = require('globals');
 
 // 頁面用 <script> 依序載入、共用全域；這些是各檔案之間的「介面」
-const appGlobals = { LuckyCore: 'readonly', LuckyWheel: 'readonly', LW: 'writable', WheelBG: 'readonly', THREE: 'readonly', XLSX: 'readonly', mqtt: 'readonly', anime: 'readonly' };
+const appGlobals = { LuckyCore: 'readonly', LuckyWheel: 'readonly', TwitchCore: 'readonly', LW: 'writable', WheelBG: 'readonly', THREE: 'readonly', XLSX: 'readonly', mqtt: 'readonly', anime: 'readonly' };
 
 module.exports = [
   js.configs.recommended,
@@ -21,7 +21,7 @@ module.exports = [
     },
   },
   {
-    files: ['core.js'], // UMD：瀏覽器與 Node 都會載入
+    files: ['core.js', 'twitch-core.js'], // UMD：瀏覽器與 Node 都會載入
     languageOptions: { globals: { ...globals.browser, ...globals.node } },
   },
   {

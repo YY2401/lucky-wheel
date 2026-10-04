@@ -1,0 +1,142 @@
+/* ============================================================
+   忠誠點轉盤（twitch.html）：沿用 style.css 的色票與元件
+   ============================================================ */
+body.tw { --twitch: #9146ff; }
+.tw .topbar { position: sticky; top: 0; z-index: 20; }
+.tw .brand .logo { font-family: "Noto Sans TC", sans-serif; font-weight: 900; }
+
+/* ---------- 頂欄狀態膠囊 ---------- */
+.tw-pill {
+  display: inline-flex; align-items: center; gap: 7px; padding: 6px 12px; border-radius: 999px; cursor: pointer;
+  border: var(--border-w) solid var(--ink); background: var(--paper); color: var(--ink); font-size: 13px; font-weight: 700; white-space: nowrap;
+}
+.tw-pill i { width: 10px; height: 10px; border-radius: 50%; background: var(--ink-soft); border: 2px solid var(--ink); flex: none; }
+.tw-pill.ok i { background: var(--green); }
+.tw-pill.wait i { background: var(--yellow); animation: twblink 1s steps(2) infinite; }
+.tw-pill.bad { background: var(--red); color: #fff; }
+.tw-pill.bad i { background: #fff; }
+@keyframes twblink { 50% { opacity: .3; } }
+
+/* ---------- 最上方提醒列 ---------- */
+.tw-alert {
+  position: sticky; top: 61px; z-index: 19; display: flex; align-items: center; justify-content: center; gap: 14px; flex-wrap: wrap;
+  padding: 10px 22px; background: var(--red); color: #fff; font-weight: 700; border-bottom: var(--border-w) solid var(--ink);
+}
+.tw-alert .btn { padding: 5px 14px; }
+
+/* ---------- 設定 ---------- */
+.tw-setup { position: relative; z-index: 1; max-width: 880px; margin: 0 auto; padding: 28px 18px 60px; }
+.tw-setup-head h1 { margin: 0 0 4px; font-size: 30px; font-weight: 900; }
+.tw-setup-head { margin-bottom: 18px; }
+.tw-step {
+  display: flex; gap: 18px; background: var(--surface); border: var(--border-w) solid var(--ink); border-radius: var(--radius);
+  padding: 20px 22px; margin-bottom: 16px; box-shadow: 4px 4px 0 var(--shadow); scroll-margin-top: 90px;
+}
+.tw-step-num {
+  flex: none; width: 44px; height: 44px; border-radius: 50%; border: var(--border-w) solid var(--ink); background: var(--yellow); color: #141414;
+  display: flex; align-items: center; justify-content: center; font-family: "Bungee", sans-serif; font-size: 20px;
+}
+.tw-step.done .tw-step-num { background: var(--green); color: #fff; font-size: 0; }
+.tw-step.done .tw-step-num::after { content: "✓"; font-size: 22px; font-family: "Noto Sans TC", sans-serif; font-weight: 900; }
+.tw-step.optional .tw-step-num { background: var(--surface2); color: var(--ink); }
+.tw-step-body { flex: 1; min-width: 0; }
+.tw-step h2 { margin: 6px 0 8px; font-size: 21px; font-weight: 900; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.tw-step h2 small { font-size: 14px; font-weight: 500; color: var(--muted); }
+.tw-step p { margin: 6px 0 12px; line-height: 1.7; }
+.tw-done { display: none; font-size: 13px; padding: 2px 10px; border-radius: 999px; background: var(--green); color: #fff; }
+.tw-step.done .tw-done { display: inline-block; }
+.btn.big { font-size: 17px; padding: 12px 24px; font-weight: 900; }
+#twLogin { background: var(--twitch); color: #fff; }
+.tw-err { color: var(--red); font-weight: 700; }
+.tw-more { margin-top: 10px; }
+.tw-more summary { cursor: pointer; color: var(--muted); font-size: 14px; }
+.tw-more code { background: var(--surface2); padding: 1px 6px; border-radius: 4px; word-break: break-all; }
+
+.tw-howto { margin: 6px 0 0; padding-left: 22px; line-height: 1.8; }
+.tw-howto li { margin-bottom: 12px; padding-left: 4px; }
+.tw-howto li::marker { font-weight: 900; }
+.tw-howto .btn { margin-top: 6px; }
+.tw-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
+.tw-row input { flex: 1; min-width: 220px; }
+.tw-check { margin-top: 10px; padding: 12px 14px; border-radius: 10px; border: var(--border-w) solid var(--ink); line-height: 1.7; background: var(--surface2); }
+.tw-check.ok { background: color-mix(in srgb, var(--green) 18%, var(--surface)); }
+.tw-check.bad { background: color-mix(in srgb, var(--red) 15%, var(--surface)); }
+.tw-check ul { margin: 6px 0 0; padding-left: 20px; }
+
+.tw-rewards { display: grid; gap: 8px; margin: 4px 0 10px; }
+.tw-reward {
+  display: flex; align-items: center; gap: 10px; padding: 10px 14px; border: var(--border-w) solid var(--ink); border-radius: 10px; cursor: pointer; background: var(--paper);
+}
+.tw-reward.on { background: color-mix(in srgb, var(--yellow) 35%, var(--paper)); }
+.tw-reward-dot { width: 16px; height: 16px; border-radius: 4px; background: var(--c); border: 2px solid var(--ink); flex: none; }
+.tw-reward-title { font-weight: 700; flex: 1; min-width: 0; }
+.tw-reward-cost { color: var(--muted); font-size: 13px; white-space: nowrap; }
+
+.tw-prizes { width: 100%; border-collapse: collapse; margin: 6px 0; }
+.tw-prizes th { text-align: left; font-size: 13px; color: var(--muted); padding: 4px 6px; }
+.tw-prizes td { padding: 4px 6px; }
+.tw-prizes td input:not([type]) { width: 100%; min-width: 80px; }
+.tw-prizes .tw-prob { font-weight: 700; white-space: nowrap; }
+.table-scroll { overflow-x: auto; }
+.tw-field { display: inline-flex; align-items: center; gap: 8px; margin: 10px 18px 0 0; flex-wrap: wrap; }
+.tw-grid { display: flex; flex-wrap: wrap; margin-top: 4px; }
+.tw-setup-foot { text-align: center; margin-top: 26px; }
+
+/* ---------- 直播畫面 ---------- */
+.tw-live { position: relative; z-index: 1; display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 22px; padding: 22px; align-items: start; }
+.tw-stage { display: flex; flex-direction: column; align-items: center; gap: 18px; }
+.tw-stage .wheel-wrap { width: min(100%, 600px, calc(100vh - 300px)); min-width: 260px; }
+.tw-now {
+  min-height: 52px; display: flex; align-items: center; gap: 12px; padding: 8px 20px; border-radius: 999px;
+  border: var(--border-w) solid var(--ink); background: var(--surface); font-size: 18px; max-width: 100%;
+}
+.tw-now .tw-now-label { color: var(--muted); }
+.tw-now.active { background: var(--yellow); color: #141414; box-shadow: 4px 4px 0 var(--shadow); }
+.tw-now.active .tw-now-label { color: #141414; }
+.tw-now-who { font-weight: 900; font-size: 22px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tw-last {
+  font-size: 22px; padding: 10px 22px; border-radius: 12px; border: var(--border-w) solid var(--ink); background: var(--surface);
+  border-left: 12px solid var(--c); animation: popin .35s cubic-bezier(.2, 1.4, .4, 1);
+}
+.tw-last b { font-size: 28px; font-weight: 900; }
+.tw-last-who { font-weight: 700; }
+.tw-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+
+.tw-side { display: grid; gap: 16px; }
+.tw-box { background: var(--surface); border: var(--border-w) solid var(--ink); border-radius: var(--radius); padding: 14px 16px; box-shadow: 4px 4px 0 var(--shadow); }
+.tw-box h3 { margin: 0 0 10px; font-size: 17px; font-weight: 900; display: flex; align-items: center; gap: 8px; }
+.tw-box h3 .btn { margin-left: auto; }
+.tw-count { background: var(--ink); color: var(--bg); border-radius: 999px; padding: 0 9px; font-size: 13px; }
+.tw-list { list-style: none; margin: 0; padding: 0; max-height: 46vh; overflow: auto; }
+.tw-list li { display: grid; grid-template-columns: auto 1fr auto; gap: 2px 8px; align-items: center; padding: 8px 2px; border-top: 1px dashed var(--ink-soft); }
+.tw-list li:first-child { border-top: 0; }
+.tw-list li > .tw-li-main:first-child { grid-column: 1 / 3; }
+.tw-list li > .tw-li-main:first-child + .tw-li-sub { grid-column: 1 / 3; }
+.tw-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--c); border: 2px solid var(--ink); grid-row: span 2; }
+.tw-li-main { font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
+.tw-li-sub { grid-column: 2; font-size: 12.5px; color: var(--muted); overflow-wrap: anywhere; }
+.tw-li-act { grid-row: 1 / 3; grid-column: 3; }
+.tw-list .tw-empty { display: block; color: var(--muted); font-size: 14px; }
+.tw-list .st-ok .tw-st { color: var(--green); font-weight: 700; }
+.tw-list .st-error .tw-st, .tw-list .st-error .tw-li-sub { color: var(--red); font-weight: 700; }
+.tw-list .st-pending .tw-st, .tw-list .st-undoing .tw-st { color: var(--blue); font-weight: 700; }
+.tw-list .st-undone .tw-li-main, .tw-list .st-test .tw-li-main { text-decoration: line-through; opacity: .6; }
+
+@media (max-width: 900px) {
+  .tw-live { grid-template-columns: 1fr; padding: 16px; }
+  .tw-stage .wheel-wrap { width: min(100%, 460px); }
+  .tw-alert { top: 0; position: relative; }
+}
+@media (max-width: 700px) {
+  .tw .topbar-right { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .tw .topbar-right .btn { grid-column: 1 / -1; }
+  .tw-pill { justify-content: center; padding: 6px 6px; font-size: 12px; white-space: normal; text-align: center; line-height: 1.2; }
+}
+@media (max-width: 600px) {
+  .tw .topbar { padding: 10px 16px; position: relative; }
+  .tw-setup { padding: 20px 16px 50px; }
+  .tw-step { padding: 16px; gap: 12px; flex-direction: column; }
+  .tw-step-num { width: 36px; height: 36px; font-size: 17px; }
+  .tw-setup-head h1 { font-size: 24px; }
+  .tw-row input { min-width: 0; width: 100%; }
+}
