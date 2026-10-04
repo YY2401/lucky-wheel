@@ -50,6 +50,8 @@ body.tw { --twitch: #9146ff; }
 .tw-err { color: var(--red); font-weight: 700; }
 .tw-more { margin-top: 10px; }
 .tw-more summary { cursor: pointer; color: var(--muted); font-size: 14px; }
+.tw-small-steps { margin: 4px 0 10px; padding-left: 22px; }
+.tw-small-steps li { margin-bottom: 2px; }
 .tw-more code { background: var(--surface2); padding: 1px 6px; border-radius: 4px; word-break: break-all; }
 
 .tw-howto { margin: 6px 0 0; padding-left: 22px; line-height: 1.8; }

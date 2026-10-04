@@ -83,7 +83,7 @@ OBS → 檢視 → 面板 → 自訂瀏覽器面板，把控制台網址加成�
 
 **直播時**：這個網頁要開著（可以縮到背景）。試算表暫時連不上時紀錄留在瀏覽器、自動重試；Twitch 斷線會自動重連，登入過期時上方會出現「重新連接」，排隊中的兌換不會掉。漏掉的可以「手動補一筆」。
 
-**架站者**：到 [dev.twitch.tv](https://dev.twitch.tv/console/apps) 建立應用程式（類別隨意、用戶端類型「公開」），OAuth Redirect URL 加上 `https://<你的網域>/twitch.html`（本機測試再加 `http://localhost:3000/twitch.html`），把 Client ID 填到 `twitch.js` 的 `BUILTIN_CLIENT_ID`。使用者也能在步驟 1 的「進階」自填。
+**架站者**：本站已內建 Client ID。自己架站時，到 [dev.twitch.tv/console](https://dev.twitch.tv/console)（帳號需開雙重驗證）按「註冊您的應用程式」：名稱自訂（實況主授權時會看到）、OAuth 重新導向網址填 `https://<你的網域>/twitch.html`（本機測試再加 `http://localhost:3000/twitch.html`）、類別 Broadcaster Suite、用戶端類型「公開」→ 建立 → 「管理」複製「用戶端 ID」，填到 `twitch.js` 的 `BUILTIN_CLIENT_ID`。用戶端密碼用不到。使用者也能在步驟 1 的「進階」自填。
 
 ## Excel
 

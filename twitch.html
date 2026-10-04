@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>忠誠點轉盤</title>
-<meta name="app-version" content="53">
+<meta name="app-version" content="54">
 <script>try { document.documentElement.dataset.theme = localStorage.getItem('tw.theme') || 'light'; } catch (e) { document.documentElement.dataset.theme = 'light'; }</script>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=53">
-<link rel="stylesheet" href="twitch.css?v=53">
+<link rel="stylesheet" href="style.css?v=54">
+<link rel="stylesheet" href="twitch.css?v=54">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.1/mqtt.min.js"></script>
 </head>
 <body class="tw">
@@ -54,8 +54,15 @@
       <p class="tw-err hidden" id="twErr"></p>
       <details class="tw-more">
         <summary>進階：自訂 Twitch Client ID</summary>
-        <p class="hint">一般不用填。自己架站時，到 dev.twitch.tv 建立應用程式，OAuth Redirect URL 填 <code id="redirectUri"></code>，再把 Client ID 貼在這裡。</p>
-        <input id="clientId" placeholder="留空用內建的" style="width:min(360px,100%)">
+        <p class="hint">這個網站已經內建，<b>一般不用填</b>。只有自己架站、或想改用自己註冊的 Twitch 應用程式時才需要：</p>
+        <ol class="hint tw-small-steps">
+          <li>到 dev.twitch.tv/console 登入（帳號需開啟雙重驗證），按「註冊您的應用程式」。</li>
+          <li>名稱：自己取（實況主授權時會看到這個名稱，全 Twitch 不能重複）。</li>
+          <li>OAuth 重新導向網址：<code id="redirectUri"></code>（要一字不差）。</li>
+          <li>類別：Broadcaster Suite；用戶端類型：<b>公開</b>。按「建立」。</li>
+          <li>回主控台對它按「管理」，複製「用戶端 ID」貼到下面。「用戶端密碼」用不到，不要產生也不要給別人。</li>
+        </ol>
+        <input id="clientId" placeholder="留空＝用內建的" style="width:min(360px,100%)">
       </details>
     </div>
   </section>
@@ -181,12 +188,12 @@
 </div>
 <div id="toast"></div>
 
-<script src="core.js?v=53"></script>
-<script src="twitch-core.js?v=53"></script>
-<script src="wheel.js?v=53"></script>
-<script src="ui.js?v=53"></script>
-<script src="store.js?v=53"></script>
-<script src="sync.js?v=53"></script>
-<script src="twitch.js?v=53"></script>
+<script src="core.js?v=54"></script>
+<script src="twitch-core.js?v=54"></script>
+<script src="wheel.js?v=54"></script>
+<script src="ui.js?v=54"></script>
+<script src="store.js?v=54"></script>
+<script src="sync.js?v=54"></script>
+<script src="twitch.js?v=54"></script>
 </body>
 </html>
