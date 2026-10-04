@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>忠誠點轉盤</title>
+<meta name="app-version" content="53">
+<script>try { document.documentElement.dataset.theme = localStorage.getItem('tw.theme') || 'light'; } catch (e) { document.documentElement.dataset.theme = 'light'; }</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css?v=53">
+<link rel="stylesheet" href="twitch.css?v=53">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.1/mqtt.min.js"></script>
+</head>
+<body class="tw">
+<header class="topbar">
+  <div class="brand">
+    <span class="logo">忠誠點轉盤</span>
+    <div class="theme-toggle" role="group" aria-label="主題">
+      <button type="button" data-theme="light">白底</button>
+      <button type="button" data-theme="dark">黑底</button>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <button class="tw-pill" id="pillTwitch" data-step="1" title="Twitch 連線狀態，點一下到設定"><i></i><span>Twitch</span></button>
+    <button class="tw-pill" id="pillSheet" data-step="3" title="試算表連線狀態，點一下到設定"><i></i><span>試算表</span></button>
+    <button class="tw-pill" id="pillObs" data-step="5" title="OBS 畫面連線狀態，點一下到設定"><i></i><span>OBS</span></button>
+    <button class="btn" id="toLive">直播畫面</button>
+    <button class="btn" id="toSetup">設定</button>
+  </div>
+</header>
+
+<div class="tw-alert hidden" id="alert"><span id="alertText"></span><button class="btn" id="alertBtn"></button></div>
+
+<!-- ===== 設定（第一次自動打開；完成後可從右上「設定」回來） ===== -->
+<main class="tw-setup hidden" id="setupView">
+  <div class="tw-setup-head">
+    <h1>3 個步驟就能開始</h1>
+    <p class="hint">設定只要做一次，之後打開這個網頁就會自動連線。資料存在這台電腦的瀏覽器裡。</p>
+  </div>
+
+  <section class="tw-step" id="step1">
+    <div class="tw-step-num">1</div>
+    <div class="tw-step-body">
+      <h2>連接 Twitch <span class="tw-done">✓ 完成</span></h2>
+      <div id="twOff">
+        <p>用你的實況主帳號登入，授權這個網頁「看見忠誠點兌換」。不會發訊息、不會動你的頻道。</p>
+        <button class="btn primary big" id="twLogin">連接 Twitch</button>
+      </div>
+      <div id="twOn" class="hidden">
+        <p>已連接：<b id="twUser"></b></p>
+        <button class="btn" id="twSwitch">換一個帳號</button>
+      </div>
+      <p class="tw-err hidden" id="twErr"></p>
+      <details class="tw-more">
+        <summary>進階：自訂 Twitch Client ID</summary>
+        <p class="hint">一般不用填。自己架站時，到 dev.twitch.tv 建立應用程式，OAuth Redirect URL 填 <code id="redirectUri"></code>，再把 Client ID 貼在這裡。</p>
+        <input id="clientId" placeholder="留空用內建的" style="width:min(360px,100%)">
+      </details>
+    </div>
+  </section>
+
+  <section class="tw-step" id="step2">
+    <div class="tw-step-num">2</div>
+    <div class="tw-step-body">
+      <h2>選擇要觸發轉盤的忠誠點品項 <span class="tw-done">✓ 完成</span></h2>
+      <p>觀眾兌換你勾選的品項時，就會自動轉一次轉盤。</p>
+      <div class="tw-rewards" id="rewards"><p class="hint">先完成步驟 1。</p></div>
+      <p class="hint">清單裡沒有？先到 Twitch「創作者工作台 → 觀眾獎勵 → 忠誠點數 → 管理獎勵」新增一個（例如「忠誠點轉盤」），再按 <button class="btn icon" id="reloadRewards">重新整理清單</button></p>
+    </div>
+  </section>
+
+  <section class="tw-step" id="step3">
+    <div class="tw-step-num">3</div>
+    <div class="tw-step-body">
+      <h2>連接 Google 試算表 <span class="tw-done">✓ 完成</span></h2>
+      <p>讓轉盤結果自動記到你的試算表。照下面做一次就好（大約 3 分鐘）：</p>
+      <ol class="tw-howto">
+        <li>在 Google 雲端硬碟打開你的轉盤紀錄試算表，上方選單按 <b>擴充功能 → Apps Script</b>。</li>
+        <li>把編輯區裡原本的字<b>全部刪掉</b>，按這個按鈕複製程式碼後貼上，再按上方的 <b>💾 儲存</b>。<br><button class="btn primary" id="copyScript">複製程式碼</button> <small class="hint">（程式碼裡含有只屬於你的暗號）</small></li>
+        <li>按右上角藍色的 <b>部署 → 新增部署作業</b>，左邊齒輪選 <b>網頁應用程式</b>；「執行身分」選<b>我</b>、「誰可以存取」選<b>所有人</b>，按 <b>部署</b>。</li>
+        <li>Google 會要求授權：按 <b>授予存取權</b> → 選你的帳號。如果出現「Google 尚未驗證這個應用程式」，按左下的 <b>進階</b> → <b>前往…（不安全）</b> → <b>允許</b>。
+          <details class="tw-more"><summary>為什麼會說「不安全」？</summary><p class="hint">因為這段程式是你自己剛建立的，沒有送給 Google 審核過，所以 Google 一律這樣提醒。程式只會讀寫你這份試算表，而且只接受帶有你專屬暗號的請求。</p></details>
+        </li>
+        <li>部署完成後，複製「網頁應用程式」底下那串網址（https://script.google.com/… 結尾是 /exec），貼到這裡：
+          <div class="tw-row"><input id="scriptUrl" placeholder="https://script.google.com/macros/s/…/exec"><button class="btn primary" id="testSheet">測試連線</button></div>
+        </li>
+      </ol>
+      <div class="tw-check hidden" id="sheetResult"></div>
+      <details class="tw-more">
+        <summary>之後改了程式碼要重新部署嗎？</summary>
+        <p class="hint">一般不需要再碰。若你按了「換一組暗號」或這個網頁更新了程式碼，請重新複製貼上，然後用 <b>部署 → 管理部署作業 → ✏️ 編輯 → 版本選「新版本」→ 部署</b>，網址會保持不變。</p>
+        <button class="btn" id="newSheetKey">換一組暗號</button>
+      </details>
+    </div>
+  </section>
+
+  <section class="tw-step optional" id="step4">
+    <div class="tw-step-num">4</div>
+    <div class="tw-step-body">
+      <h2>轉盤內容 <small>（已經照你的試算表設好，可略過）</small></h2>
+      <p class="hint">機率＝權重 ÷ 權重總和。「寫到哪一欄」是試算表每天底下的欄名。</p>
+      <div class="table-scroll">
+        <table class="tw-prizes">
+          <thead><tr><th>顏色</th><th>名稱</th><th>權重</th><th>機率</th><th>寫到哪一欄</th><th></th></tr></thead>
+          <tbody id="prizeRows"></tbody>
+        </table>
+      </div>
+      <div class="tw-row"><button class="btn" id="addPrize">＋ 新增一格</button><button class="btn ghost" id="resetPrizes">恢復成 1 / 3 / 5 點</button></div>
+      <label class="tw-field">跨夜直播：凌晨
+        <select id="cutoffHour"></select>
+        以前的兌換，算在前一天
+      </label>
+    </div>
+  </section>
+
+  <section class="tw-step optional" id="step5">
+    <div class="tw-step-num">5</div>
+    <div class="tw-step-body">
+      <h2>放到 OBS 直播畫面 <small>（可略過）</small></h2>
+      <ol class="tw-howto">
+        <li><button class="btn primary" id="copyObs">複製 OBS 網址</button></li>
+        <li>OBS 的「來源」按 <b>＋ → 瀏覽器</b>，網址貼上，寬 1280、高 720，按確定。背景是透明的。</li>
+        <li>按 <button class="btn icon" id="pingObs">測試 OBS</button>，OBS 畫面右下的小圓點會閃一下。</li>
+      </ol>
+      <div class="tw-grid">
+        <label class="tw-field">轉動秒數 <input type="number" id="spinSeconds" min="1" max="20" step="0.5"></label>
+        <label class="tw-field">結果停留秒數 <input type="number" id="resultSeconds" min="1" max="60"></label>
+        <label class="tw-field"><input type="checkbox" id="sound"> 音效</label>
+        <label class="tw-field">音量 <input type="range" id="volume" min="0" max="100"></label>
+      </div>
+    </div>
+  </section>
+
+  <div class="tw-setup-foot">
+    <button class="btn primary big" id="finishSetup">完成，開始直播 →</button>
+    <p class="hint" id="finishHint"></p>
+  </div>
+</main>
+
+<!-- ===== 直播畫面 ===== -->
+<main class="tw-live hidden" id="liveView">
+  <section class="tw-stage">
+    <div class="tw-now" id="nowBanner"><span class="tw-now-label">等待兌換中…</span></div>
+    <div class="wheel-wrap"><canvas id="wheel"></canvas></div>
+    <div class="tw-last hidden" id="lastResult"></div>
+    <div class="tw-actions">
+      <button class="btn" id="manualAdd" title="漏掉的兌換：手動輸入觀眾名稱，轉一次並寫進試算表">＋ 手動補一筆</button>
+      <button class="btn ghost" id="testSpin" title="轉一次看看，不寫進試算表">試轉（不記錄）</button>
+    </div>
+  </section>
+  <aside class="tw-side">
+    <div class="tw-box">
+      <h3>排隊中 <span class="tw-count" id="queueCount">0</span></h3>
+      <ul class="tw-list" id="queueList"></ul>
+    </div>
+    <div class="tw-box">
+      <h3>最近紀錄 <button class="btn icon hidden" id="retryAll">全部重新寫入</button></h3>
+      <ul class="tw-list" id="recordList"></ul>
+    </div>
+  </aside>
+</main>
+
+<div class="modal hidden" id="lockScreen">
+  <div class="modal-box" style="text-align:center;width:min(520px,100%)">
+    <h3 style="margin:0 0 10px;font-size:22px">這個網頁已經在另一個分頁開著</h3>
+    <p class="hint" style="font-size:15px">兩個分頁同時接收兌換會重複轉盤，所以這個分頁先暫停。請回到原本的分頁，或按下面按鈕改由這裡接手。</p>
+    <div class="modal-actions"><button class="btn primary" id="takeover">改由這個分頁接手</button></div>
+  </div>
+</div>
+<div class="modal hidden" id="confirmModal">
+  <div class="modal-box">
+    <h3 id="confirmTitle">確認</h3>
+    <p class="msg" id="confirmMsg"></p>
+    <input id="confirmInput" class="hidden">
+    <textarea id="confirmTextarea" class="hidden" rows="10"></textarea>
+    <div class="row-actions hidden" id="confirmFileBtn"><button class="btn" type="button">檔案</button></div>
+    <input type="file" id="confirmFile" hidden>
+    <div class="modal-actions"><button class="btn" id="confirmCancel">取消</button><button class="btn primary" id="confirmOk">確定</button></div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script src="core.js?v=53"></script>
+<script src="twitch-core.js?v=53"></script>
+<script src="wheel.js?v=53"></script>
+<script src="ui.js?v=53"></script>
+<script src="store.js?v=53"></script>
+<script src="sync.js?v=53"></script>
+<script src="twitch.js?v=53"></script>
+</body>
+</html>

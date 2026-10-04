@@ -63,6 +63,28 @@ OBS → 檢視 → 面板 → 自訂瀏覽器面板，把控制台網址加成�
 | `theme` | 強制覆蓋層主題 `dark` / `light`（預設跟控制台） | `&theme=light` |
 | `list=1` | 顯示獎項一覽；`lp=0` 不顯示機率、`ls=0` 不顯示剩餘、`lpos=tr` 右上角、`lpos=c` 正中間放大 | `&list=1&lpos=c` |
 
+## Twitch 忠誠點轉盤（`twitch.html`）
+
+**👉 <https://yy2401.github.io/lucky-wheel/twitch.html>**
+
+觀眾兌換指定的忠誠點品項 → 自動轉盤（OBS 畫面同步）→ 結果自動寫進 Google 試算表。給不寫程式的實況主用，第一次打開會帶著做完設定：
+
+1. **連接 Twitch**：按按鈕登入授權（只要求 `channel:read:redemptions`，看得到兌換，不能發訊息或改頻道）。頻道需是聯盟或合作夥伴才有忠誠點。
+2. **選品項**：勾選哪個忠誠點品項要觸發轉盤（可複選）。
+3. **連接試算表**：網頁一鍵複製一段 Apps Script（[`sheet-script.gs`](sheet-script.gs)，內含專屬暗號），貼到試算表的「擴充功能 → Apps Script」並部署成網頁應用程式，再把網址貼回來按「測試連線」。之後不用再登入 Google、也不會過期。
+4. （可略過）轉盤內容：預設 1點 50%、3點 30%、5點 20%，可改權重、顏色、寫到哪一欄；跨夜直播可設「凌晨幾點前算前一天」。
+5. （可略過）複製 OBS 網址加成瀏覽器來源。沿用主轉盤的覆蓋層，平常隱藏、有人兌換才出現。
+
+**寫進試算表的方式**（照「常駐_揪團_抖內_忠誠點轉盤紀錄」的結構）：
+
+- 觀眾名單在「兌換紀錄」B 欄，格式「顯示名稱(帳號)」；用括號裡的帳號找人（大小寫不分，也認得只有帳號或只有名字的舊資料），找不到就填進第一個空白列。
+- 「N月」分頁第 1 列是日期、第 2 列是欄名：把「兌換當天 × 轉到的獎項」那格 +1。總表是公式，會自己更新。
+- 同一筆兌換重送不會加兩次；格子是公式就不寫並回報。每筆可在網頁上「撤銷」（試算表減回去，Twitch 忠誠點不會退）。
+
+**直播時**：這個網頁要開著（可以縮到背景）。試算表暫時連不上時紀錄留在瀏覽器、自動重試；Twitch 斷線會自動重連，登入過期時上方會出現「重新連接」，排隊中的兌換不會掉。漏掉的可以「手動補一筆」。
+
+**架站者**：到 [dev.twitch.tv](https://dev.twitch.tv/console/apps) 建立應用程式（類別隨意、用戶端類型「公開」），OAuth Redirect URL 加上 `https://<你的網域>/twitch.html`（本機測試再加 `http://localhost:3000/twitch.html`），把 Client ID 填到 `twitch.js` 的 `BUILTIN_CLIENT_ID`。使用者也能在步驟 1 的「進階」自填。
+
 ## Excel
 
 - 使用瀏覽器的 File System Access API（Chrome / Edge），在「紀錄 / Excel」按「建立新的 Excel」或「選擇既有 Excel」綁定檔案；之後每次抽獎自動把完整紀錄寫進工作表「抽獎紀錄」。
@@ -112,6 +134,10 @@ npm run test:e2e   # 端對端：真實 Chrome 跑抽獎、撤銷、搜尋、設
 
 ```
 index.html   控制台 + OBS 覆蓋層（?overlay=1）
+twitch.html  Twitch 忠誠點轉盤（兌換 → 轉盤 → 寫 Google 試算表）
+twitch.js    忠誠點轉盤頁面：Twitch 登入 / EventSub、排隊轉盤、寫入試算表
+twitch-core.js 忠誠點轉盤純邏輯（觀眾名稱、直播日、設定）
+sheet-script.gs 貼到試算表的 Apps Script（接收並寫入月份分頁）
 app.js       進入點：載入儲存層後依網址啟動控制台或覆蓋層
 core.js      純邏輯：設定正規化、機率、建議機率、抽獎、保底、撤銷、庫存異動（瀏覽器與 Node 共用）
 control.js   控制台：獎項表格、設定頁、紀錄 / 統計、抽獎流程
@@ -123,7 +149,7 @@ excel.js     Excel 綁定與寫入（File System Access API + SheetJS）
 wheel.js     轉盤引擎（繪製、動畫、音效、彩帶）
 bg.js        Three.js 3D 動態背景（僅控制台，覆蓋層維持透明）
 style.css
-test/unit/   單元測試（node --test）
+test/unit/   單元測試（node --test；含 Apps Script 對模擬試算表）
 test/e2e/    端對端測試（puppeteer-core）
 ```
 

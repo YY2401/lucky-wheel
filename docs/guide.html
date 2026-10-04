@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>忠誠點轉盤 使用說明書</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  @page { size: A4; margin: 16mm 16mm 18mm; }
+  :root { --ink: #141414; --soft: #5c5850; --yellow: #ffcf33; --red: #e63b3b; --green: #22a06b; --blue: #2f6bff; --paper: #fffdf7; --cream: #f4efe4; --twitch: #9146ff; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Noto Sans TC", "Microsoft JhengHei", sans-serif; color: var(--ink); font-size: 11pt; line-height: 1.65; background: #fff; }
+  h1, h2, h3 { font-weight: 900; line-height: 1.35; }
+  h2 { font-size: 19pt; margin: 0 0 4mm; padding: 2mm 0 2mm 4mm; border-left: 3mm solid var(--yellow); break-after: avoid; }
+  h3 { font-size: 13.5pt; margin: 7mm 0 2mm; break-after: avoid; }
+  p { margin: 0 0 3mm; }
+  .chapter { break-before: page; }
+  .avoid { break-inside: avoid; }
+  img.shot { display: block; max-width: 100%; border: 0.4mm solid #bbb; border-radius: 2mm; margin: 3mm auto 1.5mm; box-shadow: 1mm 1mm 0 #e3ddcf; }
+  .cap { text-align: center; font-size: 9.5pt; color: var(--soft); margin: 0 0 4mm; }
+  .w60 { width: 62%; } .w75 { width: 76%; } .w45 { width: 46%; } .w85 { width: 86%; }
+
+  /* 封面 */
+  .cover { height: 255mm; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
+  .cover .badge { display: inline-block; background: var(--yellow); border: 0.8mm solid var(--ink); border-radius: 3mm; padding: 3mm 9mm; font-size: 34pt; font-weight: 900; transform: rotate(-2deg); box-shadow: 2mm 2mm 0 var(--ink); }
+  .cover h1 { font-size: 26pt; margin: 12mm 0 4mm; }
+  .cover .sub { font-size: 14pt; color: var(--soft); }
+  .flow { display: flex; align-items: center; justify-content: center; gap: 3mm; margin: 14mm 0 10mm; flex-wrap: nowrap; }
+  .flow .n { border: 0.6mm solid var(--ink); border-radius: 3mm; padding: 3mm 4mm; background: var(--paper); font-weight: 700; font-size: 11pt; width: 34mm; line-height: 1.4; }
+  .flow .n small { display: block; font-weight: 400; color: var(--soft); font-size: 8.5pt; margin-top: 1mm; }
+  .flow .a { font-size: 16pt; font-weight: 900; }
+  .cover .meta { margin-top: 18mm; color: var(--soft); font-size: 10pt; }
+
+  /* 按鈕、選單長相的小標籤：讓不熟電腦的人知道要找什麼 */
+  .k { display: inline-block; border: 0.35mm solid var(--ink); border-radius: 1.6mm; padding: 0 2mm; margin: 0 0.5mm; font-weight: 700; background: var(--paper); line-height: 1.55; font-size: 10.5pt; white-space: nowrap; }
+  .k.y { background: var(--yellow); }
+  .k.p { background: var(--twitch); color: #fff; border-color: var(--twitch); }
+  .k.g { background: #1a73e8; color: #fff; border-color: #1a73e8; border-radius: 4mm; padding: 0 3mm; }
+  .k.gw { border-color: #8a8a8a; color: #1a73e8; border-radius: 4mm; padding: 0 3mm; }
+  .k.m { border-style: dashed; background: #f2f2f2; } /* 選單項目 */
+  .path { font-weight: 700; }
+  code, .url { font-family: Consolas, "Courier New", monospace; background: #f1eee6; padding: 0 1.5mm; border-radius: 1mm; font-size: 10pt; word-break: break-all; }
+
+  /* 步驟條列 */
+  ol.steps { list-style: none; counter-reset: s; padding: 0; margin: 2mm 0 4mm; }
+  ol.steps > li { counter-increment: s; position: relative; padding: 0 0 3mm 11mm; break-inside: avoid; }
+  ol.steps > li::before { content: counter(s); position: absolute; left: 0; top: 0.4mm; width: 7.5mm; height: 7.5mm; border-radius: 50%; background: var(--ink); color: #fff; font-weight: 900; font-size: 10pt; display: flex; align-items: center; justify-content: center; }
+  ul { margin: 1mm 0 3mm; padding-left: 6mm; }
+  ul li { margin-bottom: 1mm; }
+
+  /* 提示框 */
+  .box { border: 0.5mm solid var(--ink); border-radius: 2.5mm; padding: 3mm 4mm 2mm 13mm; margin: 3mm 0 4mm; position: relative; break-inside: avoid; }
+  .box::before { position: absolute; left: 3.5mm; top: 2.6mm; font-size: 13pt; }
+  .box.tip { background: #eef8f2; border-color: var(--green); } .box.tip::before { content: "💡"; }
+  .box.warn { background: #fff4d6; border-color: #c99700; } .box.warn::before { content: "⚠️"; }
+  .box.stop { background: #fde9e9; border-color: var(--red); } .box.stop::before { content: "⛔"; }
+  .box.ok { background: #eef3ff; border-color: var(--blue); } .box.ok::before { content: "✅"; }
+  .box b:first-child { display: block; }
+
+  table { width: 100%; border-collapse: collapse; margin: 2mm 0 5mm; font-size: 10.5pt; break-inside: auto; }
+  th, td { border: 0.3mm solid #aaa; padding: 2mm 2.5mm; vertical-align: top; text-align: left; }
+  th { background: var(--cream); font-weight: 900; }
+  tr { break-inside: avoid; }
+  .dot { display: inline-block; width: 3mm; height: 3mm; border-radius: 50%; border: 0.4mm solid var(--ink); vertical-align: -0.3mm; margin-right: 1mm; }
+  .dot.g { background: var(--green); } .dot.y { background: var(--yellow); } .dot.r { background: var(--red); } .dot.n { background: #999; }
+
+  .toc { list-style: none; padding: 0; font-size: 12.5pt; }
+  .toc li { display: flex; border-bottom: 0.3mm dashed #bbb; padding: 2mm 0; }
+  .toc li span:first-child { width: 14mm; font-weight: 900; }
+  .toc li small { margin-left: auto; color: var(--soft); }
+  .check { list-style: none; padding: 0; }
+  .check li { padding-left: 8mm; position: relative; margin-bottom: 2mm; }
+  .check li::before { content: "☐"; position: absolute; left: 0; font-size: 13pt; line-height: 1.4; }
+  .two { display: flex; gap: 5mm; align-items: flex-start; }
+  .two > * { flex: 1; min-width: 0; }
+  .sheet { border-collapse: collapse; font-size: 9pt; width: auto; margin: 2mm auto 2mm; }
+  .sheet td, .sheet th { border: 0.3mm solid #999; padding: 1mm 2.5mm; text-align: center; }
+  .sheet .hl { background: var(--yellow); font-weight: 900; }
+</style>
+</head>
+<body>
+
+<!-- ======================= 封面 ======================= -->
+<section class="cover">
+  <div class="badge">忠誠點轉盤</div>
+  <h1>使用說明書</h1>
+  <p class="sub">觀眾兌換忠誠點 → 自動轉盤 → 自動記到 Google 試算表</p>
+  <div class="flow">
+    <div class="n">觀眾兌換<br>忠誠點品項<small>在 Twitch 聊天室</small></div><div class="a">→</div>
+    <div class="n">轉盤自動轉<small>你的網頁＋OBS 畫面</small></div><div class="a">→</div>
+    <div class="n">自動寫進<br>試算表<small>當月分頁、總表跟著更新</small></div>
+  </div>
+  <p>不用寫程式、不用懂網頁。照著做，第一次大約 15 分鐘，之後每次開台只要打開網頁。</p>
+  <p class="meta">網址：<span class="url">https://yy2401.github.io/lucky-wheel/twitch.html</span><br>2026 年 10 月版</p>
+</section>
+
+<!-- ======================= 目錄 ======================= -->
+<section class="chapter">
+  <h2>目錄</h2>
+  <ul class="toc">
+    <li><span>1</span>開始之前：你需要準備什麼<small>2 分鐘</small></li>
+    <li><span>2</span>它是怎麼運作的<small>先看懂，後面比較好做</small></li>
+    <li><span>3</span>打開網頁</li>
+    <li><span>4</span>設定步驟 1：連接 Twitch<small>1 分鐘</small></li>
+    <li><span>5</span>設定步驟 2：選擇要觸發轉盤的品項<small>2 分鐘</small></li>
+    <li><span>6</span>設定步驟 3：連接 Google 試算表<small>5～10 分鐘，最重要</small></li>
+    <li><span>7</span>設定步驟 4：轉盤內容（可略過）</li>
+    <li><span>8</span>設定步驟 5：放到 OBS 直播畫面（可略過）</li>
+    <li><span>9</span>直播畫面看懂了沒</li>
+    <li><span>10</span>每次開台要做的事</li>
+    <li><span>11</span>常用操作：手動補一筆、撤銷、試轉</li>
+    <li><span>12</span>出問題怎麼辦</li>
+    <li><span>13</span>名詞小抄</li>
+  </ul>
+  <div class="box tip"><b>怎麼看這份說明書</b>
+    <span class="k">像這樣的框</span> 代表畫面上的<b>按鈕</b>；<span class="k m">虛線框</span> 代表<b>選單裡的項目</b>；<span class="path">A → B → C</span> 代表依序點下去。⚠️ 是容易出錯的地方，請特別看一下。
+  </div>
+</section>
+
+<!-- ======================= 1 ======================= -->
+<section class="chapter">
+  <h2>1　開始之前：你需要準備什麼</h2>
+  <ul class="check">
+    <li><b>一台電腦</b>，用 <b>Google Chrome</b> 或 <b>Microsoft Edge</b> 瀏覽器。直播時這台電腦要開著這個網頁（通常就是你開台的那台電腦）。</li>
+    <li><b>你的 Twitch 實況主帳號</b>，而且頻道是<b>聯盟（Affiliate）或合作夥伴（Partner）</b>——這樣才有「忠誠點」功能。</li>
+    <li><b>你的轉盤紀錄試算表</b>，放在 Google 雲端硬碟（就是「常駐_揪團_抖內_忠誠點轉盤紀錄」那一份），以及能編輯它的 Google 帳號。</li>
+    <li>（可選）<b>OBS</b>：想讓觀眾在直播畫面上看到轉盤才需要。</li>
+  </ul>
+  <div class="box warn"><b>設定會存在「這台電腦的這個瀏覽器」裡</b>
+    換一台電腦、換瀏覽器，或清除了瀏覽器資料，就要重新設定一次（第 12 章有說明）。所以請在<b>平常開台的那台電腦</b>上設定。
+  </div>
+
+  </section>
+<section class="chapter">
+  <h2>2　它是怎麼運作的</h2>
+  <p>你只要開著「忠誠點轉盤」網頁，接下來全部自動：</p>
+  <ol class="steps">
+    <li>觀眾在 Twitch 用忠誠點兌換你指定的品項（例如「忠誠點轉盤」）。</li>
+    <li>網頁馬上收到通知，<b>自動轉一次轉盤</b>；有設定 OBS 的話，直播畫面上的轉盤也會同時轉。好幾個人一起兌換時會排隊，一個一個轉。</li>
+    <li>轉到的結果（例如「3點」）<b>自動寫進你的試算表</b>。</li>
+  </ol>
+  <h3>試算表會被改到哪裡？</h3>
+  <p>完全照你原本的試算表格式，不會新增奇怪的分頁：</p>
+  <ul>
+    <li>在<b>當月的分頁</b>（例如「10月」）找到<b>那位觀眾的那一列</b>、<b>兌換當天</b>底下<b>轉到的那一欄</b>（例如「3點」），把那格的數字 <b>+1</b>。</li>
+    <li>「總表」本來就是用公式從各月份加總的，所以<b>會自己更新</b>，不用動它。</li>
+    <li>如果是<b>第一次出現的觀眾</b>，會自動把他加進「兌換紀錄」分頁 B 欄名單的第一個空白列，格式跟你原本一樣：<code>顯示名稱(帳號)</code>。</li>
+  </ul>
+  <table class="sheet avoid">
+    <tr><th rowspan="2">編號</th><th rowspan="2">名稱</th><th colspan="3">10/3</th><th colspan="3">10/4（今天）</th></tr>
+    <tr><th>1點</th><th>3點</th><th>5點</th><th>1點</th><th>3點</th><th>5點</th></tr>
+    <tr><td>1</td><td>嘎唄(gabai)</td><td>1</td><td></td><td></td><td></td><td class="hl">1 → 2</td><td></td></tr>
+    <tr><td>2</td><td>HaruneUka(haruneuka)</td><td></td><td>2</td><td></td><td>1</td><td></td><td></td></tr>
+  </table>
+  <p class="cap">例：嘎唄今天又轉到「3點」，「10月」分頁 10/4 的「3點」那格從 1 變成 2</p>
+  <div class="box tip"><b>怎麼認出是哪位觀眾？</b>
+    用括號裡的 Twitch 帳號（英文那個）。觀眾改了中文顯示名稱也認得出來；名單裡只寫帳號、或只寫名字的舊資料也找得到。
+  </div>
+</section>
+
+<!-- ======================= 3 ======================= -->
+<section class="chapter">
+  <h2>3　打開網頁</h2>
+  <ol class="steps">
+    <li>打開 Chrome 或 Edge，在最上面的網址列輸入（或貼上）：<br><span class="url">https://yy2401.github.io/lucky-wheel/twitch.html</span>，按鍵盤的 <span class="k">Enter</span>。</li>
+    <li>建議<b>加入書籤</b>：按鍵盤 <span class="k">Ctrl</span>＋<span class="k">D</span> → <span class="k">完成</span>。以後從書籤列點一下就能打開。</li>
+    <li>第一次打開會看到「3 個步驟就能開始」，接下來照著第 4～8 章一步一步做。</li>
+  </ol>
+  <img class="shot w85" src="img/first-open.png">
+  <p class="cap">第一次打開的畫面。右上角三顆圓點是「狀態燈」，設定好會變綠色。</p>
+  <div class="box tip"><b>做到一半想休息？</b>
+    直接關掉沒關係，做好的步驟都會保存。下次打開會回到這個設定畫面，已完成的步驟會打勾 ✓。
+  </div>
+</section>
+
+<!-- ======================= 4 ======================= -->
+<section class="chapter">
+  <h2>4　設定步驟 1：連接 Twitch</h2>
+  <img class="shot w85" src="img/step1-before.png">
+  <ol class="steps">
+    <li>按紫色的 <span class="k p">連接 Twitch</span>。</li>
+    <li>畫面會跳到 Twitch 的網站。如果還沒登入，先用<b>你的實況主帳號</b>登入。</li>
+    <li>Twitch 會問你是否允許這個網頁「查看頻道點數兌換」，按 <span class="k p">授權</span>（Authorize）。</li>
+    <li>自動跳回轉盤網頁，步驟 1 會打勾，並顯示「已連接：你的名字」。</li>
+  </ol>
+  <img class="shot w85" src="img/step1-done.png">
+  <p class="cap">完成後的樣子</p>
+  <div class="box ok"><b>這個授權安全嗎？</b>
+    網頁只拿到「看得到忠誠點兌換」這一項權限，<b>不能</b>幫你發訊息、改標題、動你的頻道或忠誠點。想取消的話，到 Twitch 的「設定 → 連線」可以隨時中斷。
+  </div>
+  <div class="box warn"><b>登錯帳號了？</b>
+    按 <span class="k">換一個帳號</span> 重新登入。一定要用<b>有忠誠點的那個實況主帳號</b>，用小帳或觀眾帳號是收不到兌換的。
+  </div>
+</section>
+
+<!-- ======================= 5 ======================= -->
+<section class="chapter">
+  <h2>5　設定步驟 2：選擇要觸發轉盤的品項</h2>
+  <p>步驟 1 完成後，這裡會列出你頻道所有的忠誠點品項。<b>勾選</b>要觸發轉盤的那一個（可以勾好幾個），勾了就完成，不用另外按儲存。</p>
+  <img class="shot w85" src="img/step2-done.png">
+  <p class="cap">勾選「忠誠點轉盤」：觀眾兌換它才會轉；兌換「喝水」不會轉</p>
+
+  <h3>清單裡沒有我要的品項？先到 Twitch 新增一個</h3>
+  <ol class="steps">
+    <li>在 Twitch 網站右上角點你的<b>頭像</b> → <span class="k m">創作者工作台</span>。</li>
+    <li>左邊選單找到 <span class="k m">觀眾獎勵</span> → <span class="k m">忠誠點數</span>。</li>
+    <li>按 <span class="k m">管理獎勵與挑戰</span> → <span class="k p">＋ 新增自訂獎勵</span>。</li>
+    <li>名稱填例如「忠誠點轉盤」，設定要花多少點數，按 <span class="k p">建立</span>。</li>
+    <li>回到轉盤網頁，按 <span class="k">重新整理清單</span>，就會出現了，勾選它。</li>
+  </ol>
+  <div class="box tip"><b>Twitch 的選單名稱可能和這裡寫的有點不一樣</b>
+    Twitch 偶爾會改版，但大方向都是「創作者工作台 → 觀眾獎勵 → 忠誠點數」。找不到時在創作者工作台的搜尋欄打「獎勵」也可以。
+  </div>
+  <div class="box warn"><b>Twitch 上的「需要觀眾輸入文字」請不要勾</b>
+    不影響轉盤，但觀眾會多一個要打字的步驟。另外，網頁<b>不會</b>自動把兌換標成「已完成」，Twitch 的兌換佇列請照你原本的習慣處理（或把該獎勵設成「略過獎勵請求佇列」）。
+  </div>
+</section>
+
+<!-- ======================= 6 ======================= -->
+<section class="chapter">
+  <h2>6　設定步驟 3：連接 Google 試算表</h2>
+  <p>這一步是讓網頁「有權限」寫你的試算表。看起來步驟多，但<b>只要做一次</b>，而且每一步都只是點按鈕和複製貼上。</p>
+  <img class="shot w60" src="img/step3.png">
+  <p class="cap">網頁上的步驟 3。下面每一小步都對應網頁上的 1～5。</p>
+  <div class="box tip"><b>建議開兩個視窗</b>
+    一邊是轉盤網頁，一邊是 Google 試算表，來回切換比較方便（Windows：按住 <span class="k">Alt</span> 再按 <span class="k">Tab</span> 可以切換視窗）。
+  </div>
+
+  <h3>6-1　打開試算表的 Apps Script</h3>
+  <ol class="steps">
+    <li>到 Google 雲端硬碟，打開你的轉盤紀錄試算表（「常駐_揪團_抖內_忠誠點轉盤紀錄」）。</li>
+    <li>上方選單點 <span class="k m">擴充功能</span> → <span class="k m">Apps Script</span>。</li>
+    <li>會開一個新分頁，標題是「未命名的專案」，中間有一塊寫著 <code>function myFunction() { … }</code> 的編輯區。</li>
+  </ol>
+  <div class="box warn"><b>一定要從「這份試算表」裡面點 擴充功能 → Apps Script</b>
+    不要從 Google 雲端硬碟首頁另外新增 Apps Script，那樣程式不知道要寫哪一份試算表。
+  </div>
+
+  <h3>6-2　貼上程式碼</h3>
+  <ol class="steps">
+    <li>在 Apps Script 的編輯區裡點一下，按 <span class="k">Ctrl</span>＋<span class="k">A</span>（全選），再按 <span class="k">Delete</span>，把原本的字<b>全部刪掉</b>。</li>
+    <li>回到轉盤網頁，按步驟 3 裡黃色的 <span class="k y">複製程式碼</span>，按鈕會變成「✓ 已複製」。</li>
+    <li>回到 Apps Script 編輯區，按 <span class="k">Ctrl</span>＋<span class="k">V</span> 貼上。會出現一大段文字，開頭是「忠誠點轉盤 → Google 試算表 接收器」。</li>
+    <li>按上方的 <span class="k">💾 儲存專案</span>（磁碟片圖示），或按 <span class="k">Ctrl</span>＋<span class="k">S</span>。</li>
+  </ol>
+  <div class="box stop"><b>程式碼裡有一組「只屬於你的暗號」，請不要改它、也不要傳給別人</b>
+    這組暗號讓試算表只接受你的轉盤網頁寫入。程式碼裡其他文字也都不需要修改。
+  </div>
+</section>
+
+<section class="chapter">
+  <h3 style="margin-top:0">6-3　部署成「網頁應用程式」</h3>
+  <p>「部署」的意思是把剛剛貼的程式啟動起來，產生一個專屬網址讓轉盤網頁連過來。</p>
+  <ol class="steps">
+    <li>Apps Script 右上角按藍色的 <span class="k g">部署</span> → <span class="k m">新增部署作業</span>。</li>
+    <li>跳出的視窗左上方「選取類型」旁邊有一個<b>齒輪 ⚙</b>，點它 → 選 <span class="k m">網頁應用程式</span>。</li>
+    <li>右邊會出現幾個欄位，照這樣設定：
+      <table class="avoid" style="margin-top:2mm">
+        <tr><th style="width:34%">欄位</th><th>要選什麼</th></tr>
+        <tr><td>說明</td><td>可以不填（或填「轉盤」）</td></tr>
+        <tr><td>執行身分</td><td><b>我</b>（後面會顯示你的 Gmail）</td></tr>
+        <tr><td>誰可以存取</td><td><b>所有人</b>　⚠️ 最常選錯的地方，不是「只有我自己」也不是「擁有 Google 帳戶的使用者」</td></tr>
+      </table>
+    </li>
+    <li>按右下角的 <span class="k g">部署</span>。</li>
+  </ol>
+  <div class="box ok"><b>「所有人」是什麼意思？會不會被亂寫？</b>
+    意思是「不用登入 Google 也能連到這個程式」，這樣轉盤網頁才連得進來。但程式只接受帶有<b>你的暗號</b>的請求，別人就算拿到網址也寫不進去。
+  </div>
+
+  <h3>6-4　允許程式存取你的試算表（第一次才會問）</h3>
+  <ol class="steps">
+    <li>出現「網頁應用程式需要你授權存取你的資料」→ 按 <span class="k gw">授權存取</span>。</li>
+    <li>跳出小視窗，選擇<b>你的 Google 帳號</b>（擁有這份試算表的那一個）。</li>
+    <li>很可能會看到一個看起來很嚇人的畫面：<b>「Google 尚未驗證這個應用程式」</b>。這是正常的，請這樣做：
+      <ul>
+        <li>點左下角的小字 <span class="k m">進階</span>（Advanced）。</li>
+        <li>再點最下面的 <span class="k m">前往「未命名的專案」（不安全）</span>。</li>
+      </ul>
+    </li>
+    <li>列出程式要的權限（查看及管理你的試算表），按 <span class="k gw">允許</span>。</li>
+  </ol>
+  <div class="box ok"><b>為什麼 Google 說「不安全」？</b>
+    因為這段程式是<b>你自己剛剛建立的</b>，沒有送去給 Google 審核，Google 對所有沒審核的程式都會這樣提醒，並不是真的有危險。程式只會讀寫<b>這一份試算表</b>，不會看你的其他檔案或信件。
+  </div>
+  <div class="box warn"><b>如果點完「允許」小視窗就消失、沒看到網址</b>
+    回到 Apps Script，再按一次 <span class="k g">部署</span> → <span class="k m">新增部署作業</span>，設定一樣，這次就不會再問權限，直接給你網址。
+  </div>
+</section>
+
+<section class="chapter">
+  <h3 style="margin-top:0">6-5　複製網址，貼回轉盤網頁</h3>
+  <ol class="steps">
+    <li>部署成功的視窗會顯示「網頁應用程式」底下一串網址，長得像：<br><span class="url">https://script.google.com/macros/s/AKfycb……很長……/exec</span><br>按它旁邊的 <span class="k gw">複製</span>。</li>
+    <li>回到轉盤網頁步驟 3 的第 5 點，點一下輸入框，按 <span class="k">Ctrl</span>＋<span class="k">V</span> 貼上。</li>
+    <li>按 <span class="k y">測試連線</span>。</li>
+  </ol>
+
+  <h3>6-6　看測試結果</h3>
+  <p><b>成功</b>的話會出現綠色框，告訴你連到哪一份試算表、名單有幾個人、今天的結果會寫在哪幾欄。步驟 3 會打勾 ✓。</p>
+  <img class="shot" src="img/step3-ok.png">
+  <p class="cap">成功：今天（10/4）的結果會寫在「10月」分頁的 AA、AB、AC 欄</p>
+  <div class="box tip"><b>建議順手核對一下</b>
+    打開試算表的「10月」分頁，看看 10/4 底下的「1點／3點／5點」是不是真的在它說的那幾欄（欄名在最上面一排：A、B、C…AA、AB…）。對得上就沒問題了。
+  </div>
+  <p><b>失敗</b>的話會出現紅色框和原因，照下表處理：</p>
+  <table>
+    <tr><th style="width:42%">看到的訊息</th><th>怎麼辦</th></tr>
+    <tr><td>網址看起來不對／這是程式編輯器的網址</td><td>貼錯網址了。要貼的是部署完成視窗裡、結尾是 <code>/exec</code> 的那一串，<b>不是</b>瀏覽器網址列上的網址。可以到 Apps Script 按 <span class="k g">部署</span> → <span class="k m">管理部署作業</span> 找到它。</td></tr>
+    <tr><td>連不到試算表</td><td>多半是 6-3「誰可以存取」沒選「所有人」。到 <span class="k m">管理部署作業</span> → ✏️ 編輯 → 改成「所有人」→ 版本選「新版本」→ 部署。</td></tr>
+    <tr><td>暗號不符</td><td>貼到 Apps Script 的程式碼不是這台電腦複製的。重新做 6-2（複製、全刪、貼上、儲存），再到 <span class="k m">管理部署作業</span> → ✏️ 編輯 → 版本選「新版本」→ 部署。</td></tr>
+    <tr><td>找不到「兌換紀錄」分頁</td><td>程式是從別的試算表打開的，或分頁被改名了。確認 6-1 是從轉盤紀錄試算表裡點的。</td></tr>
+    <tr><td>找不到「10月」分頁／找不到 10/4 這一天</td><td>試算表還沒有這個月的分頁，或分頁第一排沒有這天的日期。照原本的格式補上（見第 12 章）。</td></tr>
+  </table>
+</section>
+
+<!-- ======================= 7 ======================= -->
+<section class="chapter">
+  <h2>7　設定步驟 4：轉盤內容（可略過）</h2>
+  <p>已經照你的試算表設好：<b>1點、3點、5點</b>三格。只有想調整機率或格子時才需要動。</p>
+  <img class="shot w75" src="img/step4.png">
+  <table>
+    <tr><th style="width:22%">欄位</th><th>意思</th></tr>
+    <tr><td>顏色</td><td>轉盤上這一格的顏色，點一下可以換。</td></tr>
+    <tr><td>名稱</td><td>轉盤上和結果顯示的文字。</td></tr>
+    <tr><td>權重</td><td>數字越大越容易轉到。機率＝這格的權重 ÷ 全部權重加起來。例如 50、30、20 → 50%、30%、20%（旁邊「機率」會自動算給你看）。</td></tr>
+    <tr><td>寫到哪一欄</td><td>轉到這格時，要在試算表每天底下的哪一欄 +1。要和試算表第二排的欄名<b>一模一樣</b>。</td></tr>
+  </table>
+  <ul>
+    <li>改了會立刻生效，不用按儲存。按 <span class="k">＋ 新增一格</span> 加格子、按 ✕ 刪除格子。</li>
+    <li>弄亂了按 <span class="k">恢復成 1 / 3 / 5 點</span>（恢復成 50%／30%／20%）。</li>
+  </ul>
+  <div class="box warn"><b>改了「寫到哪一欄」之後</b>
+    請回步驟 3 再按一次 <span class="k y">測試連線</span>，確認試算表裡找得到那一欄。
+  </div>
+  <h3>跨夜直播：凌晨幾點以前算前一天</h3>
+  <p>預設是「0 點（照日曆）」：凌晨 00:30 的兌換算在新的一天。如果你常常播過午夜，希望凌晨的兌換<b>算在開台那一天</b>，就改成例如「4 點」——凌晨 4 點以前的都算前一天。</p>
+</section>
+
+<!-- ======================= 8 ======================= -->
+<section class="chapter">
+  <h2>8　設定步驟 5：放到 OBS 直播畫面（可略過）</h2>
+  <p>做完這一步，觀眾在直播畫面上就看得到轉盤轉動和結果。<b>平常轉盤是隱藏的，有人兌換時才會出現</b>，轉完自己消失。</p>
+  <img class="shot w60" src="img/step5.png">
+  <ol class="steps">
+    <li>在轉盤網頁步驟 5 按 <span class="k y">複製 OBS 網址</span>。</li>
+    <li>打開 OBS，在下方「來源」區塊按 <span class="k">＋</span> → 選 <span class="k m">瀏覽器</span>（Browser）。</li>
+    <li>名稱填「忠誠點轉盤」→ <span class="k">確定</span>。</li>
+    <li>在「URL」欄位：先把裡面原本的網址刪掉，再按 <span class="k">Ctrl</span>＋<span class="k">V</span> 貼上剛剛複製的網址。</li>
+    <li>寬度填 <b>1280</b>、高度填 <b>720</b>，其他不用改，按 <span class="k">確定</span>。</li>
+    <li>回轉盤網頁按 <span class="k">測試 OBS</span>：OBS 畫面右下角的小圓點閃一下、轉盤網頁出現「OBS 畫面有回應 ✓」，就成功了。</li>
+  </ol>
+  <div class="two avoid" style="width:72%;margin:0 auto">
+    <div><img class="shot" src="img/obs-spin.png"><p class="cap">有人兌換：轉盤出現並轉動</p></div>
+    <div><img class="shot" src="img/obs-result.png"><p class="cap">轉完：顯示觀眾名稱和結果</p></div>
+  </div>
+  <p class="cap">（灰白格子代表透明，實際會疊在你的直播畫面上）</p>
+  <ul>
+    <li>在 OBS 預覽畫面可以拖曳、縮放這個來源，調到你喜歡的位置和大小。</li>
+    <li>「轉動秒數」「結果停留秒數」「音效」「音量」在步驟 5 下方調整，OBS 畫面會跟著變。</li>
+  </ul>
+  <div class="box warn"><b>OBS 的網址也是專屬的</b>
+    裡面也含有暗號，請不要公開。換電腦重新設定後，要重新複製一次 OBS 網址貼到 OBS。
+  </div>
+  <p>全部設定好後，按頁面最下面的 <span class="k y">完成，開始直播 →</span>。</p>
+  <img class="shot w45" src="img/finish.png">
+</section>
+
+<!-- ======================= 9 ======================= -->
+<section class="chapter">
+  <h2>9　直播畫面看懂了沒</h2>
+  <img class="shot w60" src="img/live-spinning.png">
+  <p class="cap">有人兌換時的直播畫面</p>
+  <table>
+    <tr><th style="width:26%">位置</th><th>說明</th></tr>
+    <tr><td>上方黃色條</td><td>現在在幫誰轉、他兌換了什麼品項。沒人兌換時顯示「等待兌換中…」。</td></tr>
+    <tr><td>中間轉盤</td><td>自動轉動，停下後下方顯示「某某 轉到 3點」。</td></tr>
+    <tr><td>右上「排隊中」</td><td>同時有好幾個人兌換時，還沒轉到的人會在這裡排隊，一個一個來。</td></tr>
+    <tr><td>右下「最近紀錄」</td><td>每一筆轉盤結果，以及有沒有寫進試算表（寫在哪一格）。</td></tr>
+    <tr><td>右上角 <span class="k">設定</span></td><td>隨時回到設定畫面；設定畫面右上角 <span class="k">直播畫面</span> 可以回來。</td></tr>
+  </table>
+  <h3>右上角三顆狀態燈</h3>
+  <img class="shot w45" src="img/pills-ok.png">
+  <table>
+    <tr><th style="width:30%">燈號</th><th>意思</th></tr>
+    <tr><td><span class="dot g"></span>綠色</td><td>正常。</td></tr>
+    <tr><td><span class="dot y"></span>黃色閃爍</td><td>正在連線或正在寫入，等幾秒通常就好。</td></tr>
+    <tr><td><span class="dot r"></span>紅色</td><td>有問題，畫面最上方會出現紅色提醒條和處理按鈕（見第 12 章）。</td></tr>
+    <tr><td><span class="dot n"></span>灰色</td><td>還沒設定。「OBS」燈是灰色不代表壞掉，只是網頁還沒收到 OBS 的回應；按步驟 5 的「測試 OBS」會變綠。</td></tr>
+  </table>
+  <p>點任何一顆燈，會直接跳到它的設定步驟。</p>
+  <h3>「最近紀錄」裡的狀態</h3>
+  <img class="shot w45" src="img/records.png">
+  <table>
+    <tr><th style="width:24%">狀態</th><th>意思</th></tr>
+    <tr><td style="color:var(--green);font-weight:700">已寫入</td><td>已經寫進試算表，後面是寫入的格子（例如 10月!AB3 = 「10月」分頁 AB 欄第 3 列）。「新觀眾已加入名單」表示這位觀眾第一次出現，已加進名單。</td></tr>
+    <tr><td style="color:var(--blue);font-weight:700">寫入中…</td><td>正在寫，通常 1～3 秒。</td></tr>
+    <tr><td style="color:var(--red);font-weight:700">寫入失敗</td><td>後面會寫原因，旁邊有 <span class="k">重試</span>。</td></tr>
+    <tr><td>已撤銷（刪除線）</td><td>按過「撤銷」，試算表已經減回去。</td></tr>
+    <tr><td>試轉（刪除線）</td><td>按「試轉」轉的，沒有寫進試算表。</td></tr>
+  </table>
+</section>
+
+<!-- ======================= 10 ======================= -->
+<section class="chapter">
+  <h2>10　每次開台要做的事</h2>
+  <ol class="steps">
+    <li>用書籤打開忠誠點轉盤網頁（會自動連線，不用重新設定）。</li>
+    <li>看右上角：<b>Twitch</b> 和 <b>試算表</b> 兩顆燈是綠色的。</li>
+    <li>（有用 OBS 的話）開 OBS。想確認的話按 <span class="k">設定</span> → 步驟 5 的 <span class="k">測試 OBS</span>。</li>
+    <li>開台！之後不用管它。</li>
+  </ol>
+  <div class="box stop"><b>直播時不要關掉這個網頁</b>
+    網頁關掉就收不到兌換了。可以把它<b>縮小</b>或切到別的分頁，沒關係。也請把電腦的<b>自動睡眠</b>關掉（Windows：設定 → 系統 → 電源 → 螢幕與睡眠，設成「永不」）。
+  </div>
+  <div class="box warn"><b>同一個網頁只能開一個分頁</b>
+    不小心開了兩個，第二個會顯示「這個網頁已經在另一個分頁開著」並暫停，避免同一筆兌換轉兩次。回到原本的分頁就好；或在新分頁按「改由這個分頁接手」。
+  </div>
+  <div class="box tip"><b>關台後</b>
+    等「最近紀錄」裡沒有「寫入中…」再關網頁。還有沒寫完的紀錄時，關網頁會跳出「確定要離開？」提醒你。真的關了也不要緊：紀錄存在瀏覽器裡，下次打開會自動補寫。
+  </div>
+  <div class="box ok"><b>網路斷線或試算表暫時連不上？</b>
+    不用緊張，轉盤照樣轉，結果先存在網頁裡，網頁會<b>每隔一段時間自動重試</b>，連上後自動補寫。Twitch 斷線也會自動重新連線。
+  </div>
+</section>
+
+<!-- ======================= 11 ======================= -->
+<section class="chapter">
+  <h2>11　常用操作</h2>
+  <h3>手動補一筆（漏掉的兌換）</h3>
+  <p>例如網頁沒開的時候有人兌換了，可以手動補：</p>
+  <ol class="steps">
+    <li>直播畫面按 <span class="k">＋ 手動補一筆</span>。</li>
+    <li>輸入觀眾名稱，下面三種寫法都可以：<code>小于甜心 (xiaoyuthesweetheart_)</code>、<code>xiaoyuthesweetheart_</code>（帳號）、或試算表名單裡的名稱。</li>
+    <li>按 <span class="k y">轉！</span>，會轉一次並寫進試算表。</li>
+  </ol>
+  <img class="shot w60" src="img/manual-add.png">
+  <div class="box warn"><b>補登會記在「今天」</b>
+    如果是前幾天漏掉的，又想記在當天，請直接打開試算表，在那天那一格手動 +1。
+  </div>
+
+  <h3>撤銷（記錯了、要作廢）</h3>
+  <ol class="steps">
+    <li>在「最近紀錄」找到那一筆，按旁邊的 <span class="k">撤銷</span>。</li>
+    <li>確認視窗按 <span class="k" style="background:var(--red);color:#fff">撤銷</span>，試算表那格會 −1，紀錄變成「已撤銷」。</li>
+  </ol>
+  <img class="shot w60" src="img/undo.png">
+  <p>撤銷<b>不會</b>退還觀眾在 Twitch 的忠誠點，要退的話請在 Twitch 的兌換佇列裡處理。</p>
+
+  <h3>試轉（不記錄）</h3>
+  <p>按 <span class="k">試轉（不記錄）</span> 會轉一次給你看，<b>不會</b>寫進試算表。適合開台前確認轉盤、OBS 畫面正常。</p>
+</section>
+
+<!-- ======================= 12 ======================= -->
+<section class="chapter">
+  <h2>12　出問題怎麼辦</h2>
+  <p>出問題時，畫面最上方會出現<b>紅色提醒條</b>，通常直接按提醒條右邊的按鈕就能解決。</p>
+
+  <h3>「Twitch 登入過期了」</h3>
+  <img class="shot" src="img/alert-twitch.png">
+  <p>Twitch 的登入每隔一段時間會失效，這是正常的。按 <span class="k">重新連接 Twitch</span>，照第 4 章再授權一次就好。<b>排隊中的兌換和紀錄都不會不見</b>，但過期期間有人兌換的話網頁收不到，請用「手動補一筆」補上。</p>
+
+  <h3>「有 N 筆沒寫進試算表」</h3>
+  <img class="shot" src="img/alert-row-error.png">
+  <p>看紀錄後面寫的原因：</p>
+  <table>
+    <tr><th style="width:38%">原因</th><th>怎麼辦</th></tr>
+    <tr><td>找不到「11月」分頁</td><td>試算表還沒有這個月的分頁。在試算表下方的分頁標籤上，對上個月（例如「10月」）按右鍵 → <span class="k m">複製</span>，把新分頁改名成「11月」，第一排的日期改成 11 月的日期、把各天的數字清掉（只清每天的數字，不要刪掉「當月總結」的公式）。然後回網頁按 <span class="k">全部重新寫入</span>。</td></tr>
+    <tr><td>找不到 11/1 這一天</td><td>月份分頁第一排的日期不對或缺了這天，補上後按 <span class="k">重試</span>。</td></tr>
+    <tr><td>找不到「3點」欄</td><td>試算表那天底下的欄名和步驟 4「寫到哪一欄」不一樣，改成一樣後按 <span class="k">重試</span>。</td></tr>
+    <tr><td>……是公式，不敢覆蓋</td><td>那一格裡是公式，網頁不會亂改。檢查一下試算表那格為什麼是公式。</td></tr>
+    <tr><td>暗號不符</td><td>見第 6-6 節表格。</td></tr>
+  </table>
+
+  <h3>「試算表寫入失敗：連不到試算表」</h3>
+  <p>通常是網路暫時不穩，網頁會自動重試，等一下就好；也可以按 <span class="k">立刻重試</span>。一直不好的話，回設定步驟 3 按 <span class="k y">測試連線</span> 看原因。</p>
+
+  <h3>其他常見問題</h3>
+  <table>
+    <tr><th style="width:38%">狀況</th><th>怎麼辦</th></tr>
+    <tr><td>觀眾兌換了，轉盤沒轉</td><td>① 看 Twitch 燈是不是綠色；② 設定步驟 2 有沒有勾到觀眾兌換的那個品項；③ 網頁是不是開著（且不是「另一個分頁開著」的暫停畫面）。</td></tr>
+    <tr><td>網頁有轉，OBS 畫面沒出現</td><td>① 設定步驟 5 按「測試 OBS」，看 OBS 右下角小圓點有沒有閃；② 確認 OBS 裡的網址是最新複製的；③ 在 OBS 對該來源按右鍵 → <span class="k m">內容</span> → 最下面 <span class="k">重新整理目前頁面的快取</span>。</td></tr>
+    <tr><td>OBS 右下角小圓點是紅色</td><td>OBS 網址不完整或是舊的，重新複製 OBS 網址貼上。</td></tr>
+    <tr><td>觀眾改了名字</td><td>不影響，網頁用 Twitch 帳號找人。試算表上的名稱不會自動改，想改可以自己改，但<b>括號裡的帳號請保留</b>。</td></tr>
+    <tr><td>同一個人在名單上出現兩次</td><td>可能舊資料的帳號拼錯了。把兩列合併成一列（括號裡寫正確的 Twitch 帳號）即可。</td></tr>
+    <tr><td>名單 999 人滿了</td><td>新觀眾會接在最後一列之後，但月份分頁和總表沒有那一列的公式。請照原本的方式往下多拉幾列公式。</td></tr>
+    <tr><td>換電腦／換瀏覽器／清了瀏覽器資料</td><td>要重做設定步驟 1～5。⚠️ 步驟 3 一定要用<b>新電腦</b>按「複製程式碼」，貼到 Apps Script 取代舊的、儲存，再 <span class="k g">部署</span> → <span class="k m">管理部署作業</span> → ✏️ 編輯 → 版本選 <span class="k m">新版本</span> → <span class="k g">部署</span>（網址不會變）。OBS 網址也要重新複製。</td></tr>
+    <tr><td>新的一年換了一份新的試算表</td><td>在新的試算表上重做第 6 章（會得到新的網址），貼到步驟 3 測試連線。</td></tr>
+    <tr><td>想確認到底有沒有寫進去</td><td>「最近紀錄」每一筆後面都寫了格子位置（例如 10月!AB3），到試算表對應分頁的那一格看就知道。</td></tr>
+  </table>
+  <div class="box tip"><b>還是解決不了？</b>
+    把畫面最上方紅色提醒條的文字，或「最近紀錄」那筆後面寫的原因，截圖給幫你架設的人看，他就能知道是哪裡出問題。
+  </div>
+</section>
+
+<!-- ======================= 13 ======================= -->
+<section class="chapter">
+  <h2>13　名詞小抄</h2>
+  <table>
+    <tr><th style="width:26%">名詞</th><th>白話解釋</th></tr>
+    <tr><td>忠誠點／忠誠點品項</td><td>Twitch 觀眾看台累積的頻道點數；「品項」是你設定讓觀眾用點數兌換的東西（例如「忠誠點轉盤」）。</td></tr>
+    <tr><td>授權</td><td>允許某個網頁使用你帳號的某些功能。這裡只允許「看得到忠誠點兌換」。</td></tr>
+    <tr><td>Apps Script</td><td>Google 試算表內建的小程式功能。我們把一段程式貼進去，讓它幫忙寫試算表。</td></tr>
+    <tr><td>部署</td><td>把 Apps Script 的程式「啟動」起來，並產生一個專屬網址。</td></tr>
+    <tr><td>網頁應用程式網址</td><td>部署後拿到、結尾是 <code>/exec</code> 的那串網址，轉盤網頁靠它把結果送進試算表。</td></tr>
+    <tr><td>暗號</td><td>寫在程式碼和網頁裡的一串密碼，用來確認寫入的確實是你的轉盤網頁。</td></tr>
+    <tr><td>分頁</td><td>試算表下方的標籤，例如「總表」「兌換紀錄」「10月」。</td></tr>
+    <tr><td>欄／列</td><td>欄是直的（用英文字母 A、B…AA、AB 表示），列是橫的（用數字 1、2、3 表示）。「10月!AB3」＝「10月」分頁的 AB 欄第 3 列。</td></tr>
+    <tr><td>OBS 瀏覽器來源</td><td>OBS 裡可以顯示網頁的來源，用來把轉盤疊在直播畫面上。</td></tr>
+    <tr><td>權重</td><td>決定每一格被轉到機會大小的數字，越大越容易轉到。</td></tr>
+  </table>
+  <div class="box ok" style="margin-top:8mm"><b>一頁總結</b>
+    設定一次：連 Twitch → 勾品項 → 把程式碼貼進試算表的 Apps Script 並部署 → 網址貼回來測試 →（可選）OBS。<br>
+    每次開台：打開網頁、看燈是綠的、不要關網頁。<br>
+    有紅色提醒：按提醒條上的按鈕。
+  </div>
+</section>
+
+</body>
+</html>
