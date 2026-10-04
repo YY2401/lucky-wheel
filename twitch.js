@@ -7,7 +7,7 @@
   const T = TwitchCore;
 
   // 網站管理者到 dev.twitch.tv 註冊應用程式後填入（公開資訊，不是密碼）。使用者也可在步驟 1「進階」自填
-  const BUILTIN_CLIENT_ID = '';
+  const BUILTIN_CLIENT_ID = 'owgfsq6jkw61bh7l7cvtbmkfjvbfhf';
   const REDEEM_TYPE = 'channel.channel_points_custom_reward_redemption.add';
   const K = { config: 'tw.config', records: 'tw.records', queue: 'tw.queue', auth: 'tw.auth' };
   const MAX_RECORDS = 1000;
