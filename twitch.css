@@ -24,6 +24,34 @@ body.tw { --twitch: #9146ff; }
 }
 .tw-alert .btn { padding: 5px 14px; }
 
+/* ---------- 已搬到 OBS ---------- */
+.tw-moved { position: relative; z-index: 2; display: flex; align-items: center; justify-content: center; gap: 14px; flex-wrap: wrap; padding: 14px 22px; background: var(--blue); color: #fff; border-bottom: var(--border-w) solid var(--ink); }
+.tw-moved .btn { padding: 5px 14px; }
+
+/* ---------- 放在 OBS 面板裡（窄）：只留狀態、目前轉到誰、排隊與紀錄 ---------- */
+body.dock { font-size: 14px; }
+body.dock .topbar { padding: 8px 10px; position: relative; flex-direction: column; align-items: stretch; gap: 8px; }
+body.dock .brand .logo { font-size: 15px; padding: 2px 8px; }
+body.dock .topbar-right { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+body.dock .topbar-right .btn { padding: 6px 4px; font-size: 13px; }
+body.dock .topbar-right .btn:not(#openGuide) { grid-column: span 2; }
+body.dock .tw-pill { justify-content: center; padding: 5px 4px; font-size: 11.5px; white-space: normal; text-align: center; line-height: 1.2; }
+body.dock .tw-alert { position: relative; top: 0; padding: 8px 10px; font-size: 13px; }
+body.dock .tw-live { grid-template-columns: 1fr; padding: 10px; gap: 12px; }
+body.dock .tw-stage { gap: 10px; }
+body.dock .tw-stage .wheel-wrap { width: min(100%, 220px); min-width: 0; margin: 14px 0; }
+body.dock .tw-now { font-size: 14px; min-height: 40px; padding: 6px 14px; }
+body.dock .tw-now-who { font-size: 16px; }
+body.dock .tw-last { font-size: 15px; padding: 6px 12px; }
+body.dock .tw-last b { font-size: 18px; }
+body.dock .tw-box { padding: 10px 12px; }
+body.dock .tw-setup { padding: 14px 10px 40px; }
+body.dock .tw-step { flex-direction: column; padding: 14px; gap: 8px; }
+body.dock .tw-step-num { width: 32px; height: 32px; font-size: 15px; }
+body.dock .tw-setup-head h1 { font-size: 22px; }
+body.dock .tw-row input { min-width: 0; width: 100%; }
+body.dock #bg { display: none; }
+
 /* ---------- 設定 ---------- */
 .tw-setup { position: relative; z-index: 1; max-width: 880px; margin: 0 auto; padding: 28px 18px 60px; }
 .tw-setup-head h1 { margin: 0 0 4px; font-size: 30px; font-weight: 900; }

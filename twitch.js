@@ -26,7 +26,28 @@
   const saveAuth = () => Store.set(K.auth, auth);
   saveCfg(); // 第一次開啟時把產生的暗號、頻道代碼存下來
 
+  // 放在 OBS 自訂瀏覽器停駐視窗裡：網址帶 ?dock=1（登入 Twitch 回來網址會變，所以記在 sessionStorage）
+  const isDock = (() => {
+    let v = new URLSearchParams(location.search).get('dock') === '1' || !!window.obsstudio;
+    try { if (v) sessionStorage.setItem('tw.dock', '1'); else v = sessionStorage.getItem('tw.dock') === '1'; } catch { /* ignore */ }
+    return v;
+  })();
+  document.body.classList.toggle('dock', isDock);
   const redirectUri = () => `${location.origin}${location.pathname}`;
+
+  // 複製文字：OBS 面板或沒有權限時剪貼簿可能不能用，退回舊方法，再不行就顯示出來讓人手動複製
+  async function copyText(text, label) {
+    try { await navigator.clipboard.writeText(text); return true; } catch { /* 改用舊方法 */ }
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text; ta.setAttribute('readonly', ''); ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+      document.body.appendChild(ta); ta.select();
+      const ok = document.execCommand('copy'); ta.remove();
+      if (ok) return true;
+    } catch { /* 顯示出來 */ }
+    await dialog({ title: `請手動複製${label}`, message: '點下面的框，按 Ctrl+A 全選，再按 Ctrl+C 複製：', textarea: text, okLabel: '好了' });
+    return false;
+  }
   const clientId = () => cfg.clientId || BUILTIN_CLIENT_ID;
   const fmtTime = (iso) => { const d = new Date(iso); return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
   const corePrizes = () => cfg.prizes.map((p, i) => normalizePrize({ id: p.id, name: p.name, weight: p.weight, color: p.color, quantity: -1 }, i));
@@ -57,7 +78,7 @@
   const wheel = new Wheel($('#wheel'), { onTick: (s) => Sfx.tick(s) });
   function updateWheel() {
     wheel.setPrizes(corePrizes(), 'weight', 0.04);
-    Sfx.enabled = cfg.sound; Sfx.volume = cfg.volume / 100;
+    Sfx.enabled = cfg.sound && !isDock; Sfx.volume = cfg.volume / 100; // OBS 面板不出聲：OBS 畫面那邊已經有音效，避免被桌面音訊錄成兩次
   }
 
   // ---------- OBS 覆蓋層（沿用主轉盤的 index.html?overlay=1） ----------
@@ -234,6 +255,7 @@
     async start() {
       clearTimeout(this.retryTimer);
       if (!auth || !auth.token) { this.setState('off'); return; }
+      if (cfg.movedToObs && !isDock) { this.setState('off', '已搬到 OBS 面板，這個分頁不接收兌換'); return; }
       const ok = await this.validate();
       if (ok === null) { this.scheduleRetry(); return; }
       if (!ok) return;
@@ -347,7 +369,7 @@
     kick(ms = 0) { clearTimeout(this.timer); this.timer = setTimeout(() => this.run(), ms); },
     async run() {
       if (this.busy || !leader) return;
-      if (!auth || !auth.userId || !Twitch.canManage || Twitch.state === 'expired') { this.kick(60000); return; }
+      if (!auth || !auth.userId || !Twitch.canManage || Twitch.state === 'expired' || (cfg.movedToObs && !isDock)) { this.kick(60000); return; }
       this.busy = true;
       let fail = false;
       try {
@@ -374,7 +396,7 @@
   let spinning = false;
   let leader = false; // 拿到分頁鎖之後才開始轉盤
   async function pump() {
-    if (spinning || !leader) return;
+    if (spinning || !leader || (cfg.movedToObs && !isDock)) return;
     spinning = true;
     try {
       while (queue.length) {
@@ -401,7 +423,8 @@
     $('#nowBanner').classList.add('active');
     $('#lastResult').classList.add('hidden');
     Sync.send({ type: 'spin', batchId: rec.id, batchType: '', count: 1, player: who, results: [{ rid: rec.id, index: 1, prizeId: rec.prizeId, name: rec.prize, image: '', color: rec.color, tier }], prizes: overlayConfig().prizes, reveal: 'flip', pity: '', countdown: 0 });
-    await wheel.spinTo(rec.prizeId, { duration: cfg.spinDuration, turns: cfg.turns });
+    // 視窗縮小或分頁在背景時瀏覽器會暫停動畫，spinTo 不會結束；用時間保底，排隊才不會卡住
+    await Promise.race([wheel.spinTo(rec.prizeId, { duration: cfg.spinDuration, turns: cfg.turns }), wait(cfg.spinDuration + 800)]);
     if (tier === 'big') Sfx.fanfare(); else Sfx.win();
     wheel.focus(1400);
     const last = $('#lastResult');
@@ -524,12 +547,13 @@
       1: Twitch.state === 'online' || (!!auth && !!auth.userId && Twitch.state !== 'expired' && Twitch.state !== 'error'),
       2: cfg.rewardIds.length > 0,
       3: !!cfg.scriptUrl && cfg.sheetOk === cfg.scriptUrl,
+      6: isDock || cfg.movedToObs,
     };
   }
   function renderSetup() {
     renderCreate();
     const done = stepDone();
-    [1, 2, 3].forEach((n) => $(`#step${n}`).classList.toggle('done', done[n]));
+    [1, 2, 3, 6].forEach((n) => $(`#step${n}`).classList.toggle('done', done[n]));
     const signedIn = !!(auth && auth.userId);
     $('#twOff').classList.toggle('hidden', signedIn);
     $('#twOn').classList.toggle('hidden', !signedIn);
@@ -590,8 +614,7 @@
   $('#copyScript').onclick = async () => {
     try {
       if (!scriptSrc) { const r = await fetch('sheet-script.gs', { cache: 'no-cache' }); if (!r.ok) throw new Error(r.status); scriptSrc = await r.text(); }
-      await navigator.clipboard.writeText(T.scriptWithKey(scriptSrc, cfg.sheetKey));
-      toast('已複製！到 Apps Script 編輯區按 Ctrl+V 貼上');
+      if (await copyText(T.scriptWithKey(scriptSrc, cfg.sheetKey), '程式碼')) toast('已複製！到 Apps Script 編輯區按 Ctrl+V 貼上');
       $('#copyScript').textContent = '✓ 已複製（再按一次可重新複製）';
     } catch (e) { toast(`複製失敗：${e.message}`, 6000); }
   };
@@ -661,7 +684,32 @@
   $('#cutoffHour').onchange = () => { cfg.cutoffHour = Number($('#cutoffHour').value); saveCfg(); };
 
   // 步驟 5：OBS
-  $('#copyObs').onclick = async () => { try { await navigator.clipboard.writeText(obsUrl()); toast('已複製 OBS 網址'); } catch { await dialog({ title: 'OBS 網址', message: '請手動複製：', input: obsUrl() }); } };
+  $('#copyObs').onclick = async () => { if (await copyText(obsUrl(), ' OBS 網址')) toast('已複製 OBS 網址'); };
+
+  // 步驟 6：搬到 OBS 面板
+  function dockUrl() {
+    const base = location.href.split(/[?#]/)[0];
+    return `${base}?dock=1#move=${T.encodeMove(T.buildMove(cfg, records))}`;
+  }
+  $('#copyDock').onclick = async () => {
+    if (queue.length) { toast('還有人在排隊，等轉完再搬', 5000); return; }
+    if (!(await copyText(dockUrl(), ' OBS 面板網址'))) { /* 手動複製也算 */ }
+    if (!(await dialog({ title: '貼到 OBS 了嗎？', message: '照下面第 2～4 步貼到 OBS 的「自訂瀏覽器停駐視窗」。貼好、在 OBS 面板裡看到設定都在之後按「搬好了」，這個分頁就會停止接收兌換。', okLabel: '搬好了' }))) return;
+    cfg.movedToObs = true; saveCfg();
+    Twitch.stop(); Twitch.setState('off');
+    renderMoved(); renderSetup(); renderStatus();
+  };
+  $('#unmove').onclick = async () => {
+    if (!(await dialog({ title: '改回在這個瀏覽器使用？', message: '請先把 OBS 裡的「忠誠點轉盤」面板關掉或刪掉，不然兩邊會同時轉盤。', okLabel: '改回這裡' }))) return;
+    cfg.movedToObs = false; saveCfg(); renderMoved(); renderSetup();
+    Twitch.start().then(() => { renderSetup(); renderStatus(); });
+  };
+  function renderMoved() {
+    const moved = cfg.movedToObs && !isDock;
+    $('#movedBanner').classList.toggle('hidden', !moved);
+    $('#dockHere').classList.toggle('hidden', !isDock);
+    $('#dockHow').classList.toggle('hidden', isDock);
+  }
   $('#pingObs').onclick = () => { Sync.send({ type: 'ping' }); toast('已送出測試訊號：OBS 畫面右下的小圓點會閃一下'); };
   $('#spinSeconds').value = cfg.spinDuration / 1000;
   $('#resultSeconds').value = cfg.resultSeconds;
@@ -704,10 +752,24 @@
   });
 
   // ---------- 啟動 ----------
+  {
+    const h = new URLSearchParams(location.hash.slice(1));
+    const code = h.get('move');
+    if (code) {
+      const res = T.applyMove(cfg, records, T.decodeMove(code));
+      if (res) {
+        cfg = res.cfg; records.push(...res.add); saveCfg(); saveRecords();
+        setTimeout(() => toast('已從瀏覽器搬入設定：試算表、品項、轉盤都設定好了，只要在這裡連接 Twitch 一次', 8000), 600);
+      }
+      history.replaceState(null, '', location.href.split('#')[0]); // 網址列不留設定（OBS 每次開都會用原本的網址，同一份只匯入一次）
+    }
+  }
   Twitch.takeRedirect();
   setTheme(cfg.theme);
   updateWheel();
   $('#scriptUrl').value = cfg.scriptUrl;
+  $('#clientId').value = cfg.clientId;
+  renderMoved();
   renderQueue(); renderRecords(); renderStatus();
   if (cfg.setupDone && !Twitch.error) showLive(); else showSetup();
 

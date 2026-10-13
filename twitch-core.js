@@ -25,6 +25,8 @@
     spinDuration: 5000, turns: 6, resultSeconds: 6, sound: true, volume: 70, theme: 'light',
     room: '', secret: '', sync: true, broker: 'wss://broker.emqx.io:8084/mqtt',
     setupDone: false,
+    movedToObs: false, // 設定已搬到 OBS 面板：這裡不再接收兌換（避免兩邊同時轉）
+    importedIds: [], // 已經匯入過的搬家碼（OBS 每次重開都會帶同一個網址，不能重複匯入）
   };
 
   const clampInt = (v, lo, hi, fb) => { const n = Math.trunc(Number(v)); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : fb; };
@@ -60,6 +62,8 @@
     cfg.sync = cfg.sync !== false;
     cfg.broker = /^wss?:\/\//.test(cfg.broker || '') ? cfg.broker : DEFAULT_TW.broker;
     cfg.setupDone = cfg.setupDone === true;
+    cfg.movedToObs = cfg.movedToObs === true;
+    cfg.importedIds = Array.isArray(cfg.importedIds) ? cfg.importedIds.map(String).slice(-20) : [];
     return cfg;
   }
 
@@ -139,5 +143,43 @@
   // 只有原始碼裡的 '__KEY__' 會被換掉
   const scriptWithKey = (src, key) => String(src).replace("const KEY = '__KEY__';", `const KEY = '${key}';`);
 
-  return { SHEET_COLUMNS, DEFAULT_PRIZES, DEFAULT_TW, HOLD_MS, normalizeTwPrize, normalizeTwConfig, parseViewer, dayKey, makeRecord, forSheet, viewerLabel, scriptWithKey, dueTwitchUpdates, nextHoldExpiry, missedRedemptions };
+  // ---------- 搬到 OBS 面板：把設定和還在可退點期的紀錄包進網址（# 後面，不會送到伺服器） ----------
+  // 不搬 Twitch 登入（在 OBS 面板裡重新連接一次）、不搬一般紀錄（留在原本的瀏覽器）
+  const MOVE_KEYS = ['clientId', 'rewardIds', 'scriptUrl', 'sheetKey', 'sheetOk', 'cutoffHour', 'prizes', 'spinDuration', 'turns', 'resultSeconds', 'sound', 'volume', 'theme', 'room', 'secret', 'sync', 'broker', 'setupDone'];
+  function buildMove(cfg, records, now = Date.now()) {
+    const c = {};
+    MOVE_KEYS.forEach((k) => { c[k] = cfg[k]; });
+    // 還在可退點期的：OBS 面板要接手「期滿標完成」與「退點」，也要知道它們轉過了，補抓時才不會再列出來
+    const hold = records.filter((r) => r.tw === 'hold' || r.tw === 'to-cancel');
+    return { v: 1, mid: `${now.toString(36)}${randId(6)}`, cfg: c, hold };
+  }
+  const b64urlEncode = (str) => {
+    const bytes = new TextEncoder().encode(str);
+    let bin = ''; bytes.forEach((b) => { bin += String.fromCharCode(b); });
+    return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  };
+  const b64urlDecode = (s) => {
+    const bin = atob(String(s).replace(/-/g, '+').replace(/_/g, '/'));
+    return new TextDecoder().decode(Uint8Array.from(bin, (ch) => ch.charCodeAt(0)));
+  };
+  const encodeMove = (payload) => b64urlEncode(JSON.stringify(payload));
+  // 壞掉或不是我們的資料回 null
+  function decodeMove(str) {
+    try {
+      const p = JSON.parse(b64urlDecode(str));
+      if (!p || p.v !== 1 || !p.mid || !p.cfg || typeof p.cfg !== 'object') return null;
+      return { v: 1, mid: String(p.mid), cfg: p.cfg, hold: Array.isArray(p.hold) ? p.hold.filter((r) => r && r.id) : [] };
+    } catch { return null; }
+  }
+  // 套用搬家碼：回傳新的設定與要補進紀錄的項目；同一個搬家碼只套用一次
+  function applyMove(cfg, records, payload) {
+    if (!payload || cfg.importedIds.includes(payload.mid)) return null;
+    const picked = {};
+    MOVE_KEYS.forEach((k) => { if (k in payload.cfg) picked[k] = payload.cfg[k]; });
+    const next = normalizeTwConfig({ ...cfg, ...picked, movedToObs: false, importedIds: [...cfg.importedIds, payload.mid] });
+    const have = new Set(records.map((r) => r.id));
+    return { cfg: next, add: payload.hold.filter((r) => !have.has(r.id)) };
+  }
+
+  return { SHEET_COLUMNS, buildMove, encodeMove, decodeMove, applyMove, DEFAULT_PRIZES, DEFAULT_TW, HOLD_MS, normalizeTwPrize, normalizeTwConfig, parseViewer, dayKey, makeRecord, forSheet, viewerLabel, scriptWithKey, dueTwitchUpdates, nextHoldExpiry, missedRedemptions };
 });

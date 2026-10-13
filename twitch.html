@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>忠誠點轉盤</title>
-<meta name="app-version" content="56">
+<meta name="app-version" content="57">
 <script>try { document.documentElement.dataset.theme = localStorage.getItem('tw.theme') || 'light'; } catch (e) { document.documentElement.dataset.theme = 'light'; }</script>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=56">
-<link rel="stylesheet" href="twitch.css?v=56">
+<link rel="stylesheet" href="style.css?v=57">
+<link rel="stylesheet" href="twitch.css?v=57">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.1/mqtt.min.js"></script>
 </head>
 <body class="tw">
@@ -31,6 +31,10 @@
   </div>
 </header>
 
+<div class="tw-moved hidden" id="movedBanner">
+  <div><b>已經搬到 OBS 面板了</b>：這個分頁不再接收兌換，避免和 OBS 裡的面板同時轉盤。可以關掉這個分頁。</div>
+  <button class="btn" id="unmove">改回在這裡使用</button>
+</div>
 <div class="tw-alert hidden" id="alert"><span id="alertText"></span><button class="btn" id="alertBtn"></button></div>
 
 <!-- ===== 設定（第一次自動打開；完成後可從右上「設定」回來） ===== -->
@@ -95,7 +99,7 @@
         <li>在 Google 雲端硬碟打開你的轉盤紀錄試算表，上方選單按 <b>擴充功能 → Apps Script</b>。</li>
         <li>把編輯區裡原本的字<b>全部刪掉</b>，按這個按鈕複製程式碼後貼上，再按上方的 <b>💾 儲存</b>。<br><button class="btn primary" id="copyScript">複製程式碼</button> <small class="hint">（程式碼裡含有只屬於你的暗號）</small></li>
         <li>按右上角藍色的 <b>部署 → 新增部署作業</b>，左邊齒輪選 <b>網頁應用程式</b>；「執行身分」選<b>我</b>、「誰可以存取」選<b>所有人</b>，按 <b>部署</b>。</li>
-        <li>Google 會要求授權：按 <b>授予存取權</b> → 選你的帳號。如果出現「Google 尚未驗證這個應用程式」，按左下的 <b>進階</b> → <b>前往…（不安全）</b> → <b>允許</b>。
+        <li>Google 會要求授權：按 <b>授權存取</b> → 選你的帳號。如果出現「Google 尚未驗證這個應用程式」，按左下的 <b>進階</b> → <b>前往…（不安全）</b> → <b>允許</b>。
           <details class="tw-more"><summary>為什麼會說「不安全」？</summary><p class="hint">因為這段程式是你自己剛建立的，沒有送給 Google 審核過，所以 Google 一律這樣提醒。程式只會讀寫你這份試算表，而且只接受帶有你專屬暗號的請求。</p></details>
         </li>
         <li>部署完成後，複製「網頁應用程式」底下那串網址（https://script.google.com/… 結尾是 /exec），貼到這裡：
@@ -144,6 +148,25 @@
         <label class="tw-field">結果停留秒數 <input type="number" id="resultSeconds" min="1" max="60"></label>
         <label class="tw-field"><input type="checkbox" id="sound"> 音效</label>
         <label class="tw-field">音量 <input type="range" id="volume" min="0" max="100"></label>
+      </div>
+    </div>
+  </section>
+  <section class="tw-step" id="step6">
+    <div class="tw-step-num">6</div>
+    <div class="tw-step-body">
+      <h2>放進 OBS，開台就不用另外開這個網頁 <small>（建議）</small> <span class="tw-done">✓ 完成</span></h2>
+      <div id="dockHere" class="hidden">
+        <p class="tw-check ok"><b>你現在就是在 OBS 裡使用</b>：只要 OBS 開著，就會自動接收兌換、轉盤、記到試算表，不用另外開瀏覽器。</p>
+      </div>
+      <div id="dockHow">
+        <p>把這個網頁放進 OBS 變成一個面板。之後<b>只要開 OBS 就會自動運作</b>，不用再記得開瀏覽器；瀏覽器縮小時可能會變慢的問題也不會發生。</p>
+        <ol class="tw-howto">
+          <li><button class="btn primary" id="copyDock">複製 OBS 面板網址</button> <small class="hint">（會把上面設定好的內容一起帶過去，試算表不用重新設定）</small></li>
+          <li>OBS 上方選單按 <b>停駐視窗（Docks）→ 自訂瀏覽器停駐視窗…（Custom Browser Docks）</b>。</li>
+          <li>「停駐視窗名稱」填 <b>忠誠點轉盤</b>，「URL」按 Ctrl+V 貼上，按 <b>套用</b>，再按 <b>關閉</b>。</li>
+          <li>OBS 裡會多一個「忠誠點轉盤」面板，可以拖到你喜歡的位置。在面板裡按一次 <b>連接 Twitch</b> 登入，就完成了。</li>
+          <li>回到這裡，在「貼到 OBS 了嗎？」按 <b>搬好了</b>。這個分頁就會停止接收兌換（避免兩邊同時轉），可以關掉了。</li>
+        </ol>
       </div>
     </div>
   </section>
@@ -215,12 +238,12 @@
 </div>
 <div id="toast"></div>
 
-<script src="core.js?v=56"></script>
-<script src="twitch-core.js?v=56"></script>
-<script src="wheel.js?v=56"></script>
-<script src="ui.js?v=56"></script>
-<script src="store.js?v=56"></script>
-<script src="sync.js?v=56"></script>
-<script src="twitch.js?v=56"></script>
+<script src="core.js?v=57"></script>
+<script src="twitch-core.js?v=57"></script>
+<script src="wheel.js?v=57"></script>
+<script src="ui.js?v=57"></script>
+<script src="store.js?v=57"></script>
+<script src="sync.js?v=57"></script>
+<script src="twitch.js?v=57"></script>
 </body>
 </html>

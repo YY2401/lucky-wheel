@@ -225,3 +225,19 @@ test('補抓：只列這個網頁沒處理過的兌換，照兌換時間排、�
   assert.deepEqual(out.map((m) => m.id), ['a', 'b']);
   assert.deepEqual(out[0], { id: 'a', login: 'a', display: 'A', reward: '轉盤', rewardId: 'r1', at: '2026-10-01T00:00:00Z' });
 });
+
+test('搬到 OBS 面板：設定與可退點紀錄打包進網址，同一份只套用一次，壞資料不會出錯', () => {
+  const cfg = tw.normalizeTwConfig({ scriptUrl: 'https://script.google.com/macros/s/x/exec', rewardIds: ['r1'], prizes: [{ name: '中文獎項', weight: 1 }], cutoffHour: 3 });
+  const recs = [tw.makeRecord({ id: 'h', rewardId: 'r1', prize: cfg.prizes[0] }), tw.makeRecord({ id: 'm', prize: cfg.prizes[0] })];
+  const code = tw.encodeMove(tw.buildMove(cfg, recs));
+  assert.match(code, /^[A-Za-z0-9_-]+$/); // 放在網址裡不用再編碼
+  const fresh = tw.normalizeTwConfig({ cutoffHour: 0 });
+  const r = tw.applyMove(fresh, [], tw.decodeMove(code));
+  for (const k of ['scriptUrl', 'sheetKey', 'room', 'secret', 'cutoffHour']) assert.deepEqual(r.cfg[k], cfg[k], k);
+  assert.equal(r.cfg.prizes[0].name, '中文獎項');
+  assert.deepEqual(r.add.map((x) => x.id), ['h']);
+  assert.equal(r.cfg.movedToObs, false);
+  assert.equal(tw.applyMove(r.cfg, r.add, tw.decodeMove(code)), null); // OBS 重開帶同一個網址
+  assert.equal(tw.decodeMove('壞掉'), null);
+  assert.equal(tw.decodeMove(Buffer.from('{"v":2}').toString('base64')), null);
+});

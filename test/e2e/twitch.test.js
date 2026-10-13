@@ -284,4 +284,64 @@ if (!H.chromePath()) {
     assert.match(await ov.$eval('#ovGrid', (e) => e.textContent), /[135]點/);
     assert.deepEqual(ov.errors, []);
   });
+
+  test('瀏覽器動畫被暫停（視窗縮小）時，排隊還是會一個一個轉完', async (t) => {
+    const page = await open(t);
+    await waitFor(() => page.evaluate(() => window.__tw.subscribed));
+    await page.evaluate(() => {
+      window.requestAnimationFrame = () => 0; // 模擬瀏覽器縮小時不畫面
+      ['p1', 'p2', 'p3'].forEach((id) => window.__tw.redeem({ id, user_login: id, user_name: id, reward: { id: 'rw1', title: '轉' } }));
+    });
+    await waitFor(() => page.$eval('#queueCount', (e) => e.textContent === '0'), 20000);
+    assert.equal((await records(page)).length, 3);
+  });
+
+  test('搬到 OBS 面板：設定與可退點紀錄一起搬過去、只匯入一次；原本的瀏覽器停止接收', async (t) => {
+    const hold = doneRec('h1', { rewardId: 'rw1', tw: 'hold', holdUntil: Date.now() + 3600e3 });
+    const page = await open(t, { config: { ...READY, prizes: [{ id: 'a', name: '大獎', weight: 1, column: '5點' }, { id: 'b', name: '小獎', weight: 9, column: '1點' }] }, before: (p) => H.seed(p, { 'tw.records': [hold, doneRec('old')] }) });
+    await browser.defaultBrowserContext().overridePermissions(srv.url, ['clipboard-read', 'clipboard-write', 'clipboard-sanitized-write']);
+    await waitFor(() => page.evaluate(() => window.__tw.subscribed));
+    await page.click('#toSetup'); await H.sleep(200);
+    assert.equal(await page.$eval('#step6', (e) => e.classList.contains('done')), false);
+    await page.click('#copyDock'); await H.sleep(300);
+    const url = await page.evaluate(() => navigator.clipboard.readText());
+    assert.match(url, /\/twitch\.html\?dock=1#move=[A-Za-z0-9_-]+$/);
+    await page.click('#confirmOk'); await H.sleep(300);
+    assert.equal(await page.$eval('#movedBanner', (e) => e.classList.contains('hidden')), false);
+    assert.equal(await page.$eval('#step6', (e) => e.classList.contains('done')), true);
+    assert.equal((await H.readKey(page, 'tw.config')).movedToObs, true);
+    assert.equal(await page.evaluate(() => window.__tw.sockets.at(-1).closed), true); // 不再收兌換
+
+    // OBS 面板＝另一個瀏覽器（儲存空間分開）
+    const ctx = await browser.createBrowserContext(); t.after(() => ctx.close());
+    const dock = await ctx.newPage(); dock.errors = []; dock.on('pageerror', (e) => dock.errors.push(e.message));
+    await dock.setViewport({ width: 380, height: 800 });
+    await dock.evaluateOnNewDocument(installMocks);
+    await dock.goto(url, { waitUntil: 'networkidle0' }); await H.sleep(400);
+    assert.equal(await dock.evaluate(() => document.body.classList.contains('dock')), true);
+    assert.equal(await dock.evaluate(() => location.hash), ''); // 網址列不留設定
+    const dcfg = await H.readKey(dock, 'tw.config');
+    const ccfg = await H.readKey(page, 'tw.config');
+    for (const k of ['scriptUrl', 'sheetKey', 'room', 'secret', 'rewardIds']) assert.deepEqual(dcfg[k], ccfg[k], k);
+    assert.deepEqual(dcfg.prizes.map((p) => p.name), ['大獎', '小獎']);
+    assert.equal(dcfg.movedToObs, false);
+    assert.deepEqual((await H.readKey(dock, 'tw.records')).map((r) => r.id), ['h1']); // 只搬可退點期的
+    assert.equal(await dock.$eval('#step3', (e) => e.classList.contains('done')), true);
+    assert.equal(await dock.$eval('#step6', (e) => e.classList.contains('done')), true);
+    assert.equal(await dock.$eval('#dockHere', (e) => !e.classList.contains('hidden')), true);
+    assert.equal(await dock.$eval('#step1', (e) => e.classList.contains('done')), false); // Twitch 要在面板裡登入一次
+    // OBS 重開會用同一個網址：改過的設定不能被蓋回去
+    await dock.evaluate(async () => { document.querySelector('#cutoffHour').value = '4'; document.querySelector('#cutoffHour').dispatchEvent(new Event('change')); });
+    await H.sleep(300);
+    await dock.goto(url, { waitUntil: 'networkidle0' }); await H.sleep(400);
+    assert.equal((await H.readKey(dock, 'tw.config')).cutoffHour, 4);
+    assert.equal(await dock.evaluate(() => document.body.scrollWidth <= innerWidth), true); // 窄面板不出現橫向捲軸
+    assert.deepEqual(dock.errors, []);
+
+    // 原本的瀏覽器可以改回來
+    await page.click('#unmove'); await H.sleep(200); await page.click('#confirmOk');
+    await waitFor(() => page.evaluate(() => window.__tw.sockets.length >= 2 && !window.__tw.sockets.at(-1).closed));
+    assert.equal(await page.$eval('#movedBanner', (e) => e.classList.contains('hidden')), true);
+    assert.deepEqual(page.errors, []);
+  });
 }

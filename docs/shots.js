@@ -117,6 +117,31 @@ const BASE = { clientId: 'cid', sync: false, spinDuration: 2600, resultSeconds: 
   await page.click('#catchupLater');
   await page.evaluate(() => localStorage.removeItem('mock.unfulfilled'));
 
+  // 6-3. 放進 OBS 面板：步驟 6、搬好後的瀏覽器、面板裡的樣子
+  await reset({ 'tw.config': READY, 'tw.auth': { token: 'tok', clientId: 'cid' }, 'tw.records': [rec(1, 'gabai', '嘎唄', '3點', 'ok', hold), rec(2, 'haruneuka', 'HaruneUka', '5點', 'ok', hold)] });
+  await browser.defaultBrowserContext().overridePermissions(srv.url, ['clipboard-read', 'clipboard-write', 'clipboard-sanitized-write']);
+  await page.click('#toSetup'); await sleep(300);
+  await shot('step6', '#step6');
+  await page.click('#copyDock'); await sleep(400);
+  const dockLink = await page.evaluate(() => navigator.clipboard.readText());
+  await page.click('#confirmOk'); await sleep(400);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.addStyleTag({ content: '.tw .topbar,.tw-alert{position:relative!important;top:0!important}' });
+  const mb = await page.$('#movedBanner');
+  const top = await page.$('header.topbar');
+  const a = await top.boundingBox(); const b = await mb.boundingBox();
+  await page.screenshot({ path: path.join(OUT, 'moved.png'), clip: { x: 0, y: a.y, width: 1100, height: b.y + b.height - a.y } });
+  const ctx = await browser.createBrowserContext();
+  const dock = await ctx.newPage();
+  await dock.setViewport({ width: 380, height: 760, deviceScaleFactor: 2 });
+  await dock.evaluateOnNewDocument(installMocks);
+  await dock.goto(dockLink, { waitUntil: 'networkidle0' }); await sleep(900);
+  await dock.evaluate(() => { document.querySelector('#toast').classList.remove('show'); });
+  await sleep(400);
+  await dock.screenshot({ path: path.join(OUT, 'dock-live.png') });
+  console.log('shot dock-live');
+  await ctx.close();
+
   // 7. OBS 畫面
   const cfg = await H.readKey(page, 'tw.config');
   const ov = await browser.newPage();
