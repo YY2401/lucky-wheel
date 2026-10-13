@@ -9,6 +9,8 @@
   // 網站管理者到 dev.twitch.tv 註冊應用程式後填入（公開資訊，不是密碼）。使用者也可在步驟 1「進階」自填
   const BUILTIN_CLIENT_ID = 'owgfsq6jkw61bh7l7cvtbmkfjvbfhf';
   const REDEEM_TYPE = 'channel.channel_points_custom_reward_redemption.add';
+  // read：收到兌換通知；manage：建立品項、補抓漏掉的兌換、標成已完成 / 退點（只對這個網頁建立的品項有效）
+  const SCOPES = 'channel:read:redemptions channel:manage:redemptions';
   const K = { config: 'tw.config', records: 'tw.records', queue: 'tw.queue', auth: 'tw.auth' };
   const MAX_RECORDS = 1000;
 
@@ -134,11 +136,13 @@
   // ---------- Twitch：登入（implicit grant）+ EventSub WebSocket ----------
   const Twitch = {
     ws: null, session: '', state: 'off', error: '', kaSec: 10, kaTimer: null, retry: 0, retryTimer: null, rewards: null,
+    managed: new Set(), // 這個網頁建立的品項（才能補抓、退點）
+    canManage: false, // 授權裡有沒有 manage 權限（舊的授權只有 read，要重新連接一次）
     login(force = false) {
       if (!clientId()) { this.setState('off', '這個網頁還沒設定 Twitch Client ID：請網站管理者依 README 設定，或在下方「進階」自行填入'); return; }
       const st = randId(16);
       try { sessionStorage.setItem('tw.oauth', st); } catch { /* ignore */ }
-      const q = new URLSearchParams({ response_type: 'token', client_id: clientId(), redirect_uri: redirectUri(), scope: 'channel:read:redemptions', state: st, force_verify: force ? 'true' : 'false' });
+      const q = new URLSearchParams({ response_type: 'token', client_id: clientId(), redirect_uri: redirectUri(), scope: SCOPES, state: st, force_verify: force ? 'true' : 'false' });
       leaving = true; // 去 Twitch 登入再回來：紀錄都存著，不用跳「確定要離開？」
       location.href = `https://id.twitch.tv/oauth2/authorize?${q}`;
     },
@@ -162,7 +166,8 @@
         const r = await fetch('https://id.twitch.tv/oauth2/validate', { headers: { Authorization: `OAuth ${auth.token}` } });
         if (r.status === 401) { this.expire(); return false; }
         const j = await r.json();
-        Object.assign(auth, { userId: j.user_id, login: j.login, clientId: j.client_id || auth.clientId, expiresAt: j.expires_in ? Date.now() + j.expires_in * 1000 : 0 });
+        Object.assign(auth, { userId: j.user_id, login: j.login, clientId: j.client_id || auth.clientId, scopes: j.scopes || [], expiresAt: j.expires_in ? Date.now() + j.expires_in * 1000 : 0 });
+        this.canManage = auth.scopes.includes('channel:manage:redemptions');
         if (!auth.name) { const u = await this.helix('/users'); if (u.json && u.json.data && u.json.data[0]) auth.name = u.json.data[0].display_name; }
         saveAuth();
         return true;
@@ -180,11 +185,51 @@
     },
     async loadRewards() {
       if (!auth || !auth.userId) { this.rewards = null; renderRewards(); return; }
-      const r = await this.helix(`/channel_points/custom_rewards?broadcaster_id=${auth.userId}`);
-      if (r.status === 200) this.rewards = (r.json.data || []).map((x) => ({ id: x.id, title: x.title, cost: x.cost, enabled: x.is_enabled, color: x.background_color }));
-      else if (r.status === 403) { this.rewards = []; this.rewardError = '這個頻道還沒有忠誠點功能（需要是 Twitch 聯盟或合作夥伴）'; }
+      const base = `/channel_points/custom_rewards?broadcaster_id=${auth.userId}`;
+      const r = await this.helix(base);
+      this.rewardError = '';
+      if (r.status === 200) {
+        const m = await this.helix(`${base}&only_manageable_rewards=true`);
+        this.managed = new Set(m.status === 200 ? (m.json.data || []).map((x) => x.id) : []);
+        this.rewards = (r.json.data || []).map((x) => ({ id: x.id, title: x.title, cost: x.cost, enabled: x.is_enabled, color: x.background_color, skipQueue: !!x.should_redemptions_skip_request_queue, managed: this.managed.has(x.id) }));
+      } else if (r.status === 403) { this.rewards = []; this.rewardError = '這個頻道還沒有忠誠點功能（需要是 Twitch 聯盟或合作夥伴）'; }
       else { this.rewards = []; this.rewardError = `讀取品項失敗（${r.status}）`; }
-      renderRewards();
+      renderRewards(); renderStatus();
+    },
+    // 由這個網頁建立品項：之後才能補抓漏掉的兌換、退點
+    async createReward(title, cost) {
+      const r = await this.helix(`/channel_points/custom_rewards?broadcaster_id=${auth.userId}`, { method: 'POST', body: { title, cost, is_enabled: true, should_redemptions_skip_request_queue: false } });
+      if (r.status === 200 && r.json && r.json.data && r.json.data[0]) return r.json.data[0];
+      const msg = (r.json && r.json.message) || '';
+      if (/DUPLICATE/i.test(msg)) throw new Error(`頻道裡已經有叫「${title}」的品項了，換個名稱，或直接在下面清單勾選它`);
+      if (r.status === 403) throw new Error('這個頻道還沒有忠誠點功能（需要是 Twitch 聯盟或合作夥伴）');
+      if (r.status === 401) throw new Error('Twitch 登入過期了，請重新連接');
+      throw new Error(`建立失敗（${r.status}${msg ? `：${msg}` : ''}）`);
+    },
+    // 補抓：Twitch 上還是「未完成」、但這個網頁沒處理過的兌換
+    async catchUp() {
+      if (!auth || !auth.userId || !this.canManage) return;
+      const found = [];
+      for (const rid of cfg.rewardIds.filter((id) => this.managed.has(id))) {
+        let after = '';
+        for (let page = 0; page < 20; page++) {
+          const r = await this.helix(`/channel_points/custom_rewards/redemptions?broadcaster_id=${auth.userId}&reward_id=${rid}&status=UNFULFILLED&sort=OLDEST&first=50${after ? `&after=${after}` : ''}`);
+          if (r.status !== 200) break;
+          found.push(...(r.json.data || []));
+          after = r.json.pagination && r.json.pagination.cursor;
+          if (!after) break;
+        }
+      }
+      addMissed(found);
+    },
+    // 把兌換標成已完成 / 退點。回傳 Twitch 確認改好的 id
+    async setRedemptions(rewardId, ids, status) {
+      const q = ids.map((id) => `id=${encodeURIComponent(id)}`).join('&');
+      const r = await this.helix(`/channel_points/custom_rewards/redemptions?${q}&broadcaster_id=${auth.userId}&reward_id=${rewardId}`, { method: 'PATCH', body: { status } });
+      if (r.status === 200) return { ok: new Set((r.json.data || []).map((x) => x.id)) };
+      if (r.status === 404) return { ok: new Set() }; // 都已經不是「未完成」（例如實況主自己在 Twitch 處理掉了）
+      if (r.status === 403) return { notOurs: true }; // 手動建立的品項：Twitch 不讓這個網頁改
+      throw new Error(`Twitch 回應 ${r.status}`);
     },
     async start() {
       clearTimeout(this.retryTimer);
@@ -235,7 +280,7 @@
     },
     async subscribe() {
       const r = await this.helix('/eventsub/subscriptions', { method: 'POST', body: { type: REDEEM_TYPE, version: '1', condition: { broadcaster_user_id: auth.userId }, transport: { method: 'websocket', session_id: this.session } } });
-      if (r.status === 202 || r.status === 409) this.setState('online');
+      if (r.status === 202 || r.status === 409) { this.setState('online'); this.loadRewards().then(() => this.catchUp()); TwSync.kick(); } // 連上（含斷線重連）就檢查有沒有漏掉的
       else if (r.status === 403) this.setState('error', '沒有權限讀取忠誠點兌換：頻道需要是 Twitch 聯盟或合作夥伴');
       else if (r.status !== 401) { this.setState('offline', `訂閱兌換通知失敗（${r.status}），稍後重試`); if (this.ws) this.ws.close(); }
     },
@@ -246,9 +291,85 @@
   function onRedemption(ev) {
     if (!cfg.rewardIds.includes(ev.reward && ev.reward.id)) return;
     if (queue.some((q) => q.id === ev.id) || records.some((r) => r.id === ev.id)) return; // Twitch 偶爾會重送
-    queue.push({ id: ev.id, login: ev.user_login, display: ev.user_name, reward: ev.reward.title, at: ev.redeemed_at || new Date().toISOString() });
+    queue.push({ id: ev.id, login: ev.user_login, display: ev.user_name, reward: ev.reward.title, rewardId: ev.reward.id, at: ev.redeemed_at || new Date().toISOString() });
+    missed = missed.filter((m) => m.id !== ev.id);
     saveQueue(); renderQueue(); pump();
   }
+
+  // ---------- 補抓：網頁關著（或斷線）時漏掉的兌換，先列給實況主確認 ----------
+  let missed = [];
+  const knownIds = () => [...records.map((r) => r.id), ...queue.map((q) => q.id)];
+  function addMissed(list) {
+    const fresh = T.missedRedemptions(list, [...knownIds(), ...missed.map((m) => m.id)]);
+    if (!fresh.length) return;
+    missed = [...missed, ...fresh].sort((a, b) => String(a.at).localeCompare(String(b.at)));
+    renderStatus();
+    if (leader) openCatchup();
+  }
+  function openCatchup() {
+    const known = new Set(knownIds());
+    missed = missed.filter((m) => !known.has(m.id));
+    if (!missed.length) { $('#catchupModal').classList.add('hidden'); renderStatus(); return; }
+    $('#catchupCount').textContent = missed.length;
+    $('#catchupList').innerHTML = missed.map((m) => `<li><input type="checkbox" value="${esc(m.id)}" checked><span class="tw-li-main">${esc(m.display || m.login)}</span><span class="tw-li-sub">${esc(m.reward)} · 兌換時間 ${fmtTime(m.at)}</span></li>`).join('');
+    $('#catchupModal').classList.remove('hidden');
+  }
+  $('#catchupList').addEventListener('click', (e) => { const li = e.target.closest('li'); if (li && e.target.tagName !== 'INPUT') { const c = $('input', li); c.checked = !c.checked; } });
+  $('#catchupAll').onclick = () => $$('#catchupList input').forEach((c) => { c.checked = true; });
+  $('#catchupNone').onclick = () => $$('#catchupList input').forEach((c) => { c.checked = false; });
+  $('#catchupLater').onclick = () => { $('#catchupModal').classList.add('hidden'); renderStatus(); };
+  $('#catchupGo').onclick = async () => {
+    const pick = new Set($$('#catchupList input:checked').map((c) => c.value));
+    const go = missed.filter((m) => pick.has(m.id));
+    const refund = missed.filter((m) => !pick.has(m.id));
+    if (refund.length) {
+      $('#catchupModal').classList.add('hidden');
+      const names = refund.slice(0, 5).map((m) => m.display).join('、') + (refund.length > 5 ? '…' : '');
+      if (!(await dialog({ title: `退還 ${refund.length} 筆的忠誠點？`, message: `沒勾的 ${refund.length} 筆（${names}）不轉盤，忠誠點會退還給觀眾。`, okLabel: '確定' }))) { $('#catchupModal').classList.remove('hidden'); return; }
+    }
+    $('#catchupModal').classList.add('hidden');
+    missed = [];
+    go.forEach((m) => queue.push({ ...m }));
+    saveQueue(); renderQueue(); renderStatus(); pump();
+    if (!refund.length) return;
+    const byReward = new Map();
+    refund.forEach((m) => { if (!byReward.has(m.rewardId)) byReward.set(m.rewardId, []); byReward.get(m.rewardId).push(m.id); });
+    let refunded = 0;
+    try {
+      for (const [rid, ids] of byReward) { const res = await Twitch.setRedemptions(rid, ids, 'CANCELED'); refunded += res.ok ? res.ok.size : 0; }
+      toast(`已退還 ${refunded} 筆忠誠點${go.length ? `，開始補轉 ${go.length} 筆` : ''}`, 5000);
+    } catch (e) { toast(`退點失敗：${e.message}。可以到 Twitch 的獎勵請求佇列手動退`, 8000); }
+  };
+
+  // ---------- Twitch 兌換狀態：可退點期滿標成已完成、撤銷時退點 ----------
+  const TwSync = {
+    timer: null, busy: false,
+    kick(ms = 0) { clearTimeout(this.timer); this.timer = setTimeout(() => this.run(), ms); },
+    async run() {
+      if (this.busy || !leader) return;
+      if (!auth || !auth.userId || !Twitch.canManage || Twitch.state === 'expired') { this.kick(60000); return; }
+      this.busy = true;
+      let fail = false;
+      try {
+        for (const job of T.dueTwitchUpdates(records)) {
+          let res;
+          try { res = await Twitch.setRedemptions(job.rewardId, job.ids, job.status); } catch { fail = true; continue; }
+          for (const id of job.ids) {
+            const r = records.find((x) => x.id === id); if (!r) continue;
+            if (res.notOurs) { r.tw = ''; continue; } // 手動建立的品項：不歸這個網頁管
+            if (job.status === 'FULFILLED') r.tw = 'fulfilled'; // 沒在回應裡＝已經不是未完成，一樣當作處理完
+            else if (res.ok.has(id)) r.tw = 'canceled';
+            else { r.tw = 'cancel-failed'; toast(`${r.display} 的忠誠點沒退成：這筆在 Twitch 已經被處理過了`, 8000); }
+          }
+        }
+        saveRecords(); renderRecords();
+      } finally {
+        this.busy = false;
+        const next = T.nextHoldExpiry(records);
+        this.kick(fail ? 60000 : next ? Math.min(Math.max(next - Date.now() + 1000, 1000), 3600000) : 3600000);
+      }
+    },
+  };
 
   let spinning = false;
   let leader = false; // 拿到分頁鎖之後才開始轉盤
@@ -262,7 +383,7 @@
         const prize = core && cfg.prizes.find((p) => p.id === core.id);
         if (!prize) { toast('轉盤沒有可抽的獎項：請到設定的步驟 4 檢查權重', 8000); break; }
         const at = new Date(q.at); const when = Number.isNaN(at.getTime()) ? new Date() : at; // 用兌換當下的時間決定日期（排隊跨過午夜也不會記錯天）
-        const rec = T.makeRecord({ id: q.id, login: q.login, display: q.display, reward: q.reward, prize, now: when, cutoffHour: cfg.cutoffHour, test: !!q.test });
+        const rec = T.makeRecord({ id: q.id, login: q.login, display: q.display, reward: q.reward, rewardId: q.rewardId, prize, now: when, cutoffHour: cfg.cutoffHour, test: !!q.test });
         records.unshift(rec); queue.shift();
         saveRecords(); saveQueue(); renderQueue(); renderRecords();
         Writer.kick(); // 先寫入再播動畫：就算中途關掉網頁也不會漏記
@@ -315,8 +436,10 @@
     let alert = null;
     if (Twitch.state === 'expired') alert = { text: Twitch.error, btn: '重新連接 Twitch', act: () => Twitch.login() };
     else if (Twitch.state === 'error') alert = { text: Twitch.error, btn: '到設定', act: () => showSetup(1) };
+    else if (missed.length) alert = { text: `網頁關著時有 ${missed.length} 筆兌換還沒轉`, btn: '查看並補轉', act: openCatchup };
     else if (Writer.state === 'fail' && cfg.scriptUrl) alert = { text: `試算表寫入失敗：${Writer.lastError}（每隔一段時間會自動重試，紀錄都還在）`, btn: '立刻重試', act: () => Writer.kick() };
     else if (failed) alert = { text: `有 ${failed} 筆沒寫進試算表：${records.find((r) => r.status === 'error').error}`, btn: '全部重新寫入', act: retryAll };
+    else if (auth && auth.userId && auth.scopes && !Twitch.canManage) alert = { text: '新功能：重新連接 Twitch 一次，就能補抓網頁關著時的兌換、撤銷時退點', btn: '重新連接 Twitch', act: () => Twitch.login() };
     $('#alert').classList.toggle('hidden', !alert);
     if (alert) { $('#alertText').textContent = alert.text; $('#alertBtn').textContent = alert.btn; $('#alertBtn').onclick = alert.act; }
     $('#retryAll').classList.toggle('hidden', !failed);
@@ -334,11 +457,12 @@
     const list = records.slice(0, 60);
     $('#recordList').innerHTML = list.length ? list.map((r) => {
       const actions = r.status === 'error' ? `<button class="btn icon" data-retry="${esc(r.id)}">重試</button>` : r.status === 'ok' ? `<button class="btn icon ghost" data-undo="${esc(r.id)}" title="從試算表減回去">撤銷</button>` : '';
-      const detail = r.status === 'ok' ? `${r.cell}${r.isNew ? ' · 新觀眾已加入名單' : ''}` : r.status === 'error' ? r.error : '';
+      const tw = { canceled: ' · 已退還忠誠點', 'to-cancel': ' · 退點中…', 'cancel-failed': ' · 退點失敗' }[r.tw] || '';
+      const detail = (r.status === 'ok' ? `${r.cell}${r.isNew ? ' · 新觀眾已加入名單' : ''}` : r.status === 'error' ? r.error : '') + tw;
       return `<li class="st-${r.status}">
         <span class="tw-dot" style="--c:${esc(r.color || '#888')}"></span>
         <span class="tw-li-main">${esc(r.display || r.login)} → <b>${esc(r.prize)}</b></span>
-        <span class="tw-li-sub">${fmtTime(r.time)} · <span class="tw-st">${STATUS_TEXT[r.status] || r.status}</span>${detail ? ` · ${esc(detail)}` : ''}</span>
+        <span class="tw-li-sub">${fmtTime(r.time)} · <span class="tw-st">${STATUS_TEXT[r.status] || r.status}</span>${detail ? ` · ${esc(detail.replace(/^ · /, ''))}` : ''}</span>
         <span class="tw-li-act">${actions}</span></li>`;
     }).join('') : '<li class="tw-empty">還沒有紀錄。觀眾兌換後會出現在這裡。</li>';
   }
@@ -349,10 +473,36 @@
     if (retry) { const r = records.find((x) => x.id === retry.dataset.retry); if (r) { r.status = 'pending'; r.error = ''; saveRecords(); renderRecords(); Writer.kick(); } }
     if (undo) {
       const r = records.find((x) => x.id === undo.dataset.undo); if (!r) return;
-      if (!(await dialog({ title: '撤銷這一筆？', message: `把 ${T.viewerLabel(r)} 的「${r.prize}」從試算表（${r.cell}）減回去。Twitch 那邊的忠誠點不會退還。`, okLabel: '撤銷', danger: true }))) return;
-      r.status = 'undoing'; saveRecords(); renderRecords(); Writer.kick();
+      const refund = await askUndo(r);
+      if (refund === null) return;
+      r.status = 'undoing';
+      if (refund) r.tw = 'to-cancel';
+      saveRecords(); renderRecords(); Writer.kick(); if (refund) TwSync.kick();
     }
   });
+  // 撤銷視窗：回傳 true（退點）/ false（不退）/ null（取消）
+  function refundBlocker(r) {
+    if (!r.rewardId) return '這筆不是觀眾兌換來的（手動補登），沒有忠誠點可退。';
+    if (!Twitch.canManage) return '要先重新連接 Twitch 一次，才能從這裡退點。';
+    if (!Twitch.managed.has(r.rewardId) || r.tw === '') return '這個品項是在 Twitch 後台手動建立的，網頁不能退點；請到 Twitch 的獎勵請求佇列處理。';
+    if (r.tw === 'fulfilled') return '已經超過 24 小時可退點期限，在 Twitch 上已標成完成，不能退點了。';
+    if (r.tw !== 'hold') return '這筆在 Twitch 上已經處理過了，不能退點。';
+    return '';
+  }
+  function askUndo(r) {
+    return new Promise((resolve) => {
+      const block = refundBlocker(r);
+      $('#undoMsg').textContent = `把 ${T.viewerLabel(r)} 的「${r.prize}」從試算表（${r.cell}）減回去。`;
+      $('#undoRefundYes').disabled = !!block;
+      $('#undoRefundYes').closest('label').classList.toggle('disabled', !!block);
+      $('#undoRefundHint').textContent = block || `忠誠點會退回給 ${r.display}（可退到 ${fmtTime(new Date(r.holdUntil).toISOString())}）`;
+      $(block ? '#undoRefundNo' : '#undoRefundYes').checked = true;
+      $('#undoModal').classList.remove('hidden');
+      const done = (v) => { $('#undoModal').classList.add('hidden'); $('#undoOk').onclick = $('#undoCancel').onclick = null; resolve(v); };
+      $('#undoOk').onclick = () => done($('#undoRefundYes').checked);
+      $('#undoCancel').onclick = () => done(null);
+    });
+  }
 
   // ---------- 直播畫面按鈕 ----------
   $('#manualAdd').onclick = async () => {
@@ -377,6 +527,7 @@
     };
   }
   function renderSetup() {
+    renderCreate();
     const done = stepDone();
     [1, 2, 3].forEach((n) => $(`#step${n}`).classList.toggle('done', done[n]));
     const signedIn = !!(auth && auth.userId);
@@ -394,8 +545,34 @@
     if (!auth || !auth.userId) { box.innerHTML = '<p class="hint">先完成步驟 1。</p>'; return; }
     if (Twitch.rewards === null) { box.innerHTML = '<p class="hint">讀取中…</p>'; return; }
     if (!Twitch.rewards.length) { box.innerHTML = `<p class="tw-err">${esc(Twitch.rewardError || '這個頻道還沒有任何忠誠點品項。')}</p>`; return; }
-    box.innerHTML = Twitch.rewards.map((r) => `<label class="tw-reward${cfg.rewardIds.includes(r.id) ? ' on' : ''}"><input type="checkbox" value="${esc(r.id)}"${cfg.rewardIds.includes(r.id) ? ' checked' : ''}><span class="tw-reward-dot" style="--c:${esc(r.color || '#9146ff')}"></span><span class="tw-reward-title">${esc(r.title)}</span><span class="tw-reward-cost">${r.cost.toLocaleString()} 點${r.enabled ? '' : '（已停用）'}</span></label>`).join('');
+    const tag = (r) => (!r.managed ? '<span class="tw-tag meh" title="在 Twitch 後台手動建立：網頁開著才收得到、不能退點">手動建立</span>'
+      : r.skipQueue ? '<span class="tw-tag warn" title="這個品項被設成「略過獎勵請求佇列」，兌換會直接變成已完成，補抓和退點都無效">略過佇列：無法補抓</span>'
+        : '<span class="tw-tag good" title="網頁關著時的兌換可以補抓，撤銷時可以退點">可補抓、可退點</span>');
+    box.innerHTML = Twitch.rewards.map((r) => `<label class="tw-reward${cfg.rewardIds.includes(r.id) ? ' on' : ''}"><input type="checkbox" value="${esc(r.id)}"${cfg.rewardIds.includes(r.id) ? ' checked' : ''}><span class="tw-reward-dot" style="--c:${esc(r.color || '#9146ff')}"></span><span class="tw-reward-title">${esc(r.title)}</span>${tag(r)}<span class="tw-reward-cost">${r.cost.toLocaleString()} 點${r.enabled ? '' : '（已停用）'}</span></label>`).join('');
   }
+  function renderCreate() {
+    const signedIn = !!(auth && auth.userId);
+    $('#createReward').disabled = !signedIn || !Twitch.canManage;
+    const err = $('#createErr');
+    const msg = !signedIn ? '' : !Twitch.canManage ? '你的 Twitch 授權是舊版的，請按步驟 1 的「換一個帳號」用同一個帳號重新連接一次，就能建立品項。' : '';
+    if (msg) { err.textContent = msg; err.classList.remove('hidden'); } else if (!err.dataset.keep) err.classList.add('hidden');
+  }
+  $('#createReward').onclick = async () => {
+    const title = $('#newRewardTitle').value.trim();
+    const cost = Math.trunc(Number($('#newRewardCost').value));
+    const err = $('#createErr'); delete err.dataset.keep;
+    const fail = (m) => { err.textContent = m; err.dataset.keep = '1'; err.classList.remove('hidden'); };
+    if (!title) return fail('請填品項名稱');
+    if (!(cost >= 1)) return fail('忠誠點至少要 1 點');
+    $('#createReward').disabled = true;
+    try {
+      const r = await Twitch.createReward(title, cost);
+      cfg.rewardIds = [...new Set([...cfg.rewardIds, r.id])]; saveCfg();
+      err.classList.add('hidden');
+      toast(`已在 Twitch 建立「${r.title}」並勾選好了`);
+      await Twitch.loadRewards(); renderSetup();
+    } catch (e) { fail(e.message); } finally { renderCreate(); }
+  };
   $('#rewards').addEventListener('change', (e) => {
     if (e.target.type !== 'checkbox') return;
     cfg.rewardIds = $$('#rewards input:checked').map((i) => i.value);
@@ -552,6 +729,8 @@
   // 舊的待寫入、上次沒轉完的排隊都接著做
   records.forEach((r) => { if (r.status === 'error' && /忙碌|連不到/.test(r.error)) r.status = 'pending'; });
   Writer.kick(500);
+  TwSync.kick(3000);
+  if (missed.length) openCatchup();
   Twitch.start().then(() => { renderSetup(); renderStatus(); });
   pump();
   // Twitch 規定要定期檢查 token；順便發現過期

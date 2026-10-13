@@ -48,12 +48,12 @@
   ul li { margin-bottom: 1mm; }
 
   /* 提示框 */
-  .box { border: 0.5mm solid var(--ink); border-radius: 2.5mm; padding: 3mm 4mm 2mm 13mm; margin: 3mm 0 4mm; position: relative; break-inside: avoid; }
-  .box::before { position: absolute; left: 3.5mm; top: 2.6mm; font-size: 13pt; }
-  .box.tip { background: #eef8f2; border-color: var(--green); } .box.tip::before { content: "💡"; }
-  .box.warn { background: #fff4d6; border-color: #c99700; } .box.warn::before { content: "⚠️"; }
-  .box.stop { background: #fde9e9; border-color: var(--red); } .box.stop::before { content: "⛔"; }
-  .box.ok { background: #eef3ff; border-color: var(--blue); } .box.ok::before { content: "✅"; }
+  .box { border: 0.5mm solid var(--ink); border-radius: 2.5mm; padding: 3mm 4mm 2mm 4mm; margin: 3mm 0 4mm; position: relative; break-inside: avoid; }
+  .box::before { display: inline-block; font-size: 9pt; font-weight: 900; padding: 0 2mm; border-radius: 1mm; margin-bottom: 1mm; color: #fff; }
+  .box.tip { background: #eef8f2; border-color: var(--green); } .box.tip::before { content: "提示"; background: var(--green); }
+  .box.warn { background: #fff4d6; border-color: #c99700; } .box.warn::before { content: "注意"; background: #a87e00; }
+  .box.stop { background: #fde9e9; border-color: var(--red); } .box.stop::before { content: "重要"; background: var(--red); }
+  .box.ok { background: #eef3ff; border-color: var(--blue); } .box.ok::before { content: "說明"; background: var(--blue); }
   .box b:first-child { display: block; }
 
   table { width: 100%; border-collapse: collapse; margin: 2mm 0 5mm; font-size: 10.5pt; break-inside: auto; }
@@ -101,18 +101,18 @@
     <li><span>2</span>它是怎麼運作的<small>先看懂，後面比較好做</small></li>
     <li><span>3</span>打開網頁</li>
     <li><span>4</span>設定步驟 1：連接 Twitch<small>1 分鐘</small></li>
-    <li><span>5</span>設定步驟 2：選擇要觸發轉盤的品項<small>2 分鐘</small></li>
+    <li><span>5</span>設定步驟 2：建立觸發轉盤的品項<small>1 分鐘</small></li>
     <li><span>6</span>設定步驟 3：連接 Google 試算表<small>5～10 分鐘，最重要</small></li>
     <li><span>7</span>設定步驟 4：轉盤內容（可略過）</li>
     <li><span>8</span>設定步驟 5：放到 OBS 直播畫面（可略過）</li>
     <li><span>9</span>直播畫面看懂了沒</li>
     <li><span>10</span>每次開台要做的事</li>
-    <li><span>11</span>常用操作：手動補一筆、撤銷、試轉</li>
+    <li><span>11</span>常用操作：補轉漏掉的兌換、撤銷與退點、手動補一筆、試轉</li>
     <li><span>12</span>出問題怎麼辦</li>
     <li><span>13</span>名詞小抄</li>
   </ul>
   <div class="box tip"><b>怎麼看這份說明書</b>
-    <span class="k">像這樣的框</span> 代表畫面上的<b>按鈕</b>；<span class="k m">虛線框</span> 代表<b>選單裡的項目</b>；<span class="path">A → B → C</span> 代表依序點下去。⚠️ 是容易出錯的地方，請特別看一下。
+    <span class="k">像這樣的框</span> 代表畫面上的<b>按鈕</b>；<span class="k m">虛線框</span> 代表<b>選單裡的項目</b>；<span class="path">A → B → C</span> 代表依序點下去。「注意」框是容易出錯的地方，請特別看一下。
   </div>
 </section>
 
@@ -138,6 +138,9 @@
     <li>網頁馬上收到通知，<b>自動轉一次轉盤</b>；有設定 OBS 的話，直播畫面上的轉盤也會同時轉。好幾個人一起兌換時會排隊，一個一個轉。</li>
     <li>轉到的結果（例如「3點」）<b>自動寫進你的試算表</b>。</li>
   </ol>
+  <div class="box ok"><b>網頁關著時的兌換也不會漏</b>
+    下次打開網頁時，會自動找出網頁關著時有人兌換、但還沒轉的，列給你確認後補轉，並記在<b>觀眾當時兌換的那一天</b>（第 11 章）。前提是品項要在網頁上建立（第 5 章）。
+  </div>
   <h3>試算表會被改到哪裡？</h3>
   <p>完全照你原本的試算表格式，不會新增奇怪的分頁：</p>
   <ul>
@@ -168,7 +171,7 @@
   <img class="shot w85" src="img/first-open.png">
   <p class="cap">第一次打開的畫面。右上角三顆圓點是「狀態燈」，設定好會變綠色。</p>
   <div class="box tip"><b>這份說明書在網頁上隨時打得開</b>
-    網頁右上角的 <span class="k">說明書</span> 按鈕，或設定頁標題下方的「📖 打開圖文說明書」，都會開啟這份文件。
+    網頁右上角的 <span class="k">說明書</span> 按鈕，或設定頁標題下方的「打開圖文說明書」，都會開啟這份文件。
   </div>
   <div class="box tip"><b>做到一半想休息？</b>
     直接關掉沒關係，做好的步驟都會保存。下次打開會回到這個設定畫面，已完成的步驟會打勾 ✓。
@@ -182,13 +185,13 @@
   <ol class="steps">
     <li>按紫色的 <span class="k p">連接 Twitch</span>。</li>
     <li>畫面會跳到 Twitch 的網站。如果還沒登入，先用<b>你的實況主帳號</b>登入。</li>
-    <li>Twitch 會問你是否允許這個網頁「查看頻道點數兌換」，按 <span class="k p">授權</span>（Authorize）。</li>
+    <li>Twitch 會列出這個網頁要的權限（查看頻道點數兌換、管理頻道點數獎勵與兌換），按 <span class="k p">授權</span>（Authorize）。</li>
     <li>自動跳回轉盤網頁，步驟 1 會打勾，並顯示「已連接：你的名字」。</li>
   </ol>
   <img class="shot w85" src="img/step1-done.png">
   <p class="cap">完成後的樣子</p>
   <div class="box ok"><b>這個授權安全嗎？</b>
-    網頁只拿到「看得到忠誠點兌換」這一項權限，<b>不能</b>幫你發訊息、改標題、動你的頻道或忠誠點。想取消的話，到 Twitch 的「設定 → 連線」可以隨時中斷。
+    網頁只拿到忠誠點相關的權限：看得到兌換、建立轉盤品項、把兌換標成完成或退點。而且<b>只能管理這個網頁自己建立的品項</b>，你在 Twitch 後台手動建立的其他品項動不到。<b>不能</b>幫你發訊息、改標題或動頻道其他設定。想取消的話，到 Twitch 的「設定 → 連線」可以隨時中斷。
   </div>
   <div class="box warn"><b>登錯帳號了？</b>
     按 <span class="k">換一個帳號</span> 重新登入。一定要用<b>有忠誠點的那個實況主帳號</b>，用小帳或觀眾帳號是收不到兌換的。
@@ -197,24 +200,30 @@
 
 <!-- ======================= 5 ======================= -->
 <section class="chapter">
-  <h2>5　設定步驟 2：選擇要觸發轉盤的品項</h2>
-  <p>步驟 1 完成後，這裡會列出你頻道所有的忠誠點品項。<b>勾選</b>要觸發轉盤的那一個（可以勾好幾個），勾了就完成，不用另外按儲存。</p>
-  <img class="shot w85" src="img/step2-done.png">
-  <p class="cap">勾選「忠誠點轉盤」：觀眾兌換它才會轉；兌換「喝水」不會轉</p>
-
-  <h3>清單裡沒有我要的品項？先到 Twitch 新增一個</h3>
+  <h2>5　設定步驟 2：建立觸發轉盤的品項</h2>
+  <p>觀眾兌換這個忠誠點品項時，就會自動轉一次轉盤。<b>直接在網頁上建立</b>最簡單，也最完整：</p>
   <ol class="steps">
-    <li>在 Twitch 網站右上角點你的<b>頭像</b> → <span class="k m">創作者工作台</span>。</li>
-    <li>左邊選單找到 <span class="k m">觀眾獎勵</span> → <span class="k m">忠誠點數</span>。</li>
-    <li>按 <span class="k m">管理獎勵與挑戰</span> → <span class="k p">＋ 新增自訂獎勵</span>。</li>
-    <li>名稱填例如「忠誠點轉盤」，設定要花多少點數，按 <span class="k p">建立</span>。</li>
-    <li>回到轉盤網頁，按 <span class="k">重新整理清單</span>，就會出現了，勾選它。</li>
+    <li>「品項名稱」填觀眾在聊天室看到的名字（預設「忠誠點轉盤」）。</li>
+    <li>「要花多少忠誠點」填兌換一次要幾點。</li>
+    <li>按 <span class="k y">建立品項</span>。網頁會在你的 Twitch 頻道建立這個品項，並自動勾選好，步驟 2 打勾就完成了。</li>
   </ol>
-  <div class="box tip"><b>Twitch 的選單名稱可能和這裡寫的有點不一樣</b>
-    Twitch 偶爾會改版，但大方向都是「創作者工作台 → 觀眾獎勵 → 忠誠點數」。找不到時在創作者工作台的搜尋欄打「獎勵」也可以。
+  <img class="shot w85" src="img/step2-done.png">
+  <p class="cap">建立後，清單裡的品項會標示「可補抓、可退點」並自動勾選</p>
+  <h3>清單裡的標籤是什麼意思？</h3>
+  <table>
+    <tr><th style="width:30%">標籤</th><th>意思</th></tr>
+    <tr><td><span class="tw-tag good" style="background:var(--green);color:#fff;border-radius:3mm;padding:0 2mm;font-weight:700">可補抓、可退點</span></td><td>在這個網頁建立的品項。網頁關著時的兌換之後能補轉，撤銷時能退還忠誠點。<b>建議用這種。</b></td></tr>
+    <tr><td><span style="background:#eee;border-radius:3mm;padding:0 2mm;font-weight:700">手動建立</span></td><td>你自己在 Twitch 後台建立的品項。勾選也能用，但<b>網頁開著時才收得到</b>，網頁關著時的兌換會漏掉，撤銷時也不能退點（Twitch 規定只有建立品項的那一方能處理）。</td></tr>
+    <tr><td><span style="background:var(--yellow);border-radius:3mm;padding:0 2mm;font-weight:700">略過佇列：無法補抓</span></td><td>這個品項在 Twitch 被設成「略過獎勵請求佇列」，兌換會直接變成已完成，補抓和退點都沒辦法用。到 Twitch 把這個選項關掉即可。</td></tr>
+  </table>
+  <div class="box tip"><b>品項建好之後，可以到 Twitch 後台改圖示、顏色、說明</b>
+    改了名稱或停用後，回網頁按 <span class="k">重新整理清單</span>。名稱和點數也可以在 Twitch 後台改，不影響轉盤。
   </div>
-  <div class="box warn"><b>Twitch 上的「需要觀眾輸入文字」請不要勾</b>
-    不影響轉盤，但觀眾會多一個要打字的步驟。另外，網頁<b>不會</b>自動把兌換標成「已完成」，Twitch 的兌換佇列請照你原本的習慣處理（或把該獎勵設成「略過獎勵請求佇列」）。
+  <div class="box warn"><b>Twitch 的「獎勵請求佇列」會看到最近 24 小時的兌換還是「待處理」</b>
+    這是刻意的：Twitch 規定兌換標成「已完成」後就不能退點，所以網頁會先保留 24 小時讓你撤銷時可以退點，<b>24 小時後自動標成已完成</b>。你不用自己去佇列裡處理，也請不要在佇列裡按「完成」或「退款」，交給網頁就好。
+  </div>
+  <div class="box warn"><b>網頁說「請重新連接一次」、建立品項的按鈕按不了？</b>
+    表示你的 Twitch 授權是更新前的舊版。按步驟 1 的 <span class="k">換一個帳號</span>，用<b>同一個帳號</b>再授權一次就好。
   </div>
 </section>
 
@@ -243,25 +252,23 @@
     <li>在 Apps Script 的編輯區裡點一下，按 <span class="k">Ctrl</span>＋<span class="k">A</span>（全選），再按 <span class="k">Delete</span>，把原本的字<b>全部刪掉</b>。</li>
     <li>回到轉盤網頁，按步驟 3 裡黃色的 <span class="k y">複製程式碼</span>，按鈕會變成「✓ 已複製」。</li>
     <li>回到 Apps Script 編輯區，按 <span class="k">Ctrl</span>＋<span class="k">V</span> 貼上。會出現一大段文字，開頭是「忠誠點轉盤 → Google 試算表 接收器」。</li>
-    <li>按上方的 <span class="k">💾 儲存專案</span>（磁碟片圖示），或按 <span class="k">Ctrl</span>＋<span class="k">S</span>。</li>
+    <li>按上方的 <span class="k">儲存專案</span>（磁碟片圖示），或按 <span class="k">Ctrl</span>＋<span class="k">S</span>。</li>
   </ol>
   <div class="box stop"><b>程式碼裡有一組「只屬於你的暗號」，請不要改它、也不要傳給別人</b>
     這組暗號讓試算表只接受你的轉盤網頁寫入。程式碼裡其他文字也都不需要修改。
   </div>
-</section>
 
-<section class="chapter">
-  <h3 style="margin-top:0">6-3　部署成「網頁應用程式」</h3>
+  <h3>6-3　部署成「網頁應用程式」</h3>
   <p>「部署」的意思是把剛剛貼的程式啟動起來，產生一個專屬網址讓轉盤網頁連過來。</p>
   <ol class="steps">
     <li>Apps Script 右上角按藍色的 <span class="k g">部署</span> → <span class="k m">新增部署作業</span>。</li>
-    <li>跳出的視窗左上方「選取類型」旁邊有一個<b>齒輪 ⚙</b>，點它 → 選 <span class="k m">網頁應用程式</span>。</li>
+    <li>跳出的視窗左上方「選取類型」旁邊有一個<b>齒輪圖示</b>，點它 → 選 <span class="k m">網頁應用程式</span>。</li>
     <li>右邊會出現幾個欄位，照這樣設定：
       <table class="avoid" style="margin-top:2mm">
         <tr><th style="width:34%">欄位</th><th>要選什麼</th></tr>
         <tr><td>說明</td><td>可以不填（或填「轉盤」）</td></tr>
         <tr><td>執行身分</td><td><b>我</b>（後面會顯示你的 Gmail）</td></tr>
-        <tr><td>誰可以存取</td><td><b>所有人</b>　⚠️ 最常選錯的地方，不是「只有我自己」也不是「擁有 Google 帳戶的使用者」</td></tr>
+        <tr><td>誰可以存取</td><td><b>所有人</b>　（最常選錯的地方），不是「只有我自己」也不是「擁有 Google 帳戶的使用者」</td></tr>
       </table>
     </li>
     <li>按右下角的 <span class="k g">部署</span>。</li>
@@ -288,10 +295,8 @@
   <div class="box warn"><b>如果點完「允許」小視窗就消失、沒看到網址</b>
     回到 Apps Script，再按一次 <span class="k g">部署</span> → <span class="k m">新增部署作業</span>，設定一樣，這次就不會再問權限，直接給你網址。
   </div>
-</section>
 
-<section class="chapter">
-  <h3 style="margin-top:0">6-5　複製網址，貼回轉盤網頁</h3>
+  <h3>6-5　複製網址，貼回轉盤網頁</h3>
   <ol class="steps">
     <li>部署成功的視窗會顯示「網頁應用程式」底下一串網址，長得像：<br><span class="url">https://script.google.com/macros/s/AKfycb……很長……/exec</span><br>按它旁邊的 <span class="k gw">複製</span>。</li>
     <li>回到轉盤網頁步驟 3 的第 5 點，點一下輸入框，按 <span class="k">Ctrl</span>＋<span class="k">V</span> 貼上。</li>
@@ -301,16 +306,16 @@
   <h3>6-6　看測試結果</h3>
   <p><b>成功</b>的話會出現綠色框，告訴你連到哪一份試算表、名單有幾個人、今天的結果會寫在哪幾欄。步驟 3 會打勾 ✓。</p>
   <img class="shot" src="img/step3-ok.png">
-  <p class="cap">成功：今天（10/4）的結果會寫在「10月」分頁的 AA、AB、AC 欄</p>
+  <p class="cap">成功：寫出今天的結果會寫在哪個分頁的哪幾欄</p>
   <div class="box tip"><b>建議順手核對一下</b>
-    打開試算表的「10月」分頁，看看 10/4 底下的「1點／3點／5點」是不是真的在它說的那幾欄（欄名在最上面一排：A、B、C…AA、AB…）。對得上就沒問題了。
+    打開試算表的「10月」分頁，看看今天日期底下的「1點／3點／5點」是不是真的在它說的那幾欄（欄名在最上面一排：A、B、C…AA、AB…）。對得上就沒問題了。
   </div>
   <p><b>失敗</b>的話會出現紅色框和原因，照下表處理：</p>
   <table>
     <tr><th style="width:42%">看到的訊息</th><th>怎麼辦</th></tr>
     <tr><td>網址看起來不對／這是程式編輯器的網址</td><td>貼錯網址了。要貼的是部署完成視窗裡、結尾是 <code>/exec</code> 的那一串，<b>不是</b>瀏覽器網址列上的網址。可以到 Apps Script 按 <span class="k g">部署</span> → <span class="k m">管理部署作業</span> 找到它。</td></tr>
-    <tr><td>連不到試算表</td><td>多半是 6-3「誰可以存取」沒選「所有人」。到 <span class="k m">管理部署作業</span> → ✏️ 編輯 → 改成「所有人」→ 版本選「新版本」→ 部署。</td></tr>
-    <tr><td>暗號不符</td><td>貼到 Apps Script 的程式碼不是這台電腦複製的。重新做 6-2（複製、全刪、貼上、儲存），再到 <span class="k m">管理部署作業</span> → ✏️ 編輯 → 版本選「新版本」→ 部署。</td></tr>
+    <tr><td>連不到試算表</td><td>多半是 6-3「誰可以存取」沒選「所有人」。到 <span class="k m">管理部署作業</span> → 鉛筆圖示（編輯） → 改成「所有人」→ 版本選「新版本」→ 部署。</td></tr>
+    <tr><td>暗號不符</td><td>貼到 Apps Script 的程式碼不是這台電腦複製的。重新做 6-2（複製、全刪、貼上、儲存），再到 <span class="k m">管理部署作業</span> → 鉛筆圖示（編輯） → 版本選「新版本」→ 部署。</td></tr>
     <tr><td>找不到「兌換紀錄」分頁</td><td>程式是從別的試算表打開的，或分頁被改名了。確認 6-1 是從轉盤紀錄試算表裡點的。</td></tr>
     <tr><td>找不到「10月」分頁／找不到 10/4 這一天</td><td>試算表還沒有這個月的分頁，或分頁第一排沒有這天的日期。照原本的格式補上（見第 12 章）。</td></tr>
   </table>
@@ -365,7 +370,6 @@
     裡面也含有暗號，請不要公開。換電腦重新設定後，要重新複製一次 OBS 網址貼到 OBS。
   </div>
   <p>全部設定好後，按頁面最下面的 <span class="k y">完成，開始直播 →</span>。</p>
-  <img class="shot w45" src="img/finish.png">
 </section>
 
 <!-- ======================= 9 ======================= -->
@@ -410,11 +414,12 @@
   <ol class="steps">
     <li>用書籤打開忠誠點轉盤網頁（會自動連線，不用重新設定）。</li>
     <li>看右上角：<b>Twitch</b> 和 <b>試算表</b> 兩顆燈是綠色的。</li>
+    <li>如果跳出「網頁關著時有 N 筆兌換還沒轉」，照第 11 章處理（通常直接按 <span class="k y">補轉勾選的</span>）。</li>
     <li>（有用 OBS 的話）開 OBS。想確認的話按 <span class="k">設定</span> → 步驟 5 的 <span class="k">測試 OBS</span>。</li>
     <li>開台！之後不用管它。</li>
   </ol>
   <div class="box stop"><b>直播時不要關掉這個網頁</b>
-    網頁關掉就收不到兌換了。可以把它<b>縮小</b>或切到別的分頁，沒關係。也請把電腦的<b>自動睡眠</b>關掉（Windows：設定 → 系統 → 電源 → 螢幕與睡眠，設成「永不」）。
+    網頁關掉時轉盤不會轉，觀眾要等你下次打開網頁才會補轉。可以把它<b>縮小</b>或切到別的分頁，沒關係。也請把電腦的<b>自動睡眠</b>關掉（Windows：設定 → 系統 → 電源 → 螢幕與睡眠，設成「永不」）。
   </div>
   <div class="box warn"><b>同一個網頁只能開一個分頁</b>
     不小心開了兩個，第二個會顯示「這個網頁已經在另一個分頁開著」並暫停，避免同一筆兌換轉兩次。回到原本的分頁就好；或在新分頁按「改由這個分頁接手」。
@@ -430,8 +435,21 @@
 <!-- ======================= 11 ======================= -->
 <section class="chapter">
   <h2>11　常用操作</h2>
-  <h3>手動補一筆（漏掉的兌換）</h3>
-  <p>例如網頁沒開的時候有人兌換了，可以手動補：</p>
+  <h3>補轉網頁關著時的兌換</h3>
+  <p>打開網頁、或網路斷線後重新連上時，網頁會自動檢查有沒有漏掉的兌換。有的話會跳出清單：</p>
+  <img class="shot w75" src="img/catchup.png">
+  <ol class="steps">
+    <li>清單列出每一筆的觀眾和<b>當時兌換的時間</b>，預設全部勾選。</li>
+    <li>按 <span class="k y">補轉勾選的</span>：依序補轉，結果記在<b>觀眾兌換的那一天</b>，不是今天。</li>
+    <li><b>沒勾的</b>不轉盤，忠誠點會<b>退還給觀眾</b>（按下去前會再問你一次）。</li>
+    <li>現在不方便處理（例如正在直播別的環節），按 <span class="k">稍後再說</span>。畫面上方會留一條提醒，之後按 <span class="k">查看並補轉</span> 再處理。</li>
+  </ol>
+  <div class="box tip"><b>只有「可補抓」的品項會出現在這裡</b>
+    在 Twitch 後台手動建立的品項，網頁關著時的兌換查不到，只能用下面的「手動補一筆」。
+  </div>
+
+  <h3>手動補一筆</h3>
+  <p>用在「手動建立」的品項漏掉的兌換，或任何你想額外加一次轉盤的時候：</p>
   <ol class="steps">
     <li>直播畫面按 <span class="k">＋ 手動補一筆</span>。</li>
     <li>輸入觀眾名稱，下面三種寫法都可以：<code>小于甜心 (xiaoyuthesweetheart_)</code>、<code>xiaoyuthesweetheart_</code>（帳號）、或試算表名單裡的名稱。</li>
@@ -442,13 +460,21 @@
     如果是前幾天漏掉的，又想記在當天，請直接打開試算表，在那天那一格手動 +1。
   </div>
 
-  <h3>撤銷（記錯了、要作廢）</h3>
+  <h3>撤銷（記錯了、要作廢）與退點</h3>
   <ol class="steps">
     <li>在「最近紀錄」找到那一筆，按旁邊的 <span class="k">撤銷</span>。</li>
-    <li>確認視窗按 <span class="k" style="background:var(--red);color:#fff">撤銷</span>，試算表那格會 −1，紀錄變成「已撤銷」。</li>
+    <li>選擇要怎麼撤銷：
+      <ul>
+        <li><b>撤銷，並退還忠誠點</b>：試算表那格 −1，觀眾的忠誠點也退回去。</li>
+        <li><b>只撤銷試算表</b>：試算表那格 −1，忠誠點不退。</li>
+      </ul>
+    </li>
+    <li>按 <span class="k" style="background:var(--red);color:#fff">撤銷</span>，紀錄變成「已撤銷」，有退點的會再寫「已退還忠誠點」。</li>
   </ol>
   <img class="shot w60" src="img/undo.png">
-  <p>撤銷<b>不會</b>退還觀眾在 Twitch 的忠誠點，要退的話請在 Twitch 的兌換佇列裡處理。</p>
+  <div class="box warn"><b>退點只能在 24 小時內</b>
+    轉完 24 小時後，網頁會在 Twitch 把那筆標成已完成，之後 Twitch 就不允許退點了，只能「只撤銷試算表」。「手動建立」的品項和手動補登的紀錄，也都沒辦法從網頁退點；退點的選項會變灰，並寫出原因。
+  </div>
 
   <h3>試轉（不記錄）</h3>
   <p>按 <span class="k">試轉（不記錄）</span> 會轉一次給你看，<b>不會</b>寫進試算表。適合開台前確認轉盤、OBS 畫面正常。</p>
@@ -458,10 +484,13 @@
 <section class="chapter">
   <h2>12　出問題怎麼辦</h2>
   <p>出問題時，畫面最上方會出現<b>紅色提醒條</b>，通常直接按提醒條右邊的按鈕就能解決。</p>
+  <div class="box tip"><b>還是解決不了？</b>
+    把畫面最上方紅色提醒條的文字，或「最近紀錄」那筆後面寫的原因，截圖給幫你架設的人看，他就能知道是哪裡出問題。
+  </div>
 
   <h3>「Twitch 登入過期了」</h3>
   <img class="shot" src="img/alert-twitch.png">
-  <p>Twitch 的登入每隔一段時間會失效，這是正常的。按 <span class="k">重新連接 Twitch</span>，照第 4 章再授權一次就好。<b>排隊中的兌換和紀錄都不會不見</b>，但過期期間有人兌換的話網頁收不到，請用「手動補一筆」補上。</p>
+  <p>Twitch 的登入每隔一段時間會失效，這是正常的。按 <span class="k">重新連接 Twitch</span>，照第 4 章再授權一次就好。<b>排隊中的兌換和紀錄都不會不見</b>；過期期間有人兌換的話，重新連接後會出現在補轉清單裡（「手動建立」的品項除外，要用「手動補一筆」補上）。</p>
 
   <h3>「有 N 筆沒寫進試算表」</h3>
   <img class="shot" src="img/alert-row-error.png">
@@ -481,19 +510,19 @@
   <h3>其他常見問題</h3>
   <table>
     <tr><th style="width:38%">狀況</th><th>怎麼辦</th></tr>
+    <tr><td>上方提醒「重新連接 Twitch 一次，就能補抓…退點」</td><td>你的 Twitch 授權是更新前的舊版，按提醒條上的 <span class="k">重新連接 Twitch</span>，用同一個帳號再授權一次。</td></tr>
+    <tr><td>某筆寫著「退點失敗」</td><td>那筆兌換在 Twitch 上已經被處理過（例如有人在 Twitch 的獎勵請求佇列手動按了完成），就不能退了。需要的話請在 Twitch 上用其他方式補償觀眾。</td></tr>
+    <tr><td>補轉清單裡出現已經轉過的人</td><td>通常是換了電腦或清了瀏覽器資料，網頁不記得轉過了。取消勾選那幾筆會<b>退點</b>，所以如果確定轉過了，可以照轉：試算表那邊會認出是同一筆兌換，<b>不會重複記</b>。</td></tr>
     <tr><td>觀眾兌換了，轉盤沒轉</td><td>① 看 Twitch 燈是不是綠色；② 設定步驟 2 有沒有勾到觀眾兌換的那個品項；③ 網頁是不是開著（且不是「另一個分頁開著」的暫停畫面）。</td></tr>
     <tr><td>網頁有轉，OBS 畫面沒出現</td><td>① 設定步驟 5 按「測試 OBS」，看 OBS 右下角小圓點有沒有閃；② 確認 OBS 裡的網址是最新複製的；③ 在 OBS 對該來源按右鍵 → <span class="k m">內容</span> → 最下面 <span class="k">重新整理目前頁面的快取</span>。</td></tr>
     <tr><td>OBS 右下角小圓點是紅色</td><td>OBS 網址不完整或是舊的，重新複製 OBS 網址貼上。</td></tr>
     <tr><td>觀眾改了名字</td><td>不影響，網頁用 Twitch 帳號找人。試算表上的名稱不會自動改，想改可以自己改，但<b>括號裡的帳號請保留</b>。</td></tr>
     <tr><td>同一個人在名單上出現兩次</td><td>可能舊資料的帳號拼錯了。把兩列合併成一列（括號裡寫正確的 Twitch 帳號）即可。</td></tr>
     <tr><td>名單 999 人滿了</td><td>新觀眾會接在最後一列之後，但月份分頁和總表沒有那一列的公式。請照原本的方式往下多拉幾列公式。</td></tr>
-    <tr><td>換電腦／換瀏覽器／清了瀏覽器資料</td><td>要重做設定步驟 1～5。⚠️ 步驟 3 一定要用<b>新電腦</b>按「複製程式碼」，貼到 Apps Script 取代舊的、儲存，再 <span class="k g">部署</span> → <span class="k m">管理部署作業</span> → ✏️ 編輯 → 版本選 <span class="k m">新版本</span> → <span class="k g">部署</span>（網址不會變）。OBS 網址也要重新複製。</td></tr>
+    <tr><td>換電腦／換瀏覽器／清了瀏覽器資料</td><td>要重做設定步驟 1～5。注意：步驟 3 一定要用<b>新電腦</b>按「複製程式碼」，貼到 Apps Script 取代舊的、儲存，再 <span class="k g">部署</span> → <span class="k m">管理部署作業</span> → 鉛筆圖示（編輯） → 版本選 <span class="k m">新版本</span> → <span class="k g">部署</span>（網址不會變）。OBS 網址也要重新複製。</td></tr>
     <tr><td>新的一年換了一份新的試算表</td><td>在新的試算表上重做第 6 章（會得到新的網址），貼到步驟 3 測試連線。</td></tr>
-    <tr><td>想確認到底有沒有寫進去</td><td>「最近紀錄」每一筆後面都寫了格子位置（例如 10月!AB3），到試算表對應分頁的那一格看就知道。</td></tr>
   </table>
-  <div class="box tip"><b>還是解決不了？</b>
-    把畫面最上方紅色提醒條的文字，或「最近紀錄」那筆後面寫的原因，截圖給幫你架設的人看，他就能知道是哪裡出問題。
-  </div>
+
 </section>
 
 <!-- ======================= 13 ======================= -->
@@ -502,7 +531,9 @@
   <table>
     <tr><th style="width:26%">名詞</th><th>白話解釋</th></tr>
     <tr><td>忠誠點／忠誠點品項</td><td>Twitch 觀眾看台累積的頻道點數；「品項」是你設定讓觀眾用點數兌換的東西（例如「忠誠點轉盤」）。</td></tr>
-    <tr><td>授權</td><td>允許某個網頁使用你帳號的某些功能。這裡只允許「看得到忠誠點兌換」。</td></tr>
+    <tr><td>授權</td><td>允許某個網頁使用你帳號的某些功能。這裡只允許忠誠點相關的功能（看兌換、建立品項、標成完成或退點）。</td></tr>
+    <tr><td>獎勵請求佇列</td><td>Twitch 上等待實況主處理的兌換清單。這個網頁會自動處理，不用手動按完成。</td></tr>
+    <tr><td>補抓／補轉</td><td>網頁關著時有人兌換，下次打開網頁時把那幾筆找出來補轉。</td></tr>
     <tr><td>Apps Script</td><td>Google 試算表內建的小程式功能。我們把一段程式貼進去，讓它幫忙寫試算表。</td></tr>
     <tr><td>部署</td><td>把 Apps Script 的程式「啟動」起來，並產生一個專屬網址。</td></tr>
     <tr><td>網頁應用程式網址</td><td>部署後拿到、結尾是 <code>/exec</code> 的那串網址，轉盤網頁靠它把結果送進試算表。</td></tr>
@@ -513,8 +544,8 @@
     <tr><td>權重</td><td>決定每一格被轉到機會大小的數字，越大越容易轉到。</td></tr>
   </table>
   <div class="box ok" style="margin-top:8mm"><b>一頁總結</b>
-    設定一次：連 Twitch → 勾品項 → 把程式碼貼進試算表的 Apps Script 並部署 → 網址貼回來測試 →（可選）OBS。<br>
-    每次開台：打開網頁、看燈是綠的、不要關網頁。<br>
+    設定一次：連 Twitch → 在網頁建立品項 → 把程式碼貼進試算表的 Apps Script 並部署 → 網址貼回來測試 →（可選）OBS。<br>
+    每次開台：打開網頁、有補轉清單就按「補轉勾選的」、看燈是綠的、不要關網頁。<br>
     有紅色提醒：按提醒條上的按鈕。
   </div>
 </section>

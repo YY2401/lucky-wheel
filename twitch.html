@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>忠誠點轉盤</title>
-<meta name="app-version" content="55">
+<meta name="app-version" content="56">
 <script>try { document.documentElement.dataset.theme = localStorage.getItem('tw.theme') || 'light'; } catch (e) { document.documentElement.dataset.theme = 'light'; }</script>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=55">
-<link rel="stylesheet" href="twitch.css?v=55">
+<link rel="stylesheet" href="style.css?v=56">
+<link rel="stylesheet" href="twitch.css?v=56">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.1/mqtt.min.js"></script>
 </head>
 <body class="tw">
@@ -72,10 +72,17 @@
   <section class="tw-step" id="step2">
     <div class="tw-step-num">2</div>
     <div class="tw-step-body">
-      <h2>選擇要觸發轉盤的忠誠點品項 <span class="tw-done">✓ 完成</span></h2>
-      <p>觀眾兌換你勾選的品項時，就會自動轉一次轉盤。</p>
+      <h2>建立觸發轉盤的忠誠點品項 <span class="tw-done">✓ 完成</span></h2>
+      <p>觀眾兌換這個品項時，就會自動轉一次轉盤。<b>建議直接在這裡建立</b>：網頁關著時的兌換之後也能補抓，撤銷時也能退還忠誠點。</p>
+      <div class="tw-create" id="createBox">
+        <label class="tw-field">品項名稱 <input id="newRewardTitle" value="忠誠點轉盤" maxlength="45" style="width:200px"></label>
+        <label class="tw-field">要花多少忠誠點 <input type="number" id="newRewardCost" value="500" min="1" step="1"></label>
+        <button class="btn primary" id="createReward">建立品項</button>
+        <p class="tw-err hidden" id="createErr"></p>
+      </div>
+      <h3 class="tw-sub">你頻道的品項（勾選的才會觸發轉盤）</h3>
       <div class="tw-rewards" id="rewards"><p class="hint">先完成步驟 1。</p></div>
-      <p class="hint">清單裡沒有？先到 Twitch「創作者工作台 → 觀眾獎勵 → 忠誠點數 → 管理獎勵」新增一個（例如「忠誠點轉盤」），再按 <button class="btn icon" id="reloadRewards">重新整理清單</button></p>
+      <p class="hint">在 Twitch 後台改了品項（改名、停用）後，按 <button class="btn icon" id="reloadRewards">重新整理清單</button>。標示「手動建立」的品項也能用，但網頁關著時的兌換收不到、也不能退點。</p>
     </div>
   </section>
 
@@ -170,6 +177,24 @@
   </aside>
 </main>
 
+<div class="modal hidden" id="catchupModal">
+  <div class="modal-box">
+    <h3 style="margin:0 0 6px;font-size:22px">網頁關著時有 <span id="catchupCount">0</span> 筆兌換還沒轉</h3>
+    <p class="hint">勾選的會照順序補轉，並記在<b>觀眾當時兌換的那一天</b>。沒勾的會<b>退還忠誠點</b>給觀眾。</p>
+    <div class="tw-row" style="margin:0 0 6px"><button class="btn icon" id="catchupAll">全選</button><button class="btn icon" id="catchupNone">全不選</button></div>
+    <ul class="tw-list tw-catchup" id="catchupList"></ul>
+    <div class="modal-actions"><button class="btn" id="catchupLater">稍後再說</button><button class="btn primary" id="catchupGo">補轉勾選的</button></div>
+  </div>
+</div>
+<div class="modal hidden" id="undoModal">
+  <div class="modal-box" style="width:min(560px,100%)">
+    <h3 style="margin:0 0 6px;font-size:22px">撤銷這一筆？</h3>
+    <p class="msg" id="undoMsg"></p>
+    <label class="tw-choice"><input type="radio" name="undoRefund" value="1" id="undoRefundYes"> <span><b>撤銷，並退還忠誠點</b><br><small class="hint" id="undoRefundHint"></small></span></label>
+    <label class="tw-choice"><input type="radio" name="undoRefund" value="0" id="undoRefundNo"> <span><b>只撤銷試算表</b><br><small class="hint">觀眾的忠誠點不退</small></span></label>
+    <div class="modal-actions"><button class="btn" id="undoCancel">取消</button><button class="btn danger" id="undoOk">撤銷</button></div>
+  </div>
+</div>
 <div class="modal hidden" id="lockScreen">
   <div class="modal-box" style="text-align:center;width:min(520px,100%)">
     <h3 style="margin:0 0 10px;font-size:22px">這個網頁已經在另一個分頁開著</h3>
@@ -190,12 +215,12 @@
 </div>
 <div id="toast"></div>
 
-<script src="core.js?v=55"></script>
-<script src="twitch-core.js?v=55"></script>
-<script src="wheel.js?v=55"></script>
-<script src="ui.js?v=55"></script>
-<script src="store.js?v=55"></script>
-<script src="sync.js?v=55"></script>
-<script src="twitch.js?v=55"></script>
+<script src="core.js?v=56"></script>
+<script src="twitch-core.js?v=56"></script>
+<script src="wheel.js?v=56"></script>
+<script src="ui.js?v=56"></script>
+<script src="store.js?v=56"></script>
+<script src="sync.js?v=56"></script>
+<script src="twitch.js?v=56"></script>
 </body>
 </html>

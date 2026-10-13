@@ -80,7 +80,8 @@
   }
 
   // 一筆轉盤紀錄。id 用 Twitch 兌換編號（同一筆兌換不會轉兩次、不會寫兩次）
-  function makeRecord({ id, login = '', display = '', reward = '', prize, now = new Date(), cutoffHour = 0, test = false }) {
+  // rewardId 有值＝來自 Twitch 兌換：先在 Twitch 保持「未完成」HOLD_MS（這段時間撤銷可退點），之後自動標成已完成
+  function makeRecord({ id, login = '', display = '', reward = '', rewardId = '', prize, now = new Date(), cutoffHour = 0, test = false, processedAt = Date.now() }) {
     return {
       id: String(id || `m-${randId(10)}`),
       time: now.toISOString(),
@@ -90,7 +91,43 @@
       prizeId: prize.id, prize: prize.name, column: prize.column, color: prize.color,
       status: test ? 'test' : 'pending', // pending 待寫入 / ok 已寫入 / error 失敗 / undoing 撤銷中 / undone 已撤銷 / test 測試不寫入
       cell: '', error: '', attempts: 0,
+      rewardId: String(rewardId || ''),
+      tw: rewardId && !test ? 'hold' : '', // hold 可退點期 / fulfilled 已完成 / to-cancel 退點中 / canceled 已退點 / cancel-failed 退點失敗
+      holdUntil: rewardId && !test ? processedAt + HOLD_MS : 0,
     };
+  }
+
+  // ---------- Twitch 兌換狀態 ----------
+  // Twitch 規定：兌換標成「已完成」後就不能退點，所以先保留一段可退點期
+  const HOLD_MS = 24 * 3600 * 1000;
+  const TW_CHUNK = 50; // Twitch 一次最多改 50 筆
+
+  // 該送給 Twitch 的狀態更新：[{ rewardId, status: 'FULFILLED' | 'CANCELED', ids }]
+  function dueTwitchUpdates(records, now = Date.now()) {
+    const groups = new Map();
+    for (const r of records) {
+      let status = null;
+      if (r.tw === 'hold' && r.holdUntil && now >= r.holdUntil) status = 'FULFILLED';
+      else if (r.tw === 'to-cancel') status = 'CANCELED';
+      if (!status || !r.rewardId) continue;
+      const k = `${r.rewardId}|${status}`;
+      if (!groups.has(k)) groups.set(k, { rewardId: r.rewardId, status, ids: [] });
+      groups.get(k).ids.push(r.id);
+    }
+    const out = [];
+    for (const g of groups.values()) for (let i = 0; i < g.ids.length; i += TW_CHUNK) out.push({ ...g, ids: g.ids.slice(i, i + TW_CHUNK) });
+    return out;
+  }
+  // 下一次要醒來處理「可退點期滿」的時間（沒有就回 0）
+  const nextHoldExpiry = (records) => records.reduce((m, r) => (r.tw === 'hold' && r.holdUntil && (!m || r.holdUntil < m) ? r.holdUntil : m), 0);
+
+  // Twitch 上還是「未完成」、但這個網頁沒有處理過的兌換＝網頁關著時漏掉的
+  function missedRedemptions(redemptions, knownIds) {
+    const known = new Set(knownIds);
+    const seen = new Set();
+    return redemptions.filter((x) => x && x.id && !known.has(x.id) && !seen.has(x.id) && seen.add(x.id))
+      .map((x) => ({ id: x.id, login: x.user_login || '', display: x.user_name || x.user_login || '', reward: (x.reward && x.reward.title) || '', rewardId: (x.reward && x.reward.id) || '', at: x.redeemed_at || new Date().toISOString() }))
+      .sort((a, b) => String(a.at).localeCompare(String(b.at)));
   }
 
   // 要送給 Apps Script 的欄位（不送顏色等用不到的）
@@ -102,5 +139,5 @@
   // 只有原始碼裡的 '__KEY__' 會被換掉
   const scriptWithKey = (src, key) => String(src).replace("const KEY = '__KEY__';", `const KEY = '${key}';`);
 
-  return { SHEET_COLUMNS, DEFAULT_PRIZES, DEFAULT_TW, normalizeTwPrize, normalizeTwConfig, parseViewer, dayKey, makeRecord, forSheet, viewerLabel, scriptWithKey };
+  return { SHEET_COLUMNS, DEFAULT_PRIZES, DEFAULT_TW, HOLD_MS, normalizeTwPrize, normalizeTwConfig, parseViewer, dayKey, makeRecord, forSheet, viewerLabel, scriptWithKey, dueTwitchUpdates, nextHoldExpiry, missedRedemptions };
 });

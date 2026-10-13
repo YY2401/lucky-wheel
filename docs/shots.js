@@ -97,14 +97,25 @@ const BASE = { clientId: 'cid', sync: false, spinDuration: 2600, resultSeconds: 
   await page.evaluate(() => localStorage.removeItem('mock.validate'));
 
   // 6. 手動補一筆、撤銷確認
-  await reset({ 'tw.config': READY, 'tw.auth': { token: 'tok', clientId: 'cid' }, 'tw.records': [rec(1, 'gabai', '嘎唄', '3點', 'ok')] });
+  const hold = { rewardId: 'rw1', tw: 'hold', holdUntil: Date.now() + 20 * 3600e3 };
+  await reset({ 'tw.config': READY, 'tw.auth': { token: 'tok', clientId: 'cid' }, 'tw.records': [rec(1, 'gabai', '嘎唄', '3點', 'ok', hold)] });
   await page.click('#manualAdd'); await sleep(300);
   await page.type('#confirmInput', '小于甜心 (xiaoyuthesweetheart_)');
   await shot('manual-add', '#confirmModal .modal-box', 6);
   await page.click('#confirmCancel'); await sleep(300);
   await page.click('[data-undo="r1"]'); await sleep(300);
-  await shot('undo', '#confirmModal .modal-box', 6);
-  await page.click('#confirmCancel');
+  await shot('undo', '#undoModal .modal-box', 6);
+  await page.click('#undoCancel');
+
+  // 6-2. 補轉清單：網頁關著時的兌換
+  const day = (d, h) => new Date(2026, 9, d, h, 12).toISOString();
+  const un = (id, login, name, at) => ({ id, user_login: login, user_name: name, redeemed_at: at, status: 'UNFULFILLED', reward: { id: 'rw1', title: '忠誠點轉盤' } });
+  await page.evaluate((u) => localStorage.setItem('mock.unfulfilled', JSON.stringify(u)), [un('c1', 'smallseafood', '小海鮮', day(3, 22)), un('c2', 'toastiwa', '吐司瓦熊', day(3, 23)), un('c3', 'haruneuka', 'HaruneUka', day(4, 1))]);
+  await reset({ 'tw.config': READY, 'tw.auth': { token: 'tok', clientId: 'cid' } });
+  await page.waitForSelector('#catchupModal:not(.hidden)');
+  await shot('catchup', '#catchupModal .modal-box', 6);
+  await page.click('#catchupLater');
+  await page.evaluate(() => localStorage.removeItem('mock.unfulfilled'));
 
   // 7. OBS 畫面
   const cfg = await H.readKey(page, 'tw.config');

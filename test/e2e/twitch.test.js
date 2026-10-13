@@ -20,6 +20,7 @@ if (!H.chromePath()) {
     await page.evaluateOnNewDocument(installMocks);
     await page.goto(`${srv.url}/twitch.html`, { waitUntil: 'networkidle0' });
     await page.evaluate(() => new Promise((res) => { const r = indexedDB.deleteDatabase('lucky-wheel'); r.onsuccess = r.onerror = r.onblocked = () => res(); }));
+    await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('mock.')).forEach((k) => localStorage.removeItem(k)));
     const kv = { 'tw.records': [], 'tw.queue': [] };
     if (config) kv['tw.config'] = config;
     if (auth) kv['tw.auth'] = auth;
@@ -43,7 +44,7 @@ if (!H.chromePath()) {
     await waitFor(() => authUrl);
     assert.equal(authUrl.searchParams.get('client_id'), 'cid');
     assert.equal(authUrl.searchParams.get('response_type'), 'token');
-    assert.equal(authUrl.searchParams.get('scope'), 'channel:read:redemptions');
+    assert.equal(authUrl.searchParams.get('scope'), 'channel:read:redemptions channel:manage:redemptions');
     assert.equal(authUrl.searchParams.get('redirect_uri'), `${srv.url}/twitch.html`);
     assert.ok(authUrl.searchParams.get('state'));
     assert.deepEqual(page.errors, []);
@@ -133,14 +134,115 @@ if (!H.chromePath()) {
     assert.deepEqual(page.errors, []);
   });
 
-  test('撤銷：送出 undo，狀態變「已撤銷」', async (t) => {
-    const done = { id: 'u1', time: new Date().toISOString(), date: '2026-10-04', login: 'gabai', display: '嘎唄', reward: '轉', prizeId: 'pt3', prize: '3點', column: '3點', color: '#6bcb77', status: 'ok', cell: '10月!AB3', error: '', attempts: 1 };
-    const page = await open(t, { before: (p) => H.seed(p, { 'tw.records': [done] }) });
+  const doneRec = (id, extra = {}) => ({ id, time: new Date().toISOString(), date: '2026-10-04', login: 'gabai', display: '嘎唄', reward: '轉', prizeId: 'pt3', prize: '3點', column: '3點', color: '#6bcb77', status: 'ok', cell: '10月!AB3', error: '', attempts: 1, rewardId: '', tw: '', holdUntil: 0, ...extra });
+  const unfulfilled = (id, rewardId = 'rw1', at = new Date().toISOString(), login = 'gabai', name = '嘎唄') => ({ id, user_login: login, user_name: name, redeemed_at: at, status: 'UNFULFILLED', reward: { id: rewardId, title: '忠誠點轉盤' } });
+
+  test('撤銷（手動補登的紀錄）：沒有點數可退，只撤銷試算表', async (t) => {
+    const page = await open(t, { before: (p) => H.seed(p, { 'tw.records': [doneRec('u1')] }) });
     await page.click('[data-undo="u1"]'); await H.sleep(200);
-    await page.click('#confirmOk');
+    assert.equal(await page.$eval('#undoRefundYes', (e) => e.disabled), true);
+    assert.match(await page.$eval('#undoRefundHint', (e) => e.textContent), /手動補登/);
+    await page.click('#undoOk');
     await waitFor(async () => (await records(page))[0].status === 'undone');
     const call = await page.evaluate(() => window.__tw.sheetCalls.find((c) => c.action === 'undo'));
     assert.equal(call.records[0].id, 'u1');
+    assert.deepEqual(await page.evaluate(() => window.__tw.patches), []);
+  });
+
+  test('撤銷時選「退還忠誠點」：試算表減回去、Twitch 那筆退點；選「只撤銷」就不動 Twitch', async (t) => {
+    const hold = { rewardId: 'rw1', tw: 'hold', holdUntil: Date.now() + 3600e3 };
+    const page = await open(t, { before: async (p) => {
+      await H.seed(p, { 'tw.records': [doneRec('r1', hold), doneRec('r2', hold)] });
+      await p.evaluate((u) => localStorage.setItem('mock.unfulfilled', JSON.stringify(u)), [unfulfilled('r1'), unfulfilled('r2')]);
+    } });
+    await waitFor(() => page.evaluate(() => window.__tw.subscribed));
+    assert.equal(await page.$('#catchupModal.hidden') !== null, true, '已處理過的兌換不會被當成漏掉');
+    await page.click('[data-undo="r1"]'); await H.sleep(200);
+    assert.equal(await page.$eval('#undoRefundYes', (e) => e.checked && !e.disabled), true); // 可退點時預設勾「退還」
+    await page.click('#undoOk');
+    await waitFor(async () => { const r = (await records(page)).find((x) => x.id === 'r1'); return r.status === 'undone' && r.tw === 'canceled'; });
+    await page.click('[data-undo="r2"]'); await H.sleep(200);
+    await page.click('#undoRefundNo'); await page.click('#undoOk');
+    await waitFor(async () => (await records(page)).find((x) => x.id === 'r2').status === 'undone');
+    await H.sleep(300);
+    assert.deepEqual(await page.evaluate(() => window.__tw.patches), [{ rewardId: 'rw1', ids: ['r1'], status: 'CANCELED' }]);
+    assert.equal((await records(page)).find((x) => x.id === 'r2').tw, 'hold');
+    assert.match(await page.$eval('#recordList', (e) => e.textContent), /已退還忠誠點/);
+    assert.deepEqual(page.errors, []);
+  });
+
+  test('可退點期（24 小時）過了：自動在 Twitch 標成已完成，之後撤銷不能退點', async (t) => {
+    const page = await open(t, { before: async (p) => {
+      await H.seed(p, { 'tw.records': [doneRec('old', { rewardId: 'rw1', tw: 'hold', holdUntil: Date.now() - 1000 })] });
+      await p.evaluate((u) => localStorage.setItem('mock.unfulfilled', JSON.stringify(u)), [unfulfilled('old')]);
+    } });
+    await waitFor(async () => (await records(page))[0].tw === 'fulfilled', 10000);
+    assert.deepEqual(await page.evaluate(() => window.__tw.patches), [{ rewardId: 'rw1', ids: ['old'], status: 'FULFILLED' }]);
+    await page.click('[data-undo="old"]'); await H.sleep(200);
+    assert.equal(await page.$eval('#undoRefundYes', (e) => e.disabled), true);
+    assert.match(await page.$eval('#undoRefundHint', (e) => e.textContent), /24 小時/);
+  });
+
+  test('補抓：網頁關著時的兌換列出來確認；勾的照當天日期補轉，沒勾的退點', async (t) => {
+    const page = await open(t, { before: async (p) => {
+      await H.seed(p, { 'tw.records': [doneRec('seen', { rewardId: 'rw1', tw: 'hold', holdUntil: Date.now() + 3600e3 })] });
+      await p.evaluate((u) => localStorage.setItem('mock.unfulfilled', JSON.stringify(u)), [
+        unfulfilled('seen'), // 這個網頁處理過了
+        unfulfilled('m1', 'rw1', '2026-10-01T12:00:00.000Z', 'smallseafood', '小海鮮'),
+        unfulfilled('m2', 'rw1', '2026-10-02T12:00:00.000Z', 'toastiwa', '吐司瓦熊'),
+      ]);
+    } });
+    await waitFor(() => page.$eval('#catchupModal', (e) => !e.classList.contains('hidden')));
+    assert.equal(await page.$eval('#catchupCount', (e) => e.textContent), '2');
+    assert.match(await page.$eval('#catchupList', (e) => e.textContent), /小海鮮.*吐司瓦熊/s);
+    await page.click('#catchupList input[value="m2"]'); // 取消勾選 → 退點
+    await page.click('#catchupGo'); await H.sleep(300);
+    assert.match(await page.$eval('#confirmMsg', (e) => e.textContent), /吐司瓦熊/);
+    await page.click('#confirmOk');
+    const rec = await waitFor(async () => { const r = (await records(page)).find((x) => x.id === 'm1'); return r && r.status === 'ok' && r; }, 10000);
+    assert.equal(rec.date, new Date('2026-10-01T12:00:00.000Z').toLocaleDateString('sv')); // 記在兌換那天，不是今天
+    assert.equal(rec.tw, 'hold');
+    await waitFor(() => page.evaluate(() => window.__tw.patches.some((x) => x.status === 'CANCELED')));
+    assert.deepEqual(await page.evaluate(() => window.__tw.patches), [{ rewardId: 'rw1', ids: ['m2'], status: 'CANCELED' }]);
+    assert.equal((await records(page)).some((x) => x.id === 'm2'), false);
+    assert.deepEqual(page.errors, []);
+  });
+
+  test('補抓按「稍後再說」：上方提醒列留著，按了可以再打開', async (t) => {
+    const page = await open(t, { before: (p) => p.evaluate((u) => localStorage.setItem('mock.unfulfilled', JSON.stringify(u)), [unfulfilled('m9', 'rw1', '2026-10-01T12:00:00.000Z')]) });
+    await waitFor(() => page.$eval('#catchupModal', (e) => !e.classList.contains('hidden')));
+    await page.click('#catchupLater');
+    assert.match(await page.$eval('#alertText', (e) => e.textContent), /1 筆兌換還沒轉/);
+    await page.click('#alertBtn');
+    assert.equal(await page.$eval('#catchupModal', (e) => !e.classList.contains('hidden')), true);
+  });
+
+  test('在網頁建立品項：建立後自動勾選、標示可補抓；名稱重複會說明', async (t) => {
+    const page = await open(t, { config: { ...READY, rewardIds: [], setupDone: false } });
+    await waitFor(() => page.$$eval('#rewards input', (e) => e.length === 2));
+    assert.match(await page.$eval('#rewards', (e) => e.textContent), /可補抓、可退點.*手動建立/s);
+    await page.$eval('#newRewardTitle', (e) => { e.value = '喝水'; });
+    await page.click('#createReward');
+    await waitFor(() => page.$eval('#createErr', (e) => !e.classList.contains('hidden')));
+    assert.match(await page.$eval('#createErr', (e) => e.textContent), /已經有叫「喝水」/);
+    await page.$eval('#newRewardTitle', (e) => { e.value = '幸運轉盤'; });
+    await page.$eval('#newRewardCost', (e) => { e.value = '300'; });
+    await page.click('#createReward');
+    await waitFor(() => page.$$eval('#rewards input', (e) => e.length === 3));
+    assert.deepEqual(await page.evaluate(() => window.__tw.created.map((x) => [x.title, x.cost, x.should_redemptions_skip_request_queue])), [['幸運轉盤', 300, false]]);
+    const cfg = await H.readKey(page, 'tw.config');
+    assert.deepEqual(cfg.rewardIds, ['new2']);
+    assert.equal(await page.$eval('#rewards input[value="new2"]', (e) => e.checked), true);
+    assert.equal(await page.$eval('#step2', (e) => e.classList.contains('done')), true);
+    assert.deepEqual(page.errors, []);
+  });
+
+  test('舊版授權（沒有管理權限）：提醒重新連接，建立品項按鈕停用並說明', async (t) => {
+    const page = await open(t, { before: (p) => p.evaluate(() => localStorage.setItem('mock.scopes', 'read')) });
+    await waitFor(() => page.$eval('#alertText', (e) => /重新連接 Twitch 一次/.test(e.textContent)));
+    await page.click('#toSetup'); await H.sleep(200);
+    assert.equal(await page.$eval('#createReward', (e) => e.disabled), true);
+    assert.match(await page.$eval('#createErr', (e) => e.textContent), /重新連接/);
   });
 
   test('手動補一筆、試轉（試轉不寫入）', async (t) => {

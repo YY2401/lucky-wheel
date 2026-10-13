@@ -199,3 +199,29 @@ test('設定正規化與暗號替換', () => {
   const src = fs.readFileSync(path.join(__dirname, '../../sheet-script.gs'), 'utf8');
   assert.match(tw.scriptWithKey(src, 'ABC'), /const KEY = 'ABC';/);
 });
+
+test('Twitch 兌換狀態：可退點期滿才標已完成、撤銷要退點的立刻送；依品項分組、每批最多 50 筆', () => {
+  const p = tw.DEFAULT_PRIZES[0];
+  const mk = (id, rewardId, at) => tw.makeRecord({ id, rewardId, prize: p, processedAt: at });
+  const recs = [mk('a', 'r1', 0), mk('b', 'r1', 0), mk('c', 'r2', 0), mk('d', 'r1', 1e12), tw.makeRecord({ id: 'm', prize: p }), tw.makeRecord({ id: 't', rewardId: 'r1', prize: p, test: true })];
+  recs[3].tw = 'to-cancel';
+  assert.equal(recs[4].tw, ''); assert.equal(recs[5].tw, ''); // 手動補登、試轉不碰 Twitch
+  const due = tw.dueTwitchUpdates(recs, tw.HOLD_MS + 1);
+  assert.deepEqual(due, [
+    { rewardId: 'r1', status: 'FULFILLED', ids: ['a', 'b'] },
+    { rewardId: 'r2', status: 'FULFILLED', ids: ['c'] },
+    { rewardId: 'r1', status: 'CANCELED', ids: ['d'] },
+  ]);
+  assert.deepEqual(tw.dueTwitchUpdates(recs, tw.HOLD_MS - 1).map((x) => x.status), ['CANCELED']); // 還在可退點期
+  const many = Array.from({ length: 120 }, (_, i) => mk(`x${i}`, 'r1', 0));
+  assert.deepEqual(tw.dueTwitchUpdates(many, tw.HOLD_MS).map((x) => x.ids.length), [50, 50, 20]);
+  assert.equal(tw.nextHoldExpiry(recs), tw.HOLD_MS);
+  assert.equal(tw.nextHoldExpiry([]), 0);
+});
+
+test('補抓：只列這個網頁沒處理過的兌換，照兌換時間排、不重複', () => {
+  const x = (id, at) => ({ id, user_login: id, user_name: id.toUpperCase(), redeemed_at: at, reward: { id: 'r1', title: '轉盤' } });
+  const out = tw.missedRedemptions([x('b', '2026-10-02T00:00:00Z'), x('known', '2026-10-01T00:00:00Z'), x('a', '2026-10-01T00:00:00Z'), x('b', '2026-10-02T00:00:00Z')], ['known']);
+  assert.deepEqual(out.map((m) => m.id), ['a', 'b']);
+  assert.deepEqual(out[0], { id: 'a', login: 'a', display: 'A', reward: '轉盤', rewardId: 'r1', at: '2026-10-01T00:00:00Z' });
+});

@@ -68,6 +68,20 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; }
 .tw-check.bad { background: color-mix(in srgb, var(--red) 15%, var(--surface)); }
 .tw-check ul { margin: 6px 0 0; padding-left: 20px; }
 
+.tw-create { display: flex; flex-wrap: wrap; align-items: center; gap: 0 4px; padding: 12px 14px; margin: 4px 0 12px; border: var(--border-w) dashed var(--ink); border-radius: 10px; background: var(--surface2); }
+.tw-create .tw-field { margin: 4px 14px 4px 0; }
+.tw-create .tw-err { flex-basis: 100%; margin: 6px 0 0; }
+.tw-sub { font-size: 15px; margin: 14px 0 6px; }
+.tw-tag { font-size: 12px; padding: 1px 8px; border-radius: 999px; border: 1.5px solid var(--ink); white-space: nowrap; font-weight: 700; }
+.tw-tag.good { background: var(--green); color: #fff; border-color: var(--green); }
+.tw-tag.meh { background: var(--surface2); color: var(--muted); }
+.tw-tag.warn { background: var(--yellow); color: #141414; }
+.tw-choice { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: var(--border-w) solid var(--ink); border-radius: 10px; margin: 8px 0; cursor: pointer; }
+.tw-choice input { margin-top: 4px; }
+.tw-choice.disabled { opacity: .5; cursor: not-allowed; }
+.tw-catchup { max-height: 50vh; border: var(--border-w) solid var(--ink); border-radius: 10px; padding: 4px 10px; }
+.tw-catchup li { grid-template-columns: auto 1fr; cursor: pointer; }
+.tw-catchup input { grid-row: span 2; }
 .tw-rewards { display: grid; gap: 8px; margin: 4px 0 10px; }
 .tw-reward {
   display: flex; align-items: center; gap: 10px; padding: 10px 14px; border: var(--border-w) solid var(--ink); border-radius: 10px; cursor: pointer; background: var(--paper);
