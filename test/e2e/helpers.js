@@ -60,6 +60,15 @@ const spinOnce = async (page, count) => {
   await page.click(`.spin-btn[data-count="${count}"]`);
   await page.waitForSelector('#resultModal:not(.hidden)', { timeout: 15000 });
 };
-const closeResult = (page) => page.click('#closeResult');
+// 結果視窗彈出時有縮放動畫（落空還會搖一下），動畫中「關閉」的位置會移動：
+// 太快點會點到視窗本體沒關成，下一次按抽獎就只會點到背景把視窗關掉、不會抽。等動畫停了再點，沒關掉就再點一次
+const closeResult = async (page) => {
+  for (let i = 0; i < 5; i++) {
+    await page.waitForFunction(() => { const b = document.querySelector('#resultModal .modal-box'); return !b || b.getAnimations().every((a) => a.playState !== 'running'); }, { timeout: 5000 }).catch(() => {});
+    await page.click('#closeResult');
+    try { await page.waitForSelector('#resultModal.hidden', { timeout: 1000 }); return; } catch { /* 點到動畫中的位置，再點一次 */ }
+  }
+  throw new Error('結果視窗關不掉');
+};
 
 module.exports = { ROOT, chromePath, serve, launch, newPage, seed, readKey, sleep, spinOnce, closeResult };
