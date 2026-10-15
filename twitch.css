@@ -57,6 +57,9 @@ body.dock #bg { display: none; }
 .tw-setup-head h1 { margin: 0 0 4px; font-size: 30px; font-weight: 900; }
 .tw-setup-head { margin-bottom: 18px; }
 .tw-guide-link { margin: 6px 0 0; font-weight: 700; }
+.tw-guide-step { font-size: 13px; font-weight: 700; padding: 2px 10px; border-radius: 999px; border: 1.5px solid var(--ink); background: var(--paper); color: var(--ink); white-space: nowrap; }
+.tw-guide-step:hover { background: var(--yellow); color: #141414; }
+.tw-guide-step.on-red { border-color: #fff; background: transparent; color: #fff; }
 .tw-guide-link a { text-decoration: underline; text-underline-offset: 3px; }
 a.btn { display: inline-flex; align-items: center; justify-content: center; }
 .tw-step {

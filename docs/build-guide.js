@@ -16,5 +16,7 @@ const H = require('../test/e2e/helpers');
     footerTemplate: '<div style="width:100%;font-size:8px;color:#888;text-align:center;font-family:sans-serif">忠誠點轉盤 使用說明書　·　<span class="pageNumber"></span> / <span class="totalPages"></span></div>',
   });
   console.log(out);
+  // 算出每個設定步驟在第幾頁，給網頁的「看圖解」連結用
+  require('node:child_process').execFileSync('python', [path.join(__dirname, 'guide_pages.py')], { stdio: 'inherit', env: { ...process.env, PYTHONIOENCODING: 'utf-8' } });
   await browser.close(); srv.server.close();
 })();

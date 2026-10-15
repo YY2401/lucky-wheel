@@ -344,4 +344,17 @@ if (!H.chromePath()) {
     assert.equal(await page.$eval('#movedBanner', (e) => e.classList.contains('hidden')), true);
     assert.deepEqual(page.errors, []);
   });
+
+  test('「看圖解」連結帶著說明書頁碼，PDF 與快速上手都找得到', async (t) => {
+    const page = await open(t, { config: { ...READY, setupDone: false } });
+    const pages = JSON.parse(require('node:fs').readFileSync(require('node:path').join(H.ROOT, 'docs/guide-pages.json'), 'utf8'));
+    await waitFor(() => page.$eval('[data-guide="step3"]', (a) => a.getAttribute('href').includes('#page=')));
+    const links = await page.$$eval('[data-guide]', (as) => as.map((a) => [a.dataset.guide, a.getAttribute('href')]));
+    assert.equal(links.length, 7);
+    for (const [k, href] of links) assert.ok(href.endsWith(`#page=${pages[k]}`), `${k} ${href}`);
+    for (const href of [links[0][1].split('#')[0], await page.$eval('.tw-guide-link a', (a) => a.getAttribute('href'))]) {
+      const r = await page.evaluate((u) => fetch(u).then((x) => x.status + ' ' + x.headers.get('content-type')), href);
+      assert.match(r, /^200 application\/pdf/, href);
+    }
+  });
 }

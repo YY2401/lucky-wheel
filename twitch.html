@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>忠誠點轉盤</title>
-<meta name="app-version" content="57">
+<meta name="app-version" content="58">
 <script>try { document.documentElement.dataset.theme = localStorage.getItem('tw.theme') || 'light'; } catch (e) { document.documentElement.dataset.theme = 'light'; }</script>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=57">
-<link rel="stylesheet" href="twitch.css?v=57">
+<link rel="stylesheet" href="style.css?v=58">
+<link rel="stylesheet" href="twitch.css?v=58">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.1/mqtt.min.js"></script>
 </head>
 <body class="tw">
@@ -35,20 +35,20 @@
   <div><b>已經搬到 OBS 面板了</b>：這個分頁不再接收兌換，避免和 OBS 裡的面板同時轉盤。可以關掉這個分頁。</div>
   <button class="btn" id="unmove">改回在這裡使用</button>
 </div>
-<div class="tw-alert hidden" id="alert"><span id="alertText"></span><button class="btn" id="alertBtn"></button></div>
+<div class="tw-alert hidden" id="alert"><span id="alertText"></span><button class="btn" id="alertBtn"></button><a class="tw-guide-step on-red" data-guide="faq" target="_blank" rel="noopener">怎麼辦？</a></div>
 
 <!-- ===== 設定（第一次自動打開；完成後可從右上「設定」回來） ===== -->
 <main class="tw-setup hidden" id="setupView">
   <div class="tw-setup-head">
     <h1>3 個步驟就能開始</h1>
     <p class="hint">設定只要做一次，之後打開這個網頁就會自動連線。資料存在這台電腦的瀏覽器裡。</p>
-    <p class="tw-guide-link">看不懂哪一步？<a href="docs/%E5%BF%A0%E8%AA%A0%E9%BB%9E%E8%BD%89%E7%9B%A4%E4%BD%BF%E7%94%A8%E8%AA%AA%E6%98%8E.pdf" target="_blank" rel="noopener">📖 打開圖文說明書</a>（每一步都有截圖）</p>
+    <p class="tw-guide-link">第一次用？先看 <a href="docs/%E5%BF%A0%E8%AA%A0%E9%BB%9E%E8%BD%89%E7%9B%A4_%E5%BF%AB%E9%80%9F%E4%B8%8A%E6%89%8B.pdf" target="_blank" rel="noopener">一頁快速上手</a>。看不懂哪一步？<a href="docs/%E5%BF%A0%E8%AA%A0%E9%BB%9E%E8%BD%89%E7%9B%A4%E4%BD%BF%E7%94%A8%E8%AA%AA%E6%98%8E.pdf" target="_blank" rel="noopener">📖 打開圖文說明書</a>（每一步都有截圖）</p>
   </div>
 
   <section class="tw-step" id="step1">
     <div class="tw-step-num">1</div>
     <div class="tw-step-body">
-      <h2>連接 Twitch <span class="tw-done">✓ 完成</span></h2>
+      <h2>連接 Twitch <span class="tw-done">✓ 完成</span> <a class="tw-guide-step" data-guide="step1" target="_blank" rel="noopener" title="打開說明書的這一步（有截圖）">看圖解</a></h2>
       <div id="twOff">
         <p>用你的實況主帳號登入，授權這個網頁「看見忠誠點兌換」。不會發訊息、不會動你的頻道。</p>
         <button class="btn primary big" id="twLogin">連接 Twitch</button>
@@ -76,7 +76,7 @@
   <section class="tw-step" id="step2">
     <div class="tw-step-num">2</div>
     <div class="tw-step-body">
-      <h2>建立觸發轉盤的忠誠點品項 <span class="tw-done">✓ 完成</span></h2>
+      <h2>建立觸發轉盤的忠誠點品項 <span class="tw-done">✓ 完成</span> <a class="tw-guide-step" data-guide="step2" target="_blank" rel="noopener" title="打開說明書的這一步（有截圖）">看圖解</a></h2>
       <p>觀眾兌換這個品項時，就會自動轉一次轉盤。<b>建議直接在這裡建立</b>：網頁關著時的兌換之後也能補抓，撤銷時也能退還忠誠點。</p>
       <div class="tw-create" id="createBox">
         <label class="tw-field">品項名稱 <input id="newRewardTitle" value="忠誠點轉盤" maxlength="45" style="width:200px"></label>
@@ -93,7 +93,7 @@
   <section class="tw-step" id="step3">
     <div class="tw-step-num">3</div>
     <div class="tw-step-body">
-      <h2>連接 Google 試算表 <span class="tw-done">✓ 完成</span></h2>
+      <h2>連接 Google 試算表 <span class="tw-done">✓ 完成</span> <a class="tw-guide-step" data-guide="step3" target="_blank" rel="noopener" title="打開說明書的這一步（有截圖）">看圖解</a></h2>
       <p>讓轉盤結果自動記到你的試算表。照下面做一次就好（大約 3 分鐘）：</p>
       <ol class="tw-howto">
         <li>在 Google 雲端硬碟打開你的轉盤紀錄試算表，上方選單按 <b>擴充功能 → Apps Script</b>。</li>
@@ -118,7 +118,7 @@
   <section class="tw-step optional" id="step4">
     <div class="tw-step-num">4</div>
     <div class="tw-step-body">
-      <h2>轉盤內容 <small>（已經照你的試算表設好，可略過）</small></h2>
+      <h2>轉盤內容 <small>（已經照你的試算表設好，可略過）</small> <a class="tw-guide-step" data-guide="step4" target="_blank" rel="noopener" title="打開說明書的這一步（有截圖）">看圖解</a></h2>
       <p class="hint">機率＝權重 ÷ 權重總和。「寫到哪一欄」是試算表每天底下的欄名。</p>
       <div class="table-scroll">
         <table class="tw-prizes">
@@ -137,7 +137,7 @@
   <section class="tw-step optional" id="step5">
     <div class="tw-step-num">5</div>
     <div class="tw-step-body">
-      <h2>放到 OBS 直播畫面 <small>（可略過）</small></h2>
+      <h2>放到 OBS 直播畫面 <small>（可略過）</small> <a class="tw-guide-step" data-guide="step5" target="_blank" rel="noopener" title="打開說明書的這一步（有截圖）">看圖解</a></h2>
       <ol class="tw-howto">
         <li><button class="btn primary" id="copyObs">複製 OBS 網址</button></li>
         <li>OBS 的「來源」按 <b>＋ → 瀏覽器</b>，網址貼上，寬 1280、高 720，按確定。背景是透明的。</li>
@@ -154,7 +154,7 @@
   <section class="tw-step" id="step6">
     <div class="tw-step-num">6</div>
     <div class="tw-step-body">
-      <h2>放進 OBS，開台就不用另外開這個網頁 <small>（建議）</small> <span class="tw-done">✓ 完成</span></h2>
+      <h2>放進 OBS，開台就不用另外開這個網頁 <small>（建議）</small> <span class="tw-done">✓ 完成</span> <a class="tw-guide-step" data-guide="step6" target="_blank" rel="noopener" title="打開說明書的這一步（有截圖）">看圖解</a></h2>
       <div id="dockHere" class="hidden">
         <p class="tw-check ok"><b>你現在就是在 OBS 裡使用</b>：只要 OBS 開著，就會自動接收兌換、轉盤、記到試算表，不用另外開瀏覽器。</p>
       </div>
@@ -238,12 +238,12 @@
 </div>
 <div id="toast"></div>
 
-<script src="core.js?v=57"></script>
-<script src="twitch-core.js?v=57"></script>
-<script src="wheel.js?v=57"></script>
-<script src="ui.js?v=57"></script>
-<script src="store.js?v=57"></script>
-<script src="sync.js?v=57"></script>
-<script src="twitch.js?v=57"></script>
+<script src="core.js?v=58"></script>
+<script src="twitch-core.js?v=58"></script>
+<script src="wheel.js?v=58"></script>
+<script src="ui.js?v=58"></script>
+<script src="store.js?v=58"></script>
+<script src="sync.js?v=58"></script>
+<script src="twitch.js?v=58"></script>
 </body>
 </html>
