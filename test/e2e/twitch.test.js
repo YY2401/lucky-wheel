@@ -67,6 +67,7 @@ if (!H.chromePath()) {
     await page.click('#testSheet');
     await waitFor(() => page.$eval('#sheetResult', (e) => e.classList.contains('ok')));
     assert.match(await page.$eval('#sheetResult', (e) => e.textContent), /連線成功.*216 人.*10月/s);
+    assert.match(await page.$eval('#sheetResult', (e) => e.textContent), /建議補上 Twitch 帳號（1 人）.*幽璃ゆうり/s);
     const ping = await page.evaluate(() => window.__tw.sheetCalls[0]);
     assert.equal(ping.action, 'ping'); assert.deepEqual(ping.columns, ['1點', '3點', '5點']);
     assert.equal(ping.key, (await H.readKey(page, 'tw.config')).sheetKey); // 送出的暗號＝程式碼裡的暗號
@@ -97,7 +98,7 @@ if (!H.chromePath()) {
     assert.equal(await page.evaluate(() => window.__tw.subscribed.condition.broadcaster_user_id), '123');
     assert.match(await page.$eval('#pillTwitch', (e) => e.textContent), /已連線/);
     await page.evaluate(() => {
-      window.__tw.redeem({ id: 'e1', user_login: 'gabai', user_name: '嘎唄', reward: { id: 'rw1', title: '忠誠點轉盤' } });
+      window.__tw.redeem({ id: 'e1', user_login: 'gabai', user_name: '嘎唄', user_id: '1001', reward: { id: 'rw1', title: '忠誠點轉盤' } });
       window.__tw.redeem({ id: 'e1', user_login: 'gabai', user_name: '嘎唄', reward: { id: 'rw1', title: '忠誠點轉盤' } }); // 重送
       window.__tw.redeem({ id: 'e2', user_login: 'x', user_name: 'x', reward: { id: 'rw2', title: '喝水' } });
       window.__tw.redeem({ id: 'e3', user_login: 'newbie', user_name: '新朋友', reward: { id: 'rw1', title: '忠誠點轉盤' } });
@@ -108,7 +109,8 @@ if (!H.chromePath()) {
     assert.ok(recs.every((r) => ['1點', '3點', '5點'].includes(r.column)));
     const sent = await page.evaluate(() => window.__tw.sheetCalls.flatMap((c) => c.records || []));
     assert.deepEqual([...new Set(sent.map((r) => r.id))].sort(), ['e1', 'e3']);
-    assert.deepEqual(Object.keys(sent[0]).sort(), ['column', 'date', 'display', 'id', 'login']);
+    assert.deepEqual(Object.keys(sent[0]).sort(), ['column', 'date', 'display', 'id', 'login', 'uid']);
+    assert.equal(sent.find((r) => r.id === 'e1').uid, '1001'); // Twitch 永久編號：觀眾改帳號也認得
     await waitFor(() => page.$eval('#queueCount', (e) => e.textContent === '0'));
     assert.match(await page.$eval('#recordList', (e) => e.textContent), /新觀眾已加入名單/);
     assert.deepEqual(page.errors, []);
@@ -282,6 +284,8 @@ if (!H.chromePath()) {
     await waitFor(() => ov.$eval('#ovResultLayer', (e) => !e.classList.contains('out')), 10000);
     assert.match(await ov.$eval('#ovPlayer', (e) => e.textContent), /嘎唄\(gabai\)/);
     assert.match(await ov.$eval('#ovGrid', (e) => e.textContent), /[135]點/);
+    await ov.mouse.move(300, 300); await ov.mouse.move(320, 320); await H.sleep(100);
+    assert.match(await ov.$eval('#ovWrongPlace:not(.hidden)', (e) => e.textContent), /觀眾看的轉盤.*控制面板/s); // 被貼進停駐視窗、滑鼠移過：提示貼錯地方
     assert.deepEqual(ov.errors, []);
   });
 
@@ -391,5 +395,42 @@ if (!H.chromePath()) {
     await waitFor(async () => (await records(page)).find((r) => r.id === 'nw1').status === 'undone');
     assert.equal(await page.evaluate(() => window.__tw.sheetCalls.filter((c) => c.action === 'undo').length), 0);
     assert.deepEqual(page.errors, []);
+  });
+
+  test('代抽：兌換時輸入 @帳號就記給對方；查不到就記給兌換的人並註明；事後可改記給別人', async (t) => {
+    const page = await open(t);
+    await waitFor(() => page.evaluate(() => window.__tw.subscribed));
+    await page.evaluate(() => {
+      window.__tw.redeem({ id: 'px1', user_login: 'gabai', user_name: '嘎唄', user_id: '1', user_input: '幫 @ToastIwa 抽', reward: { id: 'rw1', title: '代抽轉盤' } });
+      window.__tw.redeem({ id: 'px2', user_login: 'gabai', user_name: '嘎唄', user_id: '1', user_input: '@nobody', reward: { id: 'rw1', title: '代抽轉盤' } });
+      window.__tw.redeem({ id: 'px3', user_login: 'gabai', user_name: '嘎唄', user_id: '1', user_input: '加油', reward: { id: 'rw1', title: '代抽轉盤' } });
+    });
+    await waitFor(() => page.$eval('#nowBanner', (e) => /嘎唄 幫忙抽/.test(e.textContent)));
+    const recs = await waitFor(async () => { const r = await records(page); return r.length === 3 && r.every((x) => x.status === 'ok') && r; }, 15000);
+    const by = (id) => recs.find((r) => r.id === id);
+    assert.equal(by('px1').login, 'toastiwa'); assert.equal(by('px1').display, 'TOASTIWA'); assert.deepEqual(by('px1').by, { login: 'gabai', display: '嘎唄' });
+    assert.equal(by('px2').login, 'gabai'); assert.match(by('px2').note, /找不到 @nobody/);
+    assert.equal(by('px3').login, 'gabai'); assert.equal(by('px3').by, null); // 留言不算代抽
+    const sent = await page.evaluate(() => window.__tw.sheetCalls.flatMap((c) => c.records || []));
+    assert.equal(sent.find((r) => r.id === 'px1').login, 'toastiwa');
+    assert.match(await page.$eval('#recordList', (e) => e.textContent), /嘎唄 代抽/);
+    // 事後改記：px2 改記給 haruneuka
+    await page.click('[data-move="px2"]'); await H.sleep(200);
+    await page.type('#confirmInput', 'haruneuka'); await page.click('#confirmOk');
+    await waitFor(async () => { const r = (await records(page)).find((x) => x.id === 'px2'); return r.status === 'ok' && r.login === 'haruneuka'; });
+    const mv = await page.evaluate(() => window.__tw.sheetCalls.find((c) => c.action === 'move').records[0]);
+    assert.equal(mv.from.login, 'gabai'); assert.equal(mv.to.login, 'haruneuka');
+    assert.match(await page.$eval('#recordList', (e) => e.textContent), /由 嘎唄\(gabai\) 改記/);
+    assert.deepEqual(page.errors, []);
+  });
+
+  test('建立代抽用品項：觀眾兌換時必須輸入文字', async (t) => {
+    const page = await open(t, { config: { ...READY, rewardIds: [], setupDone: false } });
+    await waitFor(() => page.$$eval('#rewards input', (e) => e.length === 2));
+    await page.$eval('#newRewardTitle', (e) => { e.value = '代抽轉盤'; });
+    await page.click('#newRewardProxy'); await page.click('#createReward');
+    await waitFor(() => page.evaluate(() => window.__tw.created.length === 1));
+    const b = await page.evaluate(() => window.__tw.created[0]);
+    assert.equal(b.is_user_input_required, true); assert.match(b.prompt, /@對方/);
   });
 }

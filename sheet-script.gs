@@ -30,6 +30,13 @@ function doPost(e) {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     if (req.action === 'ping') return json_(ping_(ss, req));
+    if (req.action === 'move') {
+      const moved = (req.records || []).map(function (r) {
+        try { return move_(ss, r); } catch (err) { return { id: r && r.id, ok: false, error: String((err && err.message) || err) }; }
+      });
+      SpreadsheetApp.flush();
+      return json_({ ok: true, results: moved });
+    }
     if (req.action === 'add' || req.action === 'undo') {
       const delta = req.action === 'undo' ? -1 : 1;
       const results = (req.records || []).map(function (r) {
@@ -86,14 +93,48 @@ function viewerLabel_(r) {
   return display || login;
 }
 
-// 回傳 { row, name, isNew }
-function findViewerRow_(ss, r, allowAdd) {
+// ---------- 觀眾的 Twitch 永久編號 → 名單第幾列 ----------
+// 英文帳號每 60 天可以改一次，但編號永遠不變。第一次寫入時記下來，之後改了帳號也找得回同一列
+function rememberViewer_(props, uid, row, name) {
+  if (!props || !uid) return;
+  props.setProperty('id:' + uid, JSON.stringify({ row: row, name: name, login: parseViewer_(name).login }));
+}
+function viewerById_(props, uid, names) {
+  if (!props || !uid) return null;
+  let saved = null;
+  try { saved = JSON.parse(props.getProperty('id:' + uid) || 'null'); } catch (err) { return null; }
+  if (!saved || !(saved.row >= FIRST_ROW) || saved.row >= FIRST_ROW + names.length) return null;
+  const now = names[saved.row - FIRST_ROW];
+  const cur = parseViewer_(now);
+  // 那一列還是同一個人才算數（名單被重新排序過就不採用，改用帳號比對）
+  if (now === saved.name || (cur.login && cur.login === saved.login)) return { row: saved.row, cur: cur };
+  return null;
+}
+
+// 回傳 { row, name, isNew, renamedFrom }
+function findViewerRow_(ss, r, allowAdd, props) {
   const sh = ss.getSheetByName(NAME_SHEET);
   if (!sh) throw new Error('找不到「' + NAME_SHEET + '」分頁');
   const last = Math.max(sh.getLastRow(), FIRST_ROW);
   const names = sh.getRange(FIRST_ROW, 2, last - FIRST_ROW + 1, 1).getDisplayValues().map(function (x) { return x[0]; });
+  const uid = String(r.uid || '').replace(/[^0-9]/g, '');
+  const login = String(r.login || '').trim().toLowerCase();
+
+  const byId = viewerById_(props, uid, names);
+  if (byId) {
+    let name = names[byId.row - FIRST_ROW];
+    let renamedFrom = '';
+    if (login && byId.cur.login && byId.cur.login !== login) { // 改過英文帳號：括號裡換成新帳號，前面的名字照舊
+      renamedFrom = byId.cur.login;
+      name = (byId.cur.display || r.display || login) + '(' + login + ')';
+      sh.getRange(byId.row, 2).setValue(name);
+    }
+    rememberViewer_(props, uid, byId.row, name);
+    return { row: byId.row, name: name, isNew: false, renamedFrom: renamedFrom };
+  }
+
   const i = matchViewer_(names, r.login, r.display);
-  if (i >= 0) return { row: FIRST_ROW + i, name: names[i], isNew: false };
+  if (i >= 0) { rememberViewer_(props, uid, FIRST_ROW + i, names[i]); return { row: FIRST_ROW + i, name: names[i], isNew: false }; }
   if (!allowAdd) throw new Error('名單裡找不到「' + viewerLabel_(r) + '」');
   const label = viewerLabel_(r);
   if (!label) throw new Error('沒有觀眾名稱');
@@ -103,7 +144,16 @@ function findViewerRow_(ss, r, allowAdd) {
   const row = FIRST_ROW + j;
   sh.getRange(row, 2).setValue(label);
   if (sh.getRange(row, 1).getValue() === '') sh.getRange(row, 1).setValue(row - FIRST_ROW + 1);
+  rememberViewer_(props, uid, row, label);
   return { row: row, name: label, isNew: true };
+}
+
+// 名單裡沒寫 Twitch 帳號、只寫名字的人（只能靠顯示名稱比對，觀眾一改名就認不出來）
+function namesWithoutLogin_(names) {
+  return names.filter(function (n) {
+    const v = parseViewer_(n);
+    return v.display && !v.login && !/^[A-Za-z0-9_]{3,25}$/.test(v.display);
+  });
 }
 
 // ---------- 月份分頁的格子 ----------
@@ -190,7 +240,7 @@ function apply_(ss, r, delta) {
   const tz = ss.getSpreadsheetTimeZone();
   const sh = monthSheet_(ss, r.date);
   const col = findColumn_(sh, r.date, r.column, tz);
-  const viewer = findViewerRow_(ss, r, delta > 0);
+  const viewer = findViewerRow_(ss, r, delta > 0, props);
   const row = viewer.row;
 
   // 月份分頁超過原本公式範圍的列：補上「編號」和「名稱」公式，跟上面的列一樣
@@ -208,7 +258,39 @@ function apply_(ss, r, delta) {
   cell.setValue(after > 0 ? after : '');
   const info = { cell: sh.getName() + '!' + colLetter_(col) + row, row: row, name: viewer.name };
   mark_(props, doneKey, info);
-  return { id: r.id, ok: true, cell: info.cell, row: row, name: viewer.name, isNew: viewer.isNew, before: before, after: after };
+  return { id: r.id, ok: true, cell: info.cell, row: row, name: viewer.name, isNew: viewer.isNew, renamedFrom: viewer.renamedFrom || '', before: before, after: after };
+}
+
+// ---------- 改記給別人（代抽記錯人、事後更正）：原本的人那格 -1、新的人那格 +1 ----------
+function move_(ss, r) {
+  if (!r || !r.id || !r.from || !r.to) throw new Error('資料不完整');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(r.date || ''))) throw new Error('日期格式錯誤');
+  const props = PropertiesService.getScriptProperties();
+  const key = 'mv:' + r.id + ':' + (r.seq || 1);
+  if (seen_(props, key)) { const prev = JSON.parse(props.getProperty(key)).c || {}; return { id: r.id, ok: true, dup: true, cell: prev.cell, row: prev.row, name: prev.name }; }
+  if (!seen_(props, 'w:' + r.id)) throw new Error('這筆還沒寫進試算表，不能移動');
+  if (seen_(props, 'u:' + r.id)) throw new Error('這筆已經撤銷了');
+  const tz = ss.getSpreadsheetTimeZone();
+  const sh = monthSheet_(ss, r.date);
+  const col = findColumn_(sh, r.date, r.column, tz);
+  const from = findViewerRow_(ss, r.from, false, props);
+  const to = findViewerRow_(ss, r.to, true, props);
+  if (from.row === to.row) throw new Error('新的人和原本是同一列');
+  const a = sh.getRange(from.row, col); const b = sh.getRange(to.row, col);
+  if (a.getFormula() !== '' || b.getFormula() !== '') throw new Error('要改的格子是公式，不敢覆蓋');
+  const av = Math.max(0, (Number(a.getValue()) || 0) - 1);
+  a.setValue(av > 0 ? av : '');
+  if (ss.getSheetByName(SUMMARY_SHEET)) { // 新的人在月份分頁還沒有名稱公式時補上
+    const nb = sh.getRange(to.row, 2);
+    if (nb.getFormula() === '' && nb.getValue() === '') nb.setFormula("='" + SUMMARY_SHEET + "'!B" + to.row);
+    const na = sh.getRange(to.row, 1);
+    if (na.getValue() === '') na.setValue(to.row - FIRST_ROW + 1);
+  }
+  b.setValue((Number(b.getValue()) || 0) + 1);
+  const info = { cell: sh.getName() + '!' + colLetter_(col) + to.row, row: to.row, name: to.name };
+  props.setProperty('w:' + r.id, JSON.stringify({ t: Date.now(), c: info })); // 之後撤銷要減的是新的人
+  mark_(props, key, info);
+  return { id: r.id, ok: true, cell: info.cell, row: to.row, name: to.name, isNew: to.isNew };
 }
 
 // ---------- 測試連線：檢查分頁、欄位都找得到，不寫任何東西 ----------
@@ -218,7 +300,9 @@ function ping_(ss, req) {
   if (!names) out.problems.push('找不到「' + NAME_SHEET + '」分頁（觀眾名單放在它的 B 欄）');
   else {
     const last = Math.max(names.getLastRow(), FIRST_ROW);
-    out.viewers = names.getRange(FIRST_ROW, 2, last - FIRST_ROW + 1, 1).getDisplayValues().filter(function (x) { return String(x[0]).trim(); }).length;
+    const list = names.getRange(FIRST_ROW, 2, last - FIRST_ROW + 1, 1).getDisplayValues().map(function (x) { return String(x[0]).trim(); }).filter(Boolean);
+    out.viewers = list.length;
+    out.noLogin = namesWithoutLogin_(list).slice(0, 100);
   }
   if (req.date) {
     try {

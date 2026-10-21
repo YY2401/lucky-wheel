@@ -35,6 +35,7 @@ function installMocks() {
     const method = (opts.method || 'GET').toUpperCase();
     const q = url.includes('?') ? new URLSearchParams(url.split('?')[1]) : new URLSearchParams();
     if (url.startsWith('https://id.twitch.tv/oauth2/validate')) return M.validateStatus === 200 ? json({ login: 'streamer', user_id: '123', client_id: 'cid', scopes: M.scopes, expires_in: 9999 }) : json({ status: 401 }, 401);
+    if (url.startsWith('https://api.twitch.tv/helix/users?login=')) { const l = q.get('login'); return json({ data: l === 'nobody' ? [] : [{ login: l, display_name: l.toUpperCase(), id: `9${l.length}` }] }); }
     if (url.startsWith('https://api.twitch.tv/helix/users')) return json({ data: [{ display_name: '實況主' }] });
     if (url.startsWith('https://api.twitch.tv/helix/channel_points/custom_rewards/redemptions')) {
       if (method === 'GET') return json({ data: M.unfulfilled.filter((x) => x.reward.id === q.get('reward_id')), pagination: {} });
@@ -49,7 +50,7 @@ function installMocks() {
       if (method === 'POST') {
         const b = JSON.parse(opts.body);
         if (M.rewards.some((r) => r.title === b.title)) return json({ message: 'CREATE_CUSTOM_REWARD_DUPLICATE_REWARD' }, 400);
-        const r = { id: `new${M.rewards.length}`, title: b.title, cost: b.cost, is_enabled: true, background_color: '#FFCF33', managed: true };
+        const r = { id: `new${M.rewards.length}`, input: !!b.is_user_input_required, title: b.title, cost: b.cost, is_enabled: true, background_color: '#FFCF33', managed: true };
         M.rewards.push(r); M.created.push(b);
         return json({ data: [pub(r)] });
       }
@@ -61,7 +62,8 @@ function installMocks() {
       const req = JSON.parse(opts.body);
       M.sheetCalls.push(req);
       if (M.failSheet > 0) { M.failSheet--; return Promise.reject(new TypeError('Failed to fetch')); }
-      if (req.action === 'ping') return json({ ok: true, title: '轉盤紀錄', viewers: 216, sheet: '10月', columns: { '1點': 'AA', '3點': 'AB', '5點': 'AC' }, heads: ['1點', '3點', '5點', 'Q版塗鴉', '新欄位'], problems: [] });
+      if (req.action === 'ping') return json({ ok: true, title: '轉盤紀錄', viewers: 216, sheet: '10月', columns: { '1點': 'AA', '3點': 'AB', '5點': 'AC' }, heads: ['1點', '3點', '5點', 'Q版塗鴉', '新欄位'], noLogin: ['幽璃ゆうり'], problems: [] });
+      if (req.action === 'move') return json({ ok: true, results: req.records.map((r) => ({ id: r.id, ok: true, cell: `10月!AB${50}`, name: `${r.to.display}(${r.to.login})` })) });
       return json({ ok: true, results: req.records.map((r, i) => (M.rowErrors[r.login] ? { id: r.id, ok: false, error: M.rowErrors[r.login] } : { id: r.id, ok: true, cell: `${Number(r.date.slice(5, 7))}月!AB${3 + i}`, name: `${r.display}(${r.login})`, isNew: r.login === 'newbie' })) });
     }
     return real(url, opts);

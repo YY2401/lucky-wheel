@@ -119,22 +119,26 @@
       const oldestFirst = [...records].reverse();
       const adds = oldestFirst.filter((r) => r.status === 'pending').slice(0, 25);
       const undos = oldestFirst.filter((r) => r.status === 'undoing').slice(0, 25);
-      if (!adds.length && !undos.length) { if (this.state !== 'fail') this.state = 'idle'; renderStatus(); return; }
+      const moves = oldestFirst.filter((r) => r.status === 'moving' && r.moveTo).slice(0, 25);
+      if (!adds.length && !undos.length && !moves.length) { if (this.state !== 'fail') this.state = 'idle'; renderStatus(); return; }
       this.busy = true; this.again = false;
       try {
-        for (const [action, list] of [['add', adds], ['undo', undos]]) {
+        for (const [action, list] of [['add', adds], ['undo', undos], ['move', moves]]) {
           if (!list.length) continue;
-          const res = await sheetPost({ action, records: list.map(T.forSheet) });
+          const res = await sheetPost({ action, records: list.map(action === 'move' ? T.forMove : T.forSheet) });
           if (!res.ok) {
             if (!res.fatal) throw new Error(res.error || '試算表忙碌中');
-            list.forEach((r) => { r.status = action === 'add' ? 'error' : 'ok'; r.error = res.error; });
+            list.forEach((r) => { r.status = action === 'add' ? 'error' : 'ok'; r.error = res.error; r.moveTo = null; });
             continue;
           }
           for (const x of res.results || []) {
             const r = records.find((y) => y.id === x.id); if (!r) continue;
             r.attempts = (r.attempts || 0) + 1;
-            if (action === 'add') {
-              if (x.ok) Object.assign(r, { status: 'ok', cell: x.cell || '', sheetName: x.name || '', isNew: !!x.isNew, error: '' });
+            if (action === 'move') {
+              if (x.ok) Object.assign(r, { movedFrom: T.viewerLabel(r), login: r.moveTo.login, display: r.moveTo.display, userId: r.moveTo.userId || '', status: 'ok', cell: x.cell || r.cell, sheetName: x.name || '', isNew: !!x.isNew, moveTo: null, error: '' });
+              else { Object.assign(r, { status: 'ok', moveTo: null }); toast(`改記失敗：${x.error}`, 6000); }
+            } else if (action === 'add') {
+              if (x.ok) Object.assign(r, { status: 'ok', cell: x.cell || '', sheetName: x.name || '', isNew: !!x.isNew, renamedFrom: x.renamedFrom || '', error: '' });
               else Object.assign(r, { status: 'error', error: x.error || '寫入失敗' });
             } else if (x.ok) Object.assign(r, { status: 'undone', error: '' });
             else { Object.assign(r, { status: 'ok', error: '' }); toast(`撤銷失敗：${x.error}`, 6000); }
@@ -149,7 +153,7 @@
       } finally {
         this.busy = false;
         renderRecords(); renderStatus();
-        if (this.again || (this.state === 'ok' && records.some((r) => r.status === 'pending' || r.status === 'undoing'))) this.kick(300);
+        if (this.again || (this.state === 'ok' && records.some((r) => r.status === 'pending' || r.status === 'undoing' || r.status === 'moving'))) this.kick(300);
       }
     },
   };
@@ -217,9 +221,21 @@
       else { this.rewards = []; this.rewardError = `讀取品項失敗（${r.status}）`; }
       renderRewards(); renderStatus();
     },
-    // 由這個網頁建立品項：之後才能補抓漏掉的兌換、退點
-    async createReward(title, cost) {
-      const r = await this.helix(`/channel_points/custom_rewards?broadcaster_id=${auth.userId}`, { method: 'POST', body: { title, cost, is_enabled: true, should_redemptions_skip_request_queue: false } });
+    // 用英文帳號查觀眾：回傳 { login, display, userId }；查不到回 null；連不到 Twitch 回 undefined
+    async lookupUser(login) {
+      if (!auth || !auth.token) return undefined;
+      try {
+        const r = await this.helix(`/users?login=${encodeURIComponent(login)}`);
+        if (r.status !== 200) return undefined;
+        const u = r.json && r.json.data && r.json.data[0];
+        return u ? { login: u.login, display: u.display_name || u.login, userId: u.id } : null;
+      } catch { return undefined; }
+    },
+    // 由這個網頁建立品項：之後才能補抓漏掉的兌換、退點。proxy＝代抽用（觀眾兌換時要輸入幫誰抽）
+    async createReward(title, cost, proxy = false) {
+      const body = { title, cost, is_enabled: true, should_redemptions_skip_request_queue: false };
+      if (proxy) Object.assign(body, { is_user_input_required: true, prompt: '幫別人抽：輸入 @對方的 Twitch 英文帳號（幫自己抽就隨便打一個字）' });
+      const r = await this.helix(`/channel_points/custom_rewards?broadcaster_id=${auth.userId}`, { method: 'POST', body });
       if (r.status === 200 && r.json && r.json.data && r.json.data[0]) return r.json.data[0];
       const msg = (r.json && r.json.message) || '';
       if (/DUPLICATE/i.test(msg)) throw new Error(`頻道裡已經有叫「${title}」的品項了，換個名稱，或直接在下面清單勾選它`);
@@ -313,7 +329,7 @@
   function onRedemption(ev) {
     if (!cfg.rewardIds.includes(ev.reward && ev.reward.id)) return;
     if (queue.some((q) => q.id === ev.id) || records.some((r) => r.id === ev.id)) return; // Twitch 偶爾會重送
-    queue.push({ id: ev.id, login: ev.user_login, display: ev.user_name, reward: ev.reward.title, rewardId: ev.reward.id, at: ev.redeemed_at || new Date().toISOString() });
+    queue.push({ id: ev.id, login: ev.user_login, display: ev.user_name, userId: ev.user_id || '', input: ev.user_input || '', reward: ev.reward.title, rewardId: ev.reward.id, at: ev.redeemed_at || new Date().toISOString() });
     missed = missed.filter((m) => m.id !== ev.id);
     saveQueue(); renderQueue(); pump();
   }
@@ -405,7 +421,8 @@
         const prize = core && cfg.prizes.find((p) => p.id === core.id);
         if (!prize) { toast('轉盤沒有可抽的獎項：請到設定的步驟 4 檢查權重', 8000); break; }
         const at = new Date(q.at); const when = Number.isNaN(at.getTime()) ? new Date() : at; // 用兌換當下的時間決定日期（排隊跨過午夜也不會記錯天）
-        const rec = T.makeRecord({ id: q.id, login: q.login, display: q.display, reward: q.reward, rewardId: q.rewardId, prize, now: when, cutoffHour: cfg.cutoffHour, test: !!q.test });
+        const who = await proxyFor(q);
+        const rec = T.makeRecord({ id: q.id, login: who.login, display: who.display, userId: who.userId, by: who.by, note: who.note, reward: q.reward, rewardId: q.rewardId, prize, now: when, cutoffHour: cfg.cutoffHour, test: !!q.test });
         records.unshift(rec); queue.shift();
         saveRecords(); saveQueue(); renderQueue(); renderRecords();
         Writer.kick(); // 先寫入再播動畫：就算中途關掉網頁也不會漏記
@@ -414,15 +431,26 @@
     } finally { spinning = false; }
   }
 
+  // 代抽：兌換時輸入了「@帳號」就記給那個人（先向 Twitch 確認帳號存在）；查不到就記給兌換的人並註明
+  async function proxyFor(q) {
+    const self = { login: q.login, display: q.display, userId: q.userId, by: null, note: '' };
+    const target = q.test ? '' : T.proxyTarget(q.input);
+    if (!target || target === String(q.login || '').toLowerCase()) return self;
+    const u = await Twitch.lookupUser(target);
+    if (u === null) return { ...self, note: `找不到 @${target}，先記給 ${q.display}` };
+    const to = u || { login: target, display: target, userId: '' }; // 連不到 Twitch：先照帳號記，試算表那邊一樣用帳號找人
+    return { login: to.login, display: to.display, userId: to.userId, by: { login: q.login, display: q.display }, note: '' };
+  }
+
   async function animate(rec) {
     const probs = probabilities(corePrizes());
     const p = corePrizes().find((x) => x.id === rec.prizeId);
     const tier = p ? tierOf(p, probs[p.id]) : 'normal';
     const who = T.viewerLabel(rec);
-    $('#nowBanner').innerHTML = `<span class="tw-now-who">${esc(rec.display || rec.login)}</span><span class="tw-now-label">${rec.status === 'test' ? '試轉中…' : `兌換了「${esc(rec.reward)}」`}</span>`;
+    $('#nowBanner').innerHTML = `<span class="tw-now-who">${esc(rec.display || rec.login)}</span><span class="tw-now-label">${rec.status === 'test' ? '試轉中…' : rec.by ? `${esc(rec.by.display)} 幫忙抽「${esc(rec.reward)}」` : `兌換了「${esc(rec.reward)}」`}</span>`;
     $('#nowBanner').classList.add('active');
     $('#lastResult').classList.add('hidden');
-    Sync.send({ type: 'spin', batchId: rec.id, batchType: '', count: 1, player: who, results: [{ rid: rec.id, index: 1, prizeId: rec.prizeId, name: rec.prize, image: '', color: rec.color, tier }], prizes: overlayConfig().prizes, reveal: 'flip', pity: '', countdown: 0 });
+    Sync.send({ type: 'spin', batchId: rec.id, batchType: '', count: 1, player: rec.by ? `${who}（${rec.by.display} 代抽）` : who, results: [{ rid: rec.id, index: 1, prizeId: rec.prizeId, name: rec.prize, image: '', color: rec.color, tier }], prizes: overlayConfig().prizes, reveal: 'flip', pity: '', countdown: 0 });
     // 視窗縮小或分頁在背景時瀏覽器會暫停動畫，spinTo 不會結束；用時間保底，排隊才不會卡住
     await Promise.race([wheel.spinTo(rec.prizeId, { duration: cfg.spinDuration, turns: cfg.turns }), wait(cfg.spinDuration + 800)]);
     if (tier === 'big') Sfx.fanfare(); else Sfx.win();
@@ -438,7 +466,7 @@
 
   // ---------- 畫面：狀態 ----------
   function sheetSummary() {
-    const pending = records.filter((r) => r.status === 'pending' || r.status === 'undoing').length;
+    const pending = records.filter((r) => r.status === 'pending' || r.status === 'undoing' || r.status === 'moving').length;
     const failed = records.filter((r) => r.status === 'error').length;
     return { pending, failed };
   }
@@ -475,26 +503,30 @@
       ? queue.map((q) => `<li><span class="tw-li-main">${esc(q.display || q.login)}</span><span class="tw-li-sub">${esc(q.test ? '試轉' : q.reward)} · ${fmtTime(q.at)}</span></li>`).join('')
       : '<li class="tw-empty">目前沒有人排隊</li>';
   }
-  const STATUS_TEXT = { pending: '寫入中…', ok: '已寫入', error: '寫入失敗', undoing: '撤銷中…', undone: '已撤銷', test: '試轉（不記錄）', nowrite: '不寫進試算表' };
+  const STATUS_TEXT = { moving: '改記中…', pending: '寫入中…', ok: '已寫入', error: '寫入失敗', undoing: '撤銷中…', undone: '已撤銷', test: '試轉（不記錄）', nowrite: '不寫進試算表' };
   function renderRecords() {
     const list = records.slice(0, 60);
     $('#recordList').innerHTML = list.length ? list.map((r) => {
       const actions = r.status === 'error' ? `<button class="btn icon" data-retry="${esc(r.id)}">重試</button>`
         : r.status === 'ok' ? `<button class="btn icon ghost" data-undo="${esc(r.id)}" title="從試算表減回去">撤銷</button>`
           : r.status === 'nowrite' && r.tw === 'hold' ? `<button class="btn icon ghost" data-undo="${esc(r.id)}" title="作廢這一筆，可選擇退點">撤銷</button>` : '';
+      const canMove = ['ok', 'pending', 'error', 'nowrite'].includes(r.status);
+      const move = canMove ? `<button class="btn icon ghost" data-move="${esc(r.id)}" title="代抽記錯人：改記到另一位觀眾">改記給…</button>` : '';
+      const extra = (r.by ? ` · ${r.by.display} 代抽` : '') + (r.note ? ` · ${r.note}` : '') + (r.movedFrom ? ` · 由 ${r.movedFrom} 改記` : '');
       const tw = { canceled: ' · 已退還忠誠點', 'to-cancel': ' · 退點中…', 'cancel-failed': ' · 退點失敗' }[r.tw] || '';
-      const detail = (r.status === 'ok' ? `${r.cell}${r.isNew ? ' · 新觀眾已加入名單' : ''}` : r.status === 'error' ? r.error : '') + tw;
+      const detail = extra + (r.status === 'ok' ? ` · ${r.cell}${r.isNew ? ' · 新觀眾已加入名單' : ''}${r.renamedFrom ? ` · 改過帳號，名單已從 ${r.renamedFrom} 更新` : ''}` : r.status === 'error' ? ` · ${r.error}` : '') + tw;
       return `<li class="st-${r.status}">
         <span class="tw-dot" style="--c:${esc(r.color || '#888')}"></span>
         <span class="tw-li-main">${esc(r.display || r.login)} → <b>${esc(r.prize)}</b></span>
         <span class="tw-li-sub">${fmtTime(r.time)} · <span class="tw-st">${STATUS_TEXT[r.status] || r.status}</span>${detail ? ` · ${esc(detail.replace(/^ · /, ''))}` : ''}</span>
-        <span class="tw-li-act">${actions}</span></li>`;
+        <span class="tw-li-act">${actions}${move}</span></li>`;
     }).join('') : '<li class="tw-empty">還沒有紀錄。觀眾兌換後會出現在這裡。</li>';
   }
   function retryAll() { records.forEach((r) => { if (r.status === 'error') { r.status = 'pending'; r.error = ''; } }); saveRecords(); renderRecords(); Writer.kick(); }
   $('#retryAll').onclick = retryAll;
   $('#recordList').addEventListener('click', async (e) => {
-    const retry = e.target.closest('[data-retry]'); const undo = e.target.closest('[data-undo]');
+    const retry = e.target.closest('[data-retry]'); const undo = e.target.closest('[data-undo]'); const mv = e.target.closest('[data-move]');
+    if (mv) { const r = records.find((x) => x.id === mv.dataset.move); if (r) reassign(r); return; }
     if (retry) { const r = records.find((x) => x.id === retry.dataset.retry); if (r) { r.status = 'pending'; r.error = ''; saveRecords(); renderRecords(); Writer.kick(); } }
     if (undo) {
       const r = records.find((x) => x.id === undo.dataset.undo); if (!r) return;
@@ -505,6 +537,24 @@
       saveRecords(); renderRecords(); Writer.kick(); if (refund) TwSync.kick();
     }
   });
+  // 改記給別人：已寫進試算表的就從原本的人移到新的人；還沒寫的直接換人
+  async function reassign(r) {
+    const name = await dialog({ title: '改記給哪位觀眾？', message: `「${r.prize}」目前記在 ${T.viewerLabel(r)}。輸入要改記的觀眾：英文帳號最準（例如 gabai），也可以是試算表裡的名稱。${r.by ? `\n點數是 ${r.by.display} 花的，退點會退給 ${r.by.display}。` : ''}`, input: '', okLabel: '改記' });
+    if (!name || !name.trim()) return;
+    const v = T.parseViewer(name.replace(/^@/, ''));
+    let login = v.login || (/^[a-z0-9_]{3,25}$/i.test(v.display) ? v.display.toLowerCase() : '');
+    let display = v.display || login; let userId = '';
+    if (login) {
+      const u = await Twitch.lookupUser(login);
+      if (u === null && !(await dialog({ title: `Twitch 上找不到 ${login}`, message: '可能打錯帳號。還是要照這個名稱記嗎？（試算表會用這個名稱找人，找不到就新增一列）', okLabel: '照樣記' }))) return;
+      if (u) ({ login, display, userId } = u);
+    }
+    if (login && login === r.login) { toast('跟目前記的是同一位觀眾'); return; }
+    const to = { login, display, userId };
+    if (r.status === 'ok') { r.moveTo = to; r.moveSeq = (r.moveSeq || 0) + 1; r.status = 'moving'; }
+    else { r.movedFrom = T.viewerLabel(r); Object.assign(r, to); if (r.status === 'error') { r.status = 'pending'; r.error = ''; } }
+    saveRecords(); renderRecords(); Writer.kick();
+  }
   // 撤銷視窗：回傳 true（退點）/ false（不退）/ null（取消）
   function refundBlocker(r) {
     if (!r.rewardId) return '這筆不是觀眾兌換來的（手動補登），沒有忠誠點可退。';
@@ -592,7 +642,7 @@
     if (!(cost >= 1)) return fail('忠誠點至少要 1 點');
     $('#createReward').disabled = true;
     try {
-      const r = await Twitch.createReward(title, cost);
+      const r = await Twitch.createReward(title, cost, $('#newRewardProxy').checked);
       cfg.rewardIds = [...new Set([...cfg.rewardIds, r.id])]; saveCfg();
       err.classList.add('hidden');
       toast(`已在 Twitch 建立「${r.title}」並勾選好了`);
@@ -644,7 +694,8 @@
       box.classList.add(problems.length ? 'bad' : 'ok');
       box.innerHTML = `<b>${problems.length ? '⚠ 連上了，但有問題' : '✓ 連線成功'}</b>：「${esc(res.title)}」，名單目前 ${res.viewers ?? '?'} 人。` +
         (found ? `<br>今天（${m}/${d}）的結果會寫在「${esc(res.sheet)}」分頁的 ${esc(found)}。` : '') +
-        (problems.length ? `<ul>${problems.map((p) => `<li>${esc(p)}</li>`).join('')}</ul>` : '');
+        (problems.length ? `<ul>${problems.map((p) => `<li>${esc(p)}</li>`).join('')}</ul>` : '') +
+        (res.noLogin && res.noLogin.length ? `<div class="tw-nologin"><b>建議補上 Twitch 帳號（${res.noLogin.length} 人）</b>：名單裡這些人只寫了名字，觀眾一改顯示名稱就會對不上、被當成新觀眾。請到「兌換紀錄」B 欄改成「名字(英文帳號)」：<br>${res.noLogin.map(esc).join('、')}</div>` : '');
       cfg.scriptUrl = url; cfg.sheetOk = problems.length ? '' : url;
       if (Array.isArray(res.heads) && res.heads.length) cfg = T.normalizeTwConfig({ ...cfg, sheetColumns: res.heads }); // 「寫到哪一欄」改用試算表實際的欄名
       saveCfg(); renderPrizes();
@@ -700,7 +751,7 @@
   $('#cutoffHour').onchange = () => { cfg.cutoffHour = Number($('#cutoffHour').value); saveCfg(); };
 
   // 步驟 5：OBS
-  $('#copyObs').onclick = async () => { if (await copyText(obsUrl(), ' OBS 網址')) toast('已複製 OBS 網址'); };
+  $('#copyObs').onclick = async () => { if (await copyText(obsUrl(), '「觀眾看的轉盤」網址')) toast('已複製「觀眾看的轉盤」網址：貼到 OBS 的「來源 → 瀏覽器」', 5000); };
 
   // 步驟 6：搬到 OBS 面板
   function dockUrl() {
@@ -709,7 +760,7 @@
   }
   $('#copyDock').onclick = async () => {
     if (queue.length) { toast('還有人在排隊，等轉完再搬', 5000); return; }
-    if (!(await copyText(dockUrl(), ' OBS 面板網址'))) { /* 手動複製也算 */ }
+    if (!(await copyText(dockUrl(), '「控制面板」網址'))) { /* 手動複製也算 */ }
     if (!(await dialog({ title: '貼到 OBS 了嗎？', message: '照下面第 2～4 步貼到 OBS 的「自訂瀏覽器停駐視窗」。貼好、在 OBS 面板裡看到設定都在之後按「搬好了」，這個分頁就會停止接收兌換。', okLabel: '搬好了' }))) return;
     cfg.movedToObs = true; saveCfg();
     Twitch.stop(); Twitch.setState('off');

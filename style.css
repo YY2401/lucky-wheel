@@ -325,6 +325,7 @@ body.overlay .chip { font-size: 16px; padding: 7px 14px 7px 8px; }
 .result-card.single .flip-back .q { font-size: 110px; width: 180px; height: 180px; }
 .ov-status { position: fixed; right: 12px; bottom: 12px; width: 12px; height: 12px; border-radius: 50%; background: #666; z-index: 5; border: 2px solid var(--ink); transition: transform .2s; }
 .ov-status.ok { background: var(--green); }
+.ov-wrong { position: fixed; left: 12px; right: 12px; top: 12px; z-index: 6; padding: 12px 14px; border-radius: 10px; border: var(--border-w) solid var(--ink); background: var(--yellow); color: #141414; font-size: 14px; line-height: 1.6; box-shadow: 3px 3px 0 var(--ink); }
 .ov-status.wait { background: var(--yellow); }
 .ov-status.bad { background: var(--red); }
 .ov-status.flash { transform: scale(2.2); background: #fff; }

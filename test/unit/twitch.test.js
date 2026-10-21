@@ -223,7 +223,7 @@ test('補抓：只列這個網頁沒處理過的兌換，照兌換時間排、�
   const x = (id, at) => ({ id, user_login: id, user_name: id.toUpperCase(), redeemed_at: at, reward: { id: 'r1', title: '轉盤' } });
   const out = tw.missedRedemptions([x('b', '2026-10-02T00:00:00Z'), x('known', '2026-10-01T00:00:00Z'), x('a', '2026-10-01T00:00:00Z'), x('b', '2026-10-02T00:00:00Z')], ['known']);
   assert.deepEqual(out.map((m) => m.id), ['a', 'b']);
-  assert.deepEqual(out[0], { id: 'a', login: 'a', display: 'A', reward: '轉盤', rewardId: 'r1', at: '2026-10-01T00:00:00Z' });
+  assert.deepEqual(out[0], { id: 'a', login: 'a', display: 'A', userId: '', input: '', reward: '轉盤', rewardId: 'r1', at: '2026-10-01T00:00:00Z' });
 });
 
 test('搬到 OBS 面板：設定與可退點紀錄打包進網址，同一份只套用一次，壞資料不會出錯', () => {
@@ -258,4 +258,77 @@ test('「不寫進試算表」的格子：紀錄狀態是 nowrite，不送去試
   assert.equal(tw.makeRecord({ id: 'y', prize: { id: 'a', name: '1點', column: '1點' } }).status, 'pending');
   assert.deepEqual(tw.normalizeTwConfig({ sheetColumns: [' 1點 ', '1點', '', 'Q版塗鴉'] }).sheetColumns, ['1點', 'Q版塗鴉']);
   assert.equal(tw.normalizeTwConfig({ prizes: [{ name: '下次一定', column: '' }] }).prizes[0].column, '');
+});
+
+test('觀眾改了英文帳號：用 Twitch 永久編號找回同一列，括號裡換成新帳號', () => {
+  const { book, sheets } = makeBook({ names: NAMES });
+  const gas = loadScript(book);
+  const base = { date: '2026-10-04', column: '1點' };
+  const first = gas.post({ action: 'add', records: [{ ...base, id: 'a1', login: 'gabai', display: '嘎唄', uid: '1001' }] }).results[0];
+  assert.equal(first.row, 3);
+  // 改了帳號 gabai → gabai_tw：還是第 3 列、名單更新、不新增一列
+  const second = gas.post({ action: 'add', records: [{ ...base, id: 'a2', login: 'gabai_tw', display: '嘎唄唄', uid: '1001' }] }).results[0];
+  assert.equal(second.row, 3); assert.equal(second.isNew, false); assert.equal(second.renamedFrom, 'gabai');
+  assert.equal(sheets['兌換紀錄'].cell(3, 2).v, '嘎唄(gabai_tw)'); // 前面的名字維持實況主原本寫的
+  assert.equal(sheets['10月'].cell(3, 3 + 3 * 8).v, 2);
+  // 沒有編號（手動補登）用新帳號也找得到
+  assert.equal(gas.post({ action: 'add', records: [{ ...base, id: 'a3', login: 'gabai_tw', display: 'x' }] }).results[0].row, 3);
+});
+
+test('名單被重新排序過：記住的列已經不是同一人，就不採用，改用帳號比對', () => {
+  const { book, sheets } = makeBook({ names: NAMES });
+  const gas = loadScript(book);
+  const base = { date: '2026-10-04', column: '1點' };
+  gas.post({ action: 'add', records: [{ ...base, id: 'b1', login: 'haruneuka', display: 'HaruneUka', uid: '2002' }] }); // 記住第 4 列
+  sheets['兌換紀錄'].put(4, 2, '嘎唄(gabai)'); sheets['兌換紀錄'].put(3, 2, 'HaruneUka(haruneuka)'); // 兩列對調
+  const r = gas.post({ action: 'add', records: [{ ...base, id: 'b2', login: 'haruneuka', display: 'HaruneUka', uid: '2002' }] }).results[0];
+  assert.equal(r.row, 3); assert.equal(r.renamedFrom, '');
+  assert.equal(sheets['兌換紀錄'].cell(4, 2).v, '嘎唄(gabai)'); // 沒有被改掉
+});
+
+test('測試連線列出名單裡只寫名字、沒寫帳號的人（只寫英文帳號的不算）', () => {
+  const { book } = makeBook({ names: NAMES });
+  const gas = loadScript(book);
+  const res = gas.post({ action: 'ping', date: '2026-10-04', columns: [] });
+  assert.deepEqual([...res.noLogin], ['幽璃ゆうり']);
+});
+
+test('送給試算表的資料帶著 Twitch 永久編號', () => {
+  const r = tw.makeRecord({ id: 'x', login: 'Gabai', display: '嘎唄', userId: '1001', prize: tw.DEFAULT_PRIZES[0] });
+  assert.deepEqual(tw.forSheet(r), { id: 'x', date: r.date, login: 'gabai', display: '嘎唄', uid: '1001', column: '1點' });
+  assert.equal(tw.missedRedemptions([{ id: 'm', user_login: 'a', user_name: 'A', user_id: '77', redeemed_at: '2026-10-01T00:00:00Z', reward: { id: 'r', title: 't' } }], [])[0].userId, '77');
+});
+
+test('代抽：只認 @帳號 或整段是英文帳號，中文名字和留言不算', () => {
+  assert.equal(tw.proxyTarget('@ToastIwa'), 'toastiwa');
+  assert.equal(tw.proxyTarget('幫 @gabai 抽！'), 'gabai');
+  assert.equal(tw.proxyTarget('  haruneuka '), 'haruneuka');
+  assert.equal(tw.proxyTarget('嘎唄'), '');
+  assert.equal(tw.proxyTarget('加油'), '');
+  assert.equal(tw.proxyTarget('good luck everyone'), '');
+  assert.equal(tw.proxyTarget(''), '');
+  const r = tw.makeRecord({ id: 'p', login: 'toastiwa', display: '吐司', by: { login: 'Gabai', display: '嘎唄' }, prize: tw.DEFAULT_PRIZES[0] });
+  assert.deepEqual(r.by, { login: 'gabai', display: '嘎唄' });
+  r.moveTo = { login: 'newbie', display: '新人', userId: '5' };
+  assert.deepEqual(tw.forMove(r), { id: 'p', seq: 1, date: r.date, column: '1點', from: { login: 'toastiwa', display: '吐司', uid: '' }, to: { login: 'newbie', display: '新人', uid: '5' } });
+});
+
+test('改記給別人：原本的人 -1、新的人 +1，重送不會重複，之後撤銷減的是新的人', () => {
+  const { book, sheets } = makeBook({ names: NAMES });
+  const gas = loadScript(book);
+  const col = 3 + 3 * 8; // 10/4 的 1點
+  gas.post({ action: 'add', records: [{ id: 'm1', date: '2026-10-04', login: 'gabai', display: '嘎唄', column: '1點' }] });
+  const mv = { id: 'm1', seq: 1, date: '2026-10-04', column: '1點', from: { login: 'gabai', display: '嘎唄' }, to: { login: 'haruneuka', display: 'HaruneUka' } };
+  const res = gas.post({ action: 'move', records: [mv] }).results[0];
+  assert.equal(res.ok, true); assert.equal(res.row, 4);
+  assert.equal(sheets['10月'].cell(3, col).v, ''); assert.equal(sheets['10月'].cell(4, col).v, 1);
+  assert.equal(gas.post({ action: 'move', records: [mv] }).results[0].dup, true); // 重送
+  assert.equal(sheets['10月'].cell(4, col).v, 1);
+  gas.post({ action: 'undo', records: [{ id: 'm1', date: '2026-10-04', login: 'haruneuka', display: 'HaruneUka', column: '1點' }] });
+  assert.equal(sheets['10月'].cell(4, col).v, '');
+  // 還沒寫進去的、移到新觀眾
+  assert.match(gas.post({ action: 'move', records: [{ ...mv, id: 'never' }] }).results[0].error, /還沒寫進試算表/);
+  gas.post({ action: 'add', records: [{ id: 'm2', date: '2026-10-04', login: 'gabai', display: '嘎唄', column: '1點' }] });
+  const n = gas.post({ action: 'move', records: [{ ...mv, id: 'm2', to: { login: 'brandnew', display: '新來的' } }] }).results[0];
+  assert.equal(n.isNew, true); assert.equal(sheets['兌換紀錄'].cell(n.row, 2).v, '新來的(brandnew)');
 });

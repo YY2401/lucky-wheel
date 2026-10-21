@@ -78,6 +78,15 @@
     return { display: s, login: '' };
   }
 
+  // 代抽：兌換時輸入的文字裡有「@帳號」，或整段就是一個英文帳號 → 回傳那個帳號（小寫），否則回傳空字串
+  // 只認英文帳號：中文顯示名稱可能重複、也可能只是留言（例如「加油」），會記錯人
+  function proxyTarget(input) {
+    const t = String(input || '').trim();
+    const m = t.match(/@([A-Za-z0-9_]{3,25})/);
+    if (m) return m[1].toLowerCase();
+    return /^[A-Za-z0-9_]{3,25}$/.test(t) ? t.toLowerCase() : '';
+  }
+
   // 直播日：凌晨 cutoffHour 點以前算前一天。回傳 'YYYY-MM-DD'（本機時間）
   function dayKey(date, cutoffHour = 0) {
     const d = new Date(date.getTime() - cutoffHour * 3600 * 1000);
@@ -87,12 +96,15 @@
 
   // 一筆轉盤紀錄。id 用 Twitch 兌換編號（同一筆兌換不會轉兩次、不會寫兩次）
   // rewardId 有值＝來自 Twitch 兌換：先在 Twitch 保持「未完成」HOLD_MS（這段時間撤銷可退點），之後自動標成已完成
-  function makeRecord({ id, login = '', display = '', reward = '', rewardId = '', prize, now = new Date(), cutoffHour = 0, test = false, processedAt = Date.now() }) {
+  function makeRecord({ id, login = '', display = '', userId = '', by = null, note = '', reward = '', rewardId = '', prize, now = new Date(), cutoffHour = 0, test = false, processedAt = Date.now() }) {
     return {
       id: String(id || `m-${randId(10)}`),
       time: now.toISOString(),
       date: dayKey(now, cutoffHour),
       login: String(login).toLowerCase(), display: String(display || login),
+      userId: String(userId || ''), // Twitch 永久編號：觀眾改了英文帳號也認得
+      by: by && by.login ? { login: String(by.login).toLowerCase(), display: String(by.display || by.login) } : null, // 代抽：實際兌換（花點數）的人
+      note: String(note || ''),
       reward: String(reward || ''),
       prizeId: prize.id, prize: prize.name, column: prize.column, color: prize.color,
       // pending 待寫入 / ok 已寫入 / error 失敗 / undoing 撤銷中 / undone 已撤銷 / test 測試不寫入 / nowrite 這格設定成不寫進試算表
@@ -133,12 +145,15 @@
     const known = new Set(knownIds);
     const seen = new Set();
     return redemptions.filter((x) => x && x.id && !known.has(x.id) && !seen.has(x.id) && seen.add(x.id))
-      .map((x) => ({ id: x.id, login: x.user_login || '', display: x.user_name || x.user_login || '', reward: (x.reward && x.reward.title) || '', rewardId: (x.reward && x.reward.id) || '', at: x.redeemed_at || new Date().toISOString() }))
+      .map((x) => ({ id: x.id, login: x.user_login || '', display: x.user_name || x.user_login || '', userId: x.user_id || '', input: x.user_input || '', reward: (x.reward && x.reward.title) || '', rewardId: (x.reward && x.reward.id) || '', at: x.redeemed_at || new Date().toISOString() }))
       .sort((a, b) => String(a.at).localeCompare(String(b.at)));
   }
 
+  // 改記給別人：送給 Apps Script 的「從誰移到誰」
+  const forMove = (r) => ({ id: r.id, seq: r.moveSeq || 1, date: r.date, column: r.column, from: { login: r.login, display: r.display, uid: r.userId || '' }, to: { login: r.moveTo.login, display: r.moveTo.display, uid: r.moveTo.userId || '' } });
+
   // 要送給 Apps Script 的欄位（不送顏色等用不到的）
-  const forSheet = (r) => ({ id: r.id, date: r.date, login: r.login, display: r.display, column: r.column });
+  const forSheet = (r) => ({ id: r.id, date: r.date, login: r.login, display: r.display, uid: r.userId || '', column: r.column });
 
   // 名單中顯示用
   const viewerLabel = (r) => (r.display && r.login && r.display.toLowerCase() !== r.login ? `${r.display}(${r.login})` : r.display || r.login || '匿名');
@@ -184,5 +199,5 @@
     return { cfg: next, add: payload.hold.filter((r) => !have.has(r.id)) };
   }
 
-  return { SHEET_COLUMNS, buildMove, encodeMove, decodeMove, applyMove, DEFAULT_PRIZES, DEFAULT_TW, HOLD_MS, normalizeTwPrize, normalizeTwConfig, parseViewer, dayKey, makeRecord, forSheet, viewerLabel, scriptWithKey, dueTwitchUpdates, nextHoldExpiry, missedRedemptions };
+  return { proxyTarget, forMove, SHEET_COLUMNS, buildMove, encodeMove, decodeMove, applyMove, DEFAULT_PRIZES, DEFAULT_TW, HOLD_MS, normalizeTwPrize, normalizeTwConfig, parseViewer, dayKey, makeRecord, forSheet, viewerLabel, scriptWithKey, dueTwitchUpdates, nextHoldExpiry, missedRedemptions };
 });

@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>忠誠點轉盤</title>
-<meta name="app-version" content="59">
+<meta name="app-version" content="61">
 <script>try { document.documentElement.dataset.theme = localStorage.getItem('tw.theme') || 'light'; } catch (e) { document.documentElement.dataset.theme = 'light'; }</script>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=59">
-<link rel="stylesheet" href="twitch.css?v=59">
+<link rel="stylesheet" href="style.css?v=61">
+<link rel="stylesheet" href="twitch.css?v=61">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.1/mqtt.min.js"></script>
 </head>
 <body class="tw">
@@ -81,6 +81,7 @@
       <div class="tw-create" id="createBox">
         <label class="tw-field">品項名稱 <input id="newRewardTitle" value="忠誠點轉盤" maxlength="45" style="width:200px"></label>
         <label class="tw-field">要花多少忠誠點 <input type="number" id="newRewardCost" value="500" min="1" step="1"></label>
+        <label class="tw-field" title="勾了之後，觀眾兌換時要輸入文字：幫別人抽就輸入 @對方的 Twitch 英文帳號"><input type="checkbox" id="newRewardProxy"> 代抽用（觀眾兌換時輸入 @幫誰抽）</label>
         <button class="btn primary" id="createReward">建立品項</button>
         <p class="tw-err hidden" id="createErr"></p>
       </div>
@@ -137,10 +138,10 @@
   <section class="tw-step optional" id="step5">
     <div class="tw-step-num">5</div>
     <div class="tw-step-body">
-      <h2>放到 OBS 直播畫面 <small>（可略過）</small> <a class="tw-guide-step" data-guide="step5" target="_blank" rel="noopener" title="打開說明書的這一步（有截圖）">看圖解</a></h2>
+      <h2>放到直播畫面（觀眾看的轉盤） <small>（可略過）</small> <a class="tw-guide-step" data-guide="step5" target="_blank" rel="noopener" title="打開說明書的這一步（有截圖）">看圖解</a></h2>
       <ol class="tw-howto">
-        <li><button class="btn primary" id="copyObs">複製 OBS 網址</button></li>
-        <li>OBS 的「來源」按 <b>＋ → 瀏覽器</b>，網址貼上，寬 1280、高 720，按確定。背景是透明的。</li>
+        <li><button class="btn primary" id="copyObs">複製「觀眾看的轉盤」網址</button> <small class="hint">（貼到 OBS 的<b>來源</b>，不是停駐視窗）</small></li>
+        <li>OBS 下方「來源」區塊按 <b>＋ → 瀏覽器</b>，「URL」貼上，寬 1280、高 720，按確定。背景是透明的，平常看起來是空白，有人兌換才會出現轉盤。</li>
         <li>按 <button class="btn icon" id="pingObs">測試 OBS</button>，OBS 畫面右下的小圓點會閃一下。</li>
       </ol>
       <div class="tw-grid">
@@ -154,14 +155,14 @@
   <section class="tw-step" id="step6">
     <div class="tw-step-num">6</div>
     <div class="tw-step-body">
-      <h2>放進 OBS，開台就不用另外開這個網頁 <small>（建議）</small> <span class="tw-done">✓ 完成</span> <a class="tw-guide-step" data-guide="step6" target="_blank" rel="noopener" title="打開說明書的這一步（有截圖）">看圖解</a></h2>
+      <h2>把控制面板放進 OBS，開台就不用另外開這個網頁 <small>（建議）</small> <span class="tw-done">✓ 完成</span> <a class="tw-guide-step" data-guide="step6" target="_blank" rel="noopener" title="打開說明書的這一步（有截圖）">看圖解</a></h2>
       <div id="dockHere" class="hidden">
         <p class="tw-check ok"><b>你現在就是在 OBS 裡使用</b>：只要 OBS 開著，就會自動接收兌換、轉盤、記到試算表，不用另外開瀏覽器。</p>
       </div>
       <div id="dockHow">
         <p>把這個網頁放進 OBS 變成一個面板。之後<b>只要開 OBS 就會自動運作</b>，不用再記得開瀏覽器；瀏覽器縮小時可能會變慢的問題也不會發生。</p>
         <ol class="tw-howto">
-          <li><button class="btn primary" id="copyDock">複製 OBS 面板網址</button> <small class="hint">（會把上面設定好的內容一起帶過去，試算表不用重新設定）</small></li>
+          <li><button class="btn primary" id="copyDock">複製「控制面板」網址</button> <small class="hint">（貼到 OBS 的<b>停駐視窗</b>，不是來源；會把上面設定好的內容一起帶過去，試算表不用重新設定）</small></li>
           <li>OBS 上方選單按 <b>停駐視窗（Docks）→ 自訂瀏覽器停駐視窗…（Custom Browser Docks）</b>。</li>
           <li>「停駐視窗名稱」填 <b>忠誠點轉盤</b>，「URL」按 Ctrl+V 貼上，按 <b>套用</b>，再按 <b>關閉</b>。</li>
           <li>OBS 裡會多一個「忠誠點轉盤」面板，可以拖到你喜歡的位置。在面板裡按一次 <b>連接 Twitch</b> 登入，就完成了。</li>
@@ -238,12 +239,12 @@
 </div>
 <div id="toast"></div>
 
-<script src="core.js?v=59"></script>
-<script src="twitch-core.js?v=59"></script>
-<script src="wheel.js?v=59"></script>
-<script src="ui.js?v=59"></script>
-<script src="store.js?v=59"></script>
-<script src="sync.js?v=59"></script>
-<script src="twitch.js?v=59"></script>
+<script src="core.js?v=61"></script>
+<script src="twitch-core.js?v=61"></script>
+<script src="wheel.js?v=61"></script>
+<script src="ui.js?v=61"></script>
+<script src="store.js?v=61"></script>
+<script src="sync.js?v=61"></script>
+<script src="twitch.js?v=61"></script>
 </body>
 </html>
