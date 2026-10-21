@@ -142,7 +142,8 @@ const BASE = { clientId: 'cid', sync: false, spinDuration: 2600, resultSeconds: 
   console.log('shot dock-live');
   await ctx.close();
 
-  // 7. OBS 畫面
+  // 7. OBS 畫面（上一段按了「搬好了」會停止接收兌換，先重設回一般狀態）
+  await reset({ 'tw.config': READY, 'tw.auth': { token: 'tok', clientId: 'cid' } });
   const cfg = await H.readKey(page, 'tw.config');
   const ov = await browser.newPage();
   await ov.setViewport({ width: 1280, height: 720, deviceScaleFactor: 1 });
@@ -150,7 +151,7 @@ const BASE = { clientId: 'cid', sync: false, spinDuration: 2600, resultSeconds: 
   await ov.evaluate(() => { document.body.style.background = 'repeating-conic-gradient(#d8d8d8 0 25%, #f3f3f3 0 50%) 0 0 / 32px 32px'; });
   await sleep(1200);
   await page.evaluate(() => window.__tw.redeem({ id: 'obs1', user_login: 'gabai', user_name: '嘎唄', reward: { id: 'rw1', title: '忠誠點轉盤' } }));
-  await sleep(1400);
+  await ov.waitForSelector('#ovBanner:not(.hidden)', { timeout: 10000 }); await sleep(900); // 等名字出現、轉盤轉起來再拍
   await ov.screenshot({ path: path.join(OUT, 'obs-spin.png') });
   await sleep(3200);
   await ov.screenshot({ path: path.join(OUT, 'obs-result.png') });
