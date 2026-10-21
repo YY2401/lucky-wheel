@@ -4,11 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Lucky Wheel</title>
-<meta name="app-version" content="54">
+<meta name="app-version" content="55">
 <script>try { document.documentElement.dataset.theme = localStorage.getItem('lw.theme') || 'light'; } catch (e) { document.documentElement.dataset.theme = 'light'; }</script>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=54">
+<link rel="stylesheet" href="style.css?v=55">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.1/mqtt.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
@@ -401,21 +401,21 @@
   </div>
 </div>
 <div class="ov-status overlay-only hidden" id="ovStatus" title="同步狀態"></div>
-<div class="ov-wrong overlay-only hidden" id="ovWrongPlace"><b>這是「觀眾看的轉盤」</b>：要加在 OBS 的「來源 → 瀏覽器」，平常是空白的，有人抽獎才會出現。<br>如果你是貼在「停駐視窗」想要操作面板，請回控制台複製「控制面板」網址，換掉這個網址。</div>
+<div class="ov-wrong hidden" id="ovWrongPlace"><b>這是「觀眾看的轉盤」</b>：要加在 OBS 的「來源 → 瀏覽器」，平常是空白的，有人抽獎才會出現。<br>如果你是貼在「停駐視窗」想要操作面板，請回控制台複製「控制面板」網址，換掉這個網址。</div>
 <div id="countdown" class="countdown hidden"><span>3</span></div>
 <div id="flash" class="flash"></div>
 <canvas id="confetti"></canvas>
 <div id="toast"></div>
 
-<script src="core.js?v=54"></script>
-<script src="wheel.js?v=54"></script>
-<script src="ui.js?v=54"></script>
-<script src="store.js?v=54"></script>
-<script src="sync.js?v=54"></script>
-<script src="excel.js?v=54"></script>
-<script src="overlay.js?v=54"></script>
-<script src="control.js?v=54"></script>
-<script src="app.js?v=54"></script>
-<script src="bg.js?v=54"></script>
+<script src="core.js?v=55"></script>
+<script src="wheel.js?v=55"></script>
+<script src="ui.js?v=55"></script>
+<script src="store.js?v=55"></script>
+<script src="sync.js?v=55"></script>
+<script src="excel.js?v=55"></script>
+<script src="overlay.js?v=55"></script>
+<script src="control.js?v=55"></script>
+<script src="app.js?v=55"></script>
+<script src="bg.js?v=55"></script>
 </body>
 </html>

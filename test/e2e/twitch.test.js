@@ -284,8 +284,13 @@ if (!H.chromePath()) {
     await waitFor(() => ov.$eval('#ovResultLayer', (e) => !e.classList.contains('out')), 10000);
     assert.match(await ov.$eval('#ovPlayer', (e) => e.textContent), /嘎唄\(gabai\)/);
     assert.match(await ov.$eval('#ovGrid', (e) => e.textContent), /[135]點/);
-    await ov.mouse.move(300, 300); await ov.mouse.move(320, 320); await H.sleep(100);
-    assert.match(await ov.$eval('#ovWrongPlace:not(.hidden)', (e) => e.textContent), /觀眾看的轉盤.*控制面板/s); // 被貼進停駐視窗、滑鼠移過：提示貼錯地方
+    assert.equal(await ov.$eval('#ovWrongPlace', (e) => e.classList.contains('hidden')), true, '直播畫面上不能出現「貼錯地方」提示');
+    await ov.mouse.move(300, 300); await H.sleep(100);
+    assert.equal(await ov.$eval('#ovWrongPlace', (e) => e.classList.contains('hidden')), true, '滑鼠移過不提示');
+    await ov.mouse.click(320, 320); await H.sleep(100);
+    assert.match(await ov.$eval('#ovWrongPlace:not(.hidden)', (e) => e.textContent), /觀眾看的轉盤.*控制面板/s); // 被貼進停駐視窗、點到：提示貼錯地方
+    const top = await ov.evaluate(() => { const b = document.querySelector('#ovBanner').getBoundingClientRect(); const ring = document.querySelector('.wheel-wrap').getBoundingClientRect().top - document.querySelector('.wheel-wrap').offsetWidth * 0.07; return { bannerBottom: b.bottom, ringTop: ring, bannerTop: b.top }; });
+    assert.ok(top.bannerBottom <= top.ringTop + 1 && top.bannerTop >= 0, `名字不能被轉盤外圈蓋到 ${JSON.stringify(top)}`);
     assert.deepEqual(ov.errors, []);
   });
 

@@ -302,7 +302,8 @@ body.overlay { background: transparent; overflow: hidden; }
 body.overlay #bg { background: transparent; }
 body.overlay .stage { position: fixed; inset: 0; z-index: 1; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 14px; transition: opacity .5s, transform .5s; }
 body.overlay .stage.out { opacity: 0; transform: scale(.9); pointer-events: none; }
-body.overlay .wheel-wrap { width: var(--size, 520px); max-width: 95vw; }
+body.overlay .wheel-wrap { width: var(--size, 520px); max-width: 95vw; margin: calc(var(--size, 520px) * 0.07) 0; } /* 外圈條紋凸出 7%，留位置免得壓到上方的名字 */
+body.overlay .ov-banner { position: relative; z-index: 3; } /* 名字永遠在轉盤上面 */
 body.overlay .live-results { justify-content: center; }
 body.overlay .chip { font-size: 16px; padding: 7px 14px 7px 8px; }
 .result-layer { position: fixed; inset: 0; z-index: 2; display: flex; align-items: center; justify-content: center; padding: 20px; transition: opacity .4s; }

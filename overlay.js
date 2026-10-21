@@ -42,13 +42,12 @@
       if (window.WheelBG && params.get('bg') !== '0') WheelBG.setEnabled(config.bg3d);
     }
     if (params.get('status') !== '0') $('#ovStatus').classList.remove('hidden');
-    // OBS「來源」裡的瀏覽器收不到滑鼠點擊；被點到或滑鼠移過代表貼錯地方（停駐視窗或一般瀏覽器）：提示一下，8 秒後收起
+    // OBS「來源」裡的瀏覽器收不到滑鼠點擊；被點到代表貼錯地方（停駐視窗或一般瀏覽器）：提示一下，8 秒後收起
     const wrongPlace = () => {
       const w = $('#ovWrongPlace'); w.classList.remove('hidden');
       clearTimeout(w._t); w._t = setTimeout(() => w.classList.add('hidden'), 8000);
     };
-    document.addEventListener('pointerdown', wrongPlace);
-    document.addEventListener('pointermove', wrongPlace, { once: true }); // 滑鼠移過去就先提示一次
+    document.addEventListener('pointerdown', (e) => { if (e.isTrusted) wrongPlace(); }); // 只在真的被點時提示：滑鼠移動在某些環境沒人操作也會觸發，不能冒險出現在直播畫面上
     applyConfig(config);
 
     // 控制台連續快抽時覆蓋層會積壓：後面還有等待的批次就用快轉播（轉盤不轉、結果只停 2 秒）
