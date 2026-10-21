@@ -78,13 +78,18 @@
     return { display: s, login: '' };
   }
 
-  // 代抽：兌換時輸入的文字裡有「@帳號」，或整段就是一個英文帳號 → 回傳那個帳號（小寫），否則回傳空字串
-  // 只認英文帳號：中文顯示名稱可能重複、也可能只是留言（例如「加油」），會記錯人
+  // 代抽：兌換時輸入的文字裡要幫誰抽
+  //   「@帳號」或整段就是一個英文帳號 → { login }
+  //   「@中文名字」→ { name }（之後向 Twitch 搜尋名字完全一樣的帳號）
+  //   其他（「加油」、沒有 @ 的中文）→ null，當作幫自己抽
   function proxyTarget(input) {
     const t = String(input || '').trim();
-    const m = t.match(/@([A-Za-z0-9_]{3,25})/);
-    if (m) return m[1].toLowerCase();
-    return /^[A-Za-z0-9_]{3,25}$/.test(t) ? t.toLowerCase() : '';
+    const m = t.match(/[@＠]\s*([^\s@＠,，.。!！?？:：;；、()（）「」]+)/);
+    if (m) {
+      const tok = m[1];
+      return /^[A-Za-z0-9_]{3,25}$/.test(tok) ? { login: tok.toLowerCase() } : { name: tok.slice(0, 25) };
+    }
+    return /^[A-Za-z0-9_]{3,25}$/.test(t) ? { login: t.toLowerCase() } : null;
   }
 
   // 直播日：凌晨 cutoffHour 點以前算前一天。回傳 'YYYY-MM-DD'（本機時間）

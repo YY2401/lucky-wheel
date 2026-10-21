@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>忠誠點轉盤</title>
-<meta name="app-version" content="61">
+<meta name="app-version" content="63">
 <script>try { document.documentElement.dataset.theme = localStorage.getItem('tw.theme') || 'light'; } catch (e) { document.documentElement.dataset.theme = 'light'; }</script>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=61">
-<link rel="stylesheet" href="twitch.css?v=61">
+<link rel="stylesheet" href="style.css?v=63">
+<link rel="stylesheet" href="twitch.css?v=63">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.1/mqtt.min.js"></script>
 </head>
 <body class="tw">
@@ -81,7 +81,7 @@
       <div class="tw-create" id="createBox">
         <label class="tw-field">品項名稱 <input id="newRewardTitle" value="忠誠點轉盤" maxlength="45" style="width:200px"></label>
         <label class="tw-field">要花多少忠誠點 <input type="number" id="newRewardCost" value="500" min="1" step="1"></label>
-        <label class="tw-field" title="勾了之後，觀眾兌換時要輸入文字：幫別人抽就輸入 @對方的 Twitch 英文帳號"><input type="checkbox" id="newRewardProxy"> 代抽用（觀眾兌換時輸入 @幫誰抽）</label>
+        <label class="tw-field" title="勾了之後，觀眾兌換時要輸入文字：幫別人抽就輸入 @對方的 Twitch 英文帳號"><input type="checkbox" id="newRewardProxy"> 代抽用（觀眾兌換時輸入 @對方名字）</label>
         <button class="btn primary" id="createReward">建立品項</button>
         <p class="tw-err hidden" id="createErr"></p>
       </div>
@@ -112,6 +112,11 @@
         <summary>之後改了程式碼要重新部署嗎？</summary>
         <p class="hint">一般不需要再碰。若你按了「換一組暗號」或這個網頁更新了程式碼，請重新複製貼上，然後用 <b>部署 → 管理部署作業 → ✏️ 編輯 → 版本選「新版本」→ 部署</b>，網址會保持不變。</p>
         <button class="btn" id="newSheetKey">換一組暗號</button>
+      </details>
+      <details class="tw-more">
+        <summary>跨年：開新年度（每年 1 月 1 日前按一次）</summary>
+        <p class="hint">在同一份試算表裡，把「1月」～「12月」改名成「去年-1月」…，複製出今年的 12 個月份分頁（日期換新、數字清空），總表改看今年、累積點數加上去年（點數不歸零）。<b>按之前建議先到試算表「檔案 → 建立副本」備份一份</b>；出問題也可以從「檔案 → 版本記錄」還原。</p>
+        <button class="btn" id="newYearBtn">開新年度…</button>
       </details>
     </div>
   </section>
@@ -239,12 +244,12 @@
 </div>
 <div id="toast"></div>
 
-<script src="core.js?v=61"></script>
-<script src="twitch-core.js?v=61"></script>
-<script src="wheel.js?v=61"></script>
-<script src="ui.js?v=61"></script>
-<script src="store.js?v=61"></script>
-<script src="sync.js?v=61"></script>
-<script src="twitch.js?v=61"></script>
+<script src="core.js?v=63"></script>
+<script src="twitch-core.js?v=63"></script>
+<script src="wheel.js?v=63"></script>
+<script src="ui.js?v=63"></script>
+<script src="store.js?v=63"></script>
+<script src="sync.js?v=63"></script>
+<script src="twitch.js?v=63"></script>
 </body>
 </html>

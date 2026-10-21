@@ -73,7 +73,7 @@ function loadScript(book, key = 'SECRET123') {
       }),
     },
     ContentService: { MimeType: { JSON: 'json' }, createTextOutput: (t) => ({ setMimeType: () => JSON.parse(t) }) },
-    Utilities: { formatDate: (d) => `${d.getMonth() + 1}/${d.getDate()}` },
+    Utilities: { formatDate: (d, tz, f) => (f === 'yyyy' ? String(d.getFullYear()) : f === 'd' ? String(d.getDate()) : `${d.getMonth() + 1}/${d.getDate()}`) },
   });
   vm.runInContext(`${src}\n;this.__api = { doPost, doGet, parseViewer_, matchViewer_ };`, ctx);
   const api = ctx.__api;
@@ -299,14 +299,17 @@ test('送給試算表的資料帶著 Twitch 永久編號', () => {
   assert.equal(tw.missedRedemptions([{ id: 'm', user_login: 'a', user_name: 'A', user_id: '77', redeemed_at: '2026-10-01T00:00:00Z', reward: { id: 'r', title: 't' } }], [])[0].userId, '77');
 });
 
-test('代抽：只認 @帳號 或整段是英文帳號，中文名字和留言不算', () => {
-  assert.equal(tw.proxyTarget('@ToastIwa'), 'toastiwa');
-  assert.equal(tw.proxyTarget('幫 @gabai 抽！'), 'gabai');
-  assert.equal(tw.proxyTarget('  haruneuka '), 'haruneuka');
-  assert.equal(tw.proxyTarget('嘎唄'), '');
-  assert.equal(tw.proxyTarget('加油'), '');
-  assert.equal(tw.proxyTarget('good luck everyone'), '');
-  assert.equal(tw.proxyTarget(''), '');
+test('代抽：@帳號、@中文名字都算；沒有 @ 的中文和留言不算', () => {
+  assert.deepEqual(tw.proxyTarget('@ToastIwa'), { login: 'toastiwa' });
+  assert.deepEqual(tw.proxyTarget('幫 @gabai 抽！'), { login: 'gabai' });
+  assert.deepEqual(tw.proxyTarget('  haruneuka '), { login: 'haruneuka' });
+  assert.deepEqual(tw.proxyTarget('@秋野貼鐵'), { name: '秋野貼鐵' });
+  assert.deepEqual(tw.proxyTarget('幫＠秋野貼鐵 抽一次'), { name: '秋野貼鐵' });
+  assert.deepEqual(tw.proxyTarget('@ 小于甜心！'), { name: '小于甜心' });
+  assert.equal(tw.proxyTarget('嘎唄'), null);
+  assert.equal(tw.proxyTarget('加油'), null);
+  assert.equal(tw.proxyTarget('good luck everyone'), null);
+  assert.equal(tw.proxyTarget(''), null);
   const r = tw.makeRecord({ id: 'p', login: 'toastiwa', display: '吐司', by: { login: 'Gabai', display: '嘎唄' }, prize: tw.DEFAULT_PRIZES[0] });
   assert.deepEqual(r.by, { login: 'gabai', display: '嘎唄' });
   r.moveTo = { login: 'newbie', display: '新人', userId: '5' };
@@ -331,4 +334,107 @@ test('改記給別人：原本的人 -1、新的人 +1，重送不會重複，�
   gas.post({ action: 'add', records: [{ id: 'm2', date: '2026-10-04', login: 'gabai', display: '嘎唄', column: '1點' }] });
   const n = gas.post({ action: 'move', records: [{ ...mv, id: 'm2', to: { login: 'brandnew', display: '新來的' } }] }).results[0];
   assert.equal(n.isNew, true); assert.equal(sheets['兌換紀錄'].cell(n.row, 2).v, '新來的(brandnew)');
+});
+
+// ---------- 開新年度：模擬一整年 12 個月份分頁＋總表公式（照實際試算表的寫法） ----------
+const L = (n) => { let s = ''; while (n > 0) { const k = (n - 1) % 26; s = String.fromCharCode(65 + k) + s; n = Math.floor((n - 1) / 26); } return s; };
+function makeYearBook(year = 2026, viewers = ['嘎唄(gabai)', 'HaruneUka(haruneuka)']) {
+  const sheets = {};
+  const book = {
+    getSheetByName: (n) => sheets[n] || null,
+    _sheets: sheets, getName: () => '轉盤紀錄', getSpreadsheetTimeZone: () => 'Asia/Taipei',
+    rename(sh, to) { // 跟 Google 試算表一樣：分頁改名時，所有引用它的公式跟著改
+      const from = sh.name; delete sheets[from]; sh.name = to; sheets[to] = sh;
+      for (const s of Object.values(sheets)) for (const c of s.cells.values()) if (c.f) c.f = c.f.split(`'${from}'!`).join(`'${to}'!`);
+    },
+  };
+  const add = (n) => { const s = new Sheet(n); s.book = book; return (sheets[n] = s); };
+  const ex = add('兌換紀錄');
+  viewers.forEach((v, i) => { ex.put(3 + i, 1, i + 1); ex.put(3 + i, 2, v); });
+  const sum = add('總表');
+  for (let m = 1; m <= 12; m++) {
+    const days = new Date(year, m, 0).getDate();
+    const ms = add(`${m}月`);
+    for (let d = 1; d <= days; d++) { const c = 3 + (d - 1) * 8; ms.put(1, c, new Date(year, m - 1, d)); COLS.forEach((h, k) => ms.put(2, c + k, h)); }
+    const sc = 3 + days * 8; // 當月總結
+    ms.put(1, sc, '當月總結'); COLS.forEach((h, k) => ms.put(2, sc + k, h));
+    viewers.forEach((_, i) => { const r = 3 + i; ms.put(r, 1, i + 1); ms.put(r, 2, '(公式)', `='總表'!B${r}`); ms.put(r, sc, '(公式)', `=C${r}+K${r}`); });
+    // 總表：每個月 8 欄，從 P 欄開始；1點 / 3點×3 / 5點×5 / Q版塗鴉
+    viewers.forEach((_, i) => {
+      const r = 3 + i; const b = 16 + (m - 1) * 8;
+      sum.put(r, b, '(公式)', `='${m}月'!${L(sc)}${r}`); sum.put(r, b + 1, '(公式)', `='${m}月'!${L(sc + 1)}${r}*3`);
+      sum.put(r, b + 2, '(公式)', `='${m}月'!${L(sc + 2)}${r}*5`); sum.put(r, b + 3, '(公式)', `='${m}月'!${L(sc + 3)}${r}`);
+    });
+  }
+  viewers.forEach((_, i) => {
+    const r = 3 + i; const cols = (k) => Array.from({ length: 12 }, (_, m) => `${L(16 + m * 8 + k)}${r}`);
+    sum.put(r, 1, i + 1); sum.put(r, 2, '(公式)', `='兌換紀錄'!B${r}`);
+    sum.put(r, 3, '(公式)', `=${[...cols(0), ...cols(1), ...cols(2)].join('+')}`); // 累積點數
+    sum.put(r, 5, '(公式)', `=C${r}-D${r}`);
+    sum.put(r, 6, '(公式)', `=${cols(3).join('+')}-G${r}`); // Q版塗鴉剩餘
+    sum.put(r, 7, 0);
+  });
+  return { book, sheets };
+}
+// 模擬補上「開新年度」會用到的試算表功能
+Sheet.prototype.setName = function (n) { this.book.rename(this, n); return this; };
+Sheet.prototype.copyTo = function (book) { const c = new Sheet(`${this.name} 的副本`); c.book = book; for (const [k, v] of this.cells) c.cells.set(k, { ...v }); c.maxRow = this.maxRow; c.maxCol = this.maxCol; book._sheets[c.name] = c; return c; };
+{
+  const orig = Sheet.prototype.getRange;
+  Sheet.prototype.getRange = function (r, c, nr = 1, nc = 1) {
+    const sh = this; const rg = orig.call(this, r, c, nr, nc);
+    rg.getFormulas = () => Array.from({ length: nr }, (_, i) => Array.from({ length: nc }, (_, j) => sh.cell(r + i, c + j).f));
+    rg.setFormulas = (fs) => fs.forEach((row, i) => row.forEach((f, j) => sh.put(r + i, c + j, `(公式)${f}`, f)));
+    rg.clearContent = () => { for (let i = 0; i < nr; i++) for (let j = 0; j < nc; j++) sh.put(r + i, c + j, ''); };
+    rg.setFormula = (f) => { const d = /^=DATE\((\d+),(\d+),(\d+)\)$/.exec(f); sh.put(r, c, d ? new Date(+d[1], d[2] - 1, +d[3]) : `(公式)${f}`, f); };
+    return rg;
+  };
+}
+
+test('跨年：還沒開新年度時，2027 的兌換不會寫進 2026 年的分頁', () => {
+  const { book, sheets } = makeYearBook(2026);
+  const gas = loadScript(book);
+  const r = gas.post({ action: 'add', records: [{ id: 'y1', date: '2027-01-05', login: 'gabai', display: '嘎唄', column: '1點' }] }).results[0];
+  assert.equal(r.ok, false); assert.match(r.error, /還沒有 2027 年 1 月的分頁.*開新年度/);
+  assert.equal(sheets['1月'].cell(3, 3 + 4 * 8).v, ''); // 2026/1/5 沒被動到
+  assert.equal(gas.post({ action: 'add', records: [{ id: 'y0', date: '2026-10-04', login: 'gabai', display: '嘎唄', column: '1點' }] }).results[0].ok, true);
+});
+
+test('開新年度：舊分頁改名、建新分頁（日期換新、數字清空）、總表改看今年且累積點數加上去年', () => {
+  const { book, sheets } = makeYearBook(2026);
+  const gas = loadScript(book);
+  gas.post({ action: 'add', records: [{ id: 'old', date: '2026-01-05', login: 'gabai', display: '嘎唄', column: '1點' }] });
+  const res = gas.post({ action: 'newYear', year: 2027 });
+  assert.equal(res.ok, true, JSON.stringify(res));
+  assert.equal(res.renamed.length, 12); assert.equal(res.created.length, 12);
+  assert.ok(sheets['2026-1月'] && sheets['2027-1月'] && !sheets['1月']);
+  const n = sheets['2027-1月']; const o = sheets['2026-1月'];
+  assert.equal(n.cell(1, 3).v.getFullYear(), 2027); assert.equal(n.cell(1, 3 + 30 * 8).v.getDate(), 31);
+  assert.equal(o.cell(3, 3 + 4 * 8).v, 1); assert.equal(n.cell(3, 3 + 4 * 8).v, ''); // 舊的留著、新的清空
+  assert.equal(n.cell(3, 2).f, "='總表'!B3"); // 名稱公式保留
+  const sum = sheets['總表'];
+  assert.match(sum.cell(3, 16).f, /^='2027-1月'!/); // 每月欄改看今年
+  assert.match(sum.cell(3, 3).f, /^=P3\+.*\+\(\('2026-1月'!.*\)\+.*'2026-12月'!/); // 累積點數 = 今年 + 去年
+  assert.match(sum.cell(3, 6).f, /-G3\+\(\('2026-1月'!/); // Q版塗鴉剩餘也加上去年
+  assert.equal(sum.cell(3, 5).f, '=C3-D3'); // 不相干的公式不動
+  assert.deepEqual(res.warnings, []);
+  // 開完之後：2027 寫進新分頁；補抓到的 2026 年底兌換寫進舊分頁
+  assert.match(gas.post({ action: 'add', records: [{ id: 'n1', date: '2027-01-05', login: 'gabai', display: '嘎唄', column: '1點' }] }).results[0].cell, /^2027-1月!/);
+  assert.match(gas.post({ action: 'add', records: [{ id: 'n2', date: '2026-12-31', login: 'gabai', display: '嘎唄', column: '1點' }] }).results[0].cell, /^2026-12月!/);
+  // 同一年不能開兩次
+  const again = gas.post({ action: 'newYear', year: 2027 });
+  assert.equal(again.ok, false); assert.match(again.error, /已經建立過/);
+});
+
+test('連續兩年開新年度：累積點數疊加兩個舊年度；閏年 2 月少一天會提醒', () => {
+  const { book, sheets } = makeYearBook(2026);
+  const gas = loadScript(book);
+  assert.equal(gas.post({ action: 'newYear', year: 2027 }).ok, true);
+  const res = gas.post({ action: 'newYear', year: 2028 });
+  assert.equal(res.ok, true, JSON.stringify(res));
+  assert.equal(res.renamed.length, 0); // 已經是「年份-N月」，不用改名
+  const c = sheets['總表'].cell(3, 3).f;
+  assert.match(c, /2026-1月.*2027-1月/s);
+  assert.match(sheets['總表'].cell(3, 16).f, /^='2028-1月'!/);
+  assert.ok(res.warnings.some((w) => /2028-2月 少了 2\/29/.test(w)), res.warnings.join('\n'));
 });

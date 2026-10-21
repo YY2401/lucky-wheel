@@ -231,10 +231,21 @@
         return u ? { login: u.login, display: u.display_name || u.login, userId: u.id } : null;
       } catch { return undefined; }
     },
+    // 用顯示名稱（例如中文名字）找觀眾：Twitch 沒有直接用名字查的方式，用頻道搜尋找「名字完全一樣」的那一位
+    async findByName(name) {
+      if (!auth || !auth.token) return undefined;
+      try {
+        const r = await this.helix(`/search/channels?query=${encodeURIComponent(name)}&first=50`);
+        if (r.status !== 200) return undefined;
+        const want = String(name).trim().toLowerCase();
+        const hit = (r.json.data || []).filter((c) => String(c.display_name || '').toLowerCase() === want || String(c.broadcaster_login || '') === want);
+        return hit.length === 1 ? { login: hit[0].broadcaster_login, display: hit[0].display_name || hit[0].broadcaster_login, userId: hit[0].id } : null; // 找不到或同名不只一位都不猜
+      } catch { return undefined; }
+    },
     // 由這個網頁建立品項：之後才能補抓漏掉的兌換、退點。proxy＝代抽用（觀眾兌換時要輸入幫誰抽）
     async createReward(title, cost, proxy = false) {
       const body = { title, cost, is_enabled: true, should_redemptions_skip_request_queue: false };
-      if (proxy) Object.assign(body, { is_user_input_required: true, prompt: '幫別人抽：輸入 @對方的 Twitch 英文帳號（幫自己抽就隨便打一個字）' });
+      if (proxy) Object.assign(body, { is_user_input_required: true, prompt: '幫別人抽：輸入 @對方的名字或英文帳號（幫自己抽就隨便打一個字）' });
       const r = await this.helix(`/channel_points/custom_rewards?broadcaster_id=${auth.userId}`, { method: 'POST', body });
       if (r.status === 200 && r.json && r.json.data && r.json.data[0]) return r.json.data[0];
       const msg = (r.json && r.json.message) || '';
@@ -434,12 +445,16 @@
   // 代抽：兌換時輸入了「@帳號」就記給那個人（先向 Twitch 確認帳號存在）；查不到就記給兌換的人並註明
   async function proxyFor(q) {
     const self = { login: q.login, display: q.display, userId: q.userId, by: null, note: '' };
-    const target = q.test ? '' : T.proxyTarget(q.input);
-    if (!target || target === String(q.login || '').toLowerCase()) return self;
-    const u = await Twitch.lookupUser(target);
-    if (u === null) return { ...self, note: `找不到 @${target}，先記給 ${q.display}` };
-    const to = u || { login: target, display: target, userId: '' }; // 連不到 Twitch：先照帳號記，試算表那邊一樣用帳號找人
-    return { login: to.login, display: to.display, userId: to.userId, by: { login: q.login, display: q.display }, note: '' };
+    const target = q.test ? null : T.proxyTarget(q.input);
+    if (!target) return self;
+    const me = String(q.login || '').toLowerCase();
+    if (target.login === me || (target.name && target.name.toLowerCase() === String(q.display || '').toLowerCase())) return self;
+    const label = target.login || target.name;
+    const u = target.login ? await Twitch.lookupUser(target.login) : await Twitch.findByName(target.name);
+    // 找不到（或同名不只一位）：先記給兌換的人，紀錄上一定註明，讓實況主用「改記給…」更正
+    if (!u) return { ...self, note: `${u === null ? '找不到' : '查不到'} @${label}，先記給 ${q.display}，可以按「改記給…」更正` };
+    if (u.login === me) return self;
+    return { login: u.login, display: u.display, userId: u.userId, by: { login: q.login, display: q.display }, note: '' };
   }
 
   async function animate(rec) {
@@ -489,7 +504,13 @@
     else if (Twitch.state === 'error') alert = { text: Twitch.error, btn: '到設定', act: () => showSetup(1) };
     else if (missed.length) alert = { text: `網頁關著時有 ${missed.length} 筆兌換還沒轉`, btn: '查看並補轉', act: openCatchup };
     else if (Writer.state === 'fail' && cfg.scriptUrl) alert = { text: `試算表寫入失敗：${Writer.lastError}（每隔一段時間會自動重試，紀錄都還在）`, btn: '立刻重試', act: () => Writer.kick() };
-    else if (failed) alert = { text: `有 ${failed} 筆沒寫進試算表：${records.find((r) => r.status === 'error').error}`, btn: '全部重新寫入', act: retryAll };
+    else if (failed) {
+      const err = records.find((r) => r.status === 'error');
+      // 跨年還沒開新年度：直接給「開新年度」
+      const yearErr = records.find((r) => r.status === 'error' && /開新年度/.test(r.error));
+      alert = yearErr ? { text: `有 ${failed} 筆沒寫進試算表：${yearErr.error}`, btn: '開新年度', act: () => openNewYear(Number(yearErr.date.slice(0, 4))) }
+        : { text: `有 ${failed} 筆沒寫進試算表：${err.error}`, btn: '全部重新寫入', act: retryAll };
+    }
     else if (auth && auth.userId && auth.scopes && !Twitch.canManage) alert = { text: '新功能：重新連接 Twitch 一次，就能補抓網頁關著時的兌換、撤銷時退點', btn: '重新連接 Twitch', act: () => Twitch.login() };
     $('#alert').classList.toggle('hidden', !alert);
     if (alert) { $('#alertText').textContent = alert.text; $('#alertBtn').textContent = alert.btn; $('#alertBtn').onclick = alert.act; }
@@ -544,7 +565,10 @@
     const v = T.parseViewer(name.replace(/^@/, ''));
     let login = v.login || (/^[a-z0-9_]{3,25}$/i.test(v.display) ? v.display.toLowerCase() : '');
     let display = v.display || login; let userId = '';
-    if (login) {
+    if (!login && display) { // 中文名字：向 Twitch 找名字完全一樣的觀眾
+      const u = await Twitch.findByName(display);
+      if (u) ({ login, display, userId } = u);
+    } else if (login) {
       const u = await Twitch.lookupUser(login);
       if (u === null && !(await dialog({ title: `Twitch 上找不到 ${login}`, message: '可能打錯帳號。還是要照這個名稱記嗎？（試算表會用這個名稱找人，找不到就新增一列）', okLabel: '照樣記' }))) return;
       if (u) ({ login, display, userId } = u);
@@ -670,6 +694,24 @@
       $('#copyScript').textContent = '✓ 已複製（再按一次可重新複製）';
     } catch (e) { toast(`複製失敗：${e.message}`, 6000); }
   };
+  // 開新年度：在同一份試算表建好今年的月份分頁，總表接著累積
+  async function openNewYear(year) {
+    if (!cfg.scriptUrl) { toast('請先完成步驟 3 連接試算表'); return; }
+    const now = new Date();
+    const y = year || (now.getMonth() >= 10 ? now.getFullYear() + 1 : now.getFullYear()); // 11、12 月按的話準備明年
+    const typed = await dialog({ title: '開新年度', message: `要建立哪一年的月份分頁？\n會做這些事：把「1月」～「12月」改名成「${y - 1}-1月」…；複製出「${y}-1月」～「${y}-12月」（日期換成 ${y} 年、數字清空）；總表改看 ${y} 年，累積點數加上去年（點數不歸零）。\n建議先到試算表「檔案 → 建立副本」備份一份。`, input: String(y), okLabel: '開始' });
+    if (typed === null) return;
+    const yy = Number(String(typed).trim());
+    if (!(yy >= 2000 && yy < 2100)) { toast('年份不對'); return; }
+    toast('建立中，大約需要半分鐘…', 30000);
+    let res;
+    try { res = await sheetPost({ action: 'newYear', year: yy }); } catch (e) { toast(`開新年度失敗：${e.message}`, 8000); return; }
+    if (!res.ok) { await dialog({ title: '開新年度沒有完成', message: res.error || '失敗', okLabel: '知道了' }); return; }
+    const warn = (res.warnings || []).length ? `\n\n要注意：\n・${res.warnings.join('\n・')}` : '';
+    await dialog({ title: `${yy} 年的分頁建好了`, message: `建立了 ${res.created.length} 個月份分頁${res.renamed.length ? `，舊分頁改名為「${res.renamed[0]}」等 ${res.renamed.length} 個` : ''}，總表更新了 ${res.summaryCells || 0} 格公式。${warn}\n\n卡住的紀錄會自動補寫。`, okLabel: '好' });
+    retryAll();
+  }
+  $('#newYearBtn').onclick = () => openNewYear();
   $('#newSheetKey').onclick = async () => {
     if (!(await dialog({ title: '換一組暗號？', message: '換了之後，舊的程式碼就不能寫入了。要重新複製程式碼、貼到 Apps Script，並重新部署（管理部署作業 → 編輯 → 新版本）。', okLabel: '換', danger: true }))) return;
     cfg = T.normalizeTwConfig({ ...cfg, sheetKey: '', sheetOk: '' }); saveCfg();

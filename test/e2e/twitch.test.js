@@ -404,13 +404,17 @@ if (!H.chromePath()) {
       window.__tw.redeem({ id: 'px1', user_login: 'gabai', user_name: '嘎唄', user_id: '1', user_input: '幫 @ToastIwa 抽', reward: { id: 'rw1', title: '代抽轉盤' } });
       window.__tw.redeem({ id: 'px2', user_login: 'gabai', user_name: '嘎唄', user_id: '1', user_input: '@nobody', reward: { id: 'rw1', title: '代抽轉盤' } });
       window.__tw.redeem({ id: 'px3', user_login: 'gabai', user_name: '嘎唄', user_id: '1', user_input: '加油', reward: { id: 'rw1', title: '代抽轉盤' } });
+      window.__tw.redeem({ id: 'px4', user_login: 'mark880504', user_name: '福叔', user_id: '2', user_input: '@秋野貼鐵', reward: { id: 'rw1', title: '代抽用' } });
+      window.__tw.redeem({ id: 'px5', user_login: 'mark880504', user_name: '福叔', user_id: '2', user_input: '@雙胞胎', reward: { id: 'rw1', title: '代抽用' } });
     });
     await waitFor(() => page.$eval('#nowBanner', (e) => /嘎唄 幫忙抽/.test(e.textContent)));
-    const recs = await waitFor(async () => { const r = await records(page); return r.length === 3 && r.every((x) => x.status === 'ok') && r; }, 15000);
+    const recs = await waitFor(async () => { const r = await records(page); return r.length === 5 && r.every((x) => x.status === 'ok') && r; }, 25000);
     const by = (id) => recs.find((r) => r.id === id);
     assert.equal(by('px1').login, 'toastiwa'); assert.equal(by('px1').display, 'TOASTIWA'); assert.deepEqual(by('px1').by, { login: 'gabai', display: '嘎唄' });
     assert.equal(by('px2').login, 'gabai'); assert.match(by('px2').note, /找不到 @nobody/);
     assert.equal(by('px3').login, 'gabai'); assert.equal(by('px3').by, null); // 留言不算代抽
+    assert.equal(by('px4').login, 'akino_tieh'); assert.equal(by('px4').display, '秋野貼鐵'); assert.deepEqual(by('px4').by, { login: 'mark880504', display: '福叔' }); // @中文名字
+    assert.equal(by('px5').login, 'mark880504'); assert.match(by('px5').note, /找不到 @雙胞胎.*改記給/); // 同名不只一位：不猜，註明
     const sent = await page.evaluate(() => window.__tw.sheetCalls.flatMap((c) => c.records || []));
     assert.equal(sent.find((r) => r.id === 'px1').login, 'toastiwa');
     assert.match(await page.$eval('#recordList', (e) => e.textContent), /嘎唄 代抽/);
@@ -432,5 +436,22 @@ if (!H.chromePath()) {
     await waitFor(() => page.evaluate(() => window.__tw.created.length === 1));
     const b = await page.evaluate(() => window.__tw.created[0]);
     assert.equal(b.is_user_input_required, true); assert.match(b.prompt, /@對方/);
+  });
+
+  test('跨年：寫入因為沒有新年度分頁失敗時，提醒條變成「開新年度」，開完自動補寫', async (t) => {
+    const page = await open(t);
+    await waitFor(() => page.evaluate(() => window.__tw.subscribed));
+    await page.evaluate(() => { window.__tw.rowErrors.gabai = '還沒有 2027 年 1 月的分頁（「1月」分頁是 2026 年的），請在轉盤網頁按「開新年度」'; });
+    await page.evaluate(() => window.__tw.redeem({ id: 'ny1', user_login: 'gabai', user_name: '嘎唄', reward: { id: 'rw1', title: '轉' }, redeemed_at: '2027-01-05T12:00:00Z' }));
+    await waitFor(() => page.$eval('#alertBtn', (e) => e.textContent === '開新年度'), 15000);
+    await page.click('#alertBtn'); await H.sleep(200);
+    assert.equal(await page.$eval('#confirmInput', (e) => e.value), '2027'); // 用失敗那筆的年份
+    await page.click('#confirmOk');
+    await waitFor(() => page.$eval('#confirmTitle', (e) => /2027 年的分頁建好了/.test(e.textContent)));
+    assert.match(await page.$eval('#confirmMsg', (e) => e.textContent), /12 個月份分頁.*98 格/s);
+    await page.click('#confirmOk');
+    await waitFor(async () => (await records(page)).find((r) => r.id === 'ny1').status === 'ok');
+    assert.equal(await page.evaluate(() => window.__tw.newYear), 2027);
+    assert.deepEqual(page.errors, []);
   });
 }

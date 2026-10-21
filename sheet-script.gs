@@ -30,6 +30,10 @@ function doPost(e) {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     if (req.action === 'ping') return json_(ping_(ss, req));
+    if (req.action === 'newYear') {
+      try { const res = newYear_(ss, req.year); SpreadsheetApp.flush(); return json_(res); }
+      catch (err) { return json_({ ok: false, fatal: true, error: String((err && err.message) || err) }); }
+    }
     if (req.action === 'move') {
       const moved = (req.records || []).map(function (r) {
         try { return move_(ss, r); } catch (err) { return { id: r && r.id, ok: false, error: String((err && err.message) || err) }; }
@@ -157,12 +161,34 @@ function namesWithoutLogin_(names) {
 }
 
 // ---------- 月份分頁的格子 ----------
+// 月份分頁的命名：開過新年度之後是「2027-1月」；還沒開過時是「1月」（從分頁上的日期看出是哪一年）
+const isDate_ = function (v) { return Object.prototype.toString.call(v) === '[object Date]'; };
+function sheetYear_(sh, tz) {
+  const n = Math.min(sh.getLastColumn(), 60);
+  if (n < 1) return null;
+  const row = sh.getRange(DATE_ROW, 1, 1, n).getValues()[0];
+  for (let i = 0; i < row.length; i++) {
+    const v = row[i];
+    if (isDate_(v)) return Number(Utilities.formatDate(v, tz, 'yyyy'));
+    const x = String(v).match(/^\s*(\d{4})[/\-.年]\d{1,2}/);
+    if (x) return Number(x[1]);
+  }
+  return null; // 日期沒寫年份：不檢查
+}
 function monthSheet_(ss, date) {
-  const m = Number(String(date).split('-')[1]);
-  const name = m + '月';
-  const sh = ss.getSheetByName(name);
-  if (!sh) throw new Error('找不到「' + name + '」分頁');
-  return sh;
+  const parts = String(date).split('-').map(Number);
+  const y = parts[0]; const m = parts[1];
+  const tz = ss.getSpreadsheetTimeZone();
+  const named = ss.getSheetByName(y + '-' + m + '月');
+  if (named) return named;
+  const plain = ss.getSheetByName(m + '月');
+  if (plain) {
+    const sy = sheetYear_(plain, tz);
+    if (sy === null || sy === y) return plain;
+    throw new Error('還沒有 ' + y + ' 年 ' + m + ' 月的分頁（「' + m + '月」分頁是 ' + sy + ' 年的），請在轉盤網頁按「開新年度」');
+  }
+  if (ss.getSheetByName((y - 1) + '-' + m + '月')) throw new Error('還沒有 ' + y + ' 年 ' + m + ' 月的分頁，請在轉盤網頁按「開新年度」');
+  throw new Error('找不到「' + m + '月」分頁');
 }
 
 function sameDay_(v, m, d, tz) {
@@ -259,6 +285,111 @@ function apply_(ss, r, delta) {
   const info = { cell: sh.getName() + '!' + colLetter_(col) + row, row: row, name: viewer.name };
   mark_(props, doneKey, info);
   return { id: r.id, ok: true, cell: info.cell, row: row, name: viewer.name, isNew: viewer.isNew, renamedFrom: viewer.renamedFrom || '', before: before, after: after };
+}
+
+// ---------- 開新年度：舊分頁改名「去年-N月」、複製出「今年-N月」並清空，總表改看今年、累積點數加上去年 ----------
+function newYear_(ss, y) {
+  y = Number(y);
+  if (!(y >= 2000 && y < 2100)) throw new Error('年份不對');
+  const tz = ss.getSpreadsheetTimeZone();
+  if (ss.getSheetByName(y + '-1月')) throw new Error(y + ' 年的分頁已經建立過了');
+  const out = { ok: true, year: y, created: [], renamed: [], warnings: [] };
+  // 1. 還沒加年份的「N月」分頁，改名成「那一年-N月」（試算表會自動更新引用它的公式）
+  for (let m = 1; m <= 12; m++) {
+    const sh = ss.getSheetByName(m + '月');
+    if (!sh) continue;
+    const sy = sheetYear_(sh, tz) || (y - 1);
+    if (sy === y) throw new Error('「' + m + '月」分頁已經是 ' + y + ' 年的，不用開新年度');
+    const name = sy + '-' + m + '月';
+    if (ss.getSheetByName(name)) { out.warnings.push('已經有「' + name + '」，「' + m + '月」分頁沒有改名'); continue; }
+    sh.setName(name); out.renamed.push(name);
+  }
+  // 2. 每個月從最近一年的分頁複製一份當範本
+  const prev = {};
+  for (let m = 1; m <= 12; m++) {
+    let src = null;
+    for (let yy = y - 1; yy >= y - 10 && !src; yy--) src = ss.getSheetByName(yy + '-' + m + '月');
+    if (!src) { out.warnings.push('找不到 ' + m + ' 月的舊分頁可以當範本，' + y + '-' + m + '月沒有建立'); continue; }
+    prev[m] = src.getName();
+    const sh = src.copyTo(ss);
+    sh.setName(y + '-' + m + '月');
+    resetMonth_(sh, y, m, tz, out.warnings);
+    out.created.push(sh.getName());
+  }
+  // 3. 總表
+  rollSummary_(ss, y, prev, out);
+  return out;
+}
+
+// 新分頁：第 1 列日期換成新年份、清掉每天的數字（公式保留）
+function resetMonth_(sh, y, m, tz, warnings) {
+  const lastCol = sh.getLastColumn();
+  const dates = sh.getRange(DATE_ROW, 1, 1, lastCol).getValues()[0];
+  const days = new Date(y, m, 0).getDate();
+  let first = -1; let sumStart = lastCol + 1; let maxDay = 0;
+  for (let i = 0; i < lastCol; i++) {
+    const v = dates[i];
+    let d = 0;
+    if (isDate_(v)) d = Number(Utilities.formatDate(v, tz, 'd'));
+    else { const x = String(v).match(/(?:\d{4}[/\-.年])?\d{1,2}[/\-.月](\d{1,2})/); if (x) d = Number(x[1]); }
+    if (d) {
+      if (first < 0) first = i + 1;
+      if (d <= days) { sh.getRange(DATE_ROW, i + 1).setFormula('=DATE(' + y + ',' + m + ',' + d + ')'); maxDay = Math.max(maxDay, d); }
+      else { sh.getRange(DATE_ROW, i + 1).setValue(''); warnings.push(y + '-' + m + '月 多出 ' + m + '/' + d + ' 的欄位（今年沒有這一天），可以刪掉'); }
+    } else if (first > 0 && v !== '' && v != null && sumStart > lastCol) sumStart = i + 1; // 「當月總結」
+  }
+  if (maxDay < days) warnings.push(y + '-' + m + '月 少了 ' + m + '/' + (maxDay + 1) + (days > maxDay + 1 ? '～' + m + '/' + days : '') + ' 的欄位：那幾天有人兌換時會寫入失敗，請照前一天的格式手動補上');
+  const rows = sh.getLastRow() - FIRST_ROW + 1;
+  if (first < 0 || rows < 1 || sumStart <= first) return;
+  const rng = sh.getRange(FIRST_ROW, first, rows, sumStart - first);
+  const f = rng.getFormulas();
+  if (f.every(function (r) { return r.every(function (x) { return !x; }); })) { rng.clearContent(); return; }
+  for (let i = 0; i < f.length; i++) for (let j = 0; j < f[i].length; j++) if (!f[i][j]) sh.getRange(FIRST_ROW + i, first + j).setValue('');
+}
+
+// 總表：指向去年月份分頁的欄改指向今年；其他用到這些欄的合計（累積點數等）加上去年的數字，點數不歸零
+function rollSummary_(ss, y, prev, out) {
+  const sh = ss.getSheetByName(SUMMARY_SHEET);
+  if (!sh) { out.warnings.push('找不到「' + SUMMARY_SHEET + '」分頁，總表沒有更新'); return; }
+  const last = sh.getLastRow(); const lastCol = sh.getLastColumn();
+  if (last < FIRST_ROW) return;
+  const F = sh.getRange(FIRST_ROW, 1, last - FIRST_ROW + 1, lastCol).getFormulas();
+  const names = Object.keys(prev).map(function (m) { return prev[m]; });
+  const esc = function (t) { return t.replace(/[-]/g, '\\-'); };
+  const refRe = new RegExp("'(" + names.map(esc).join('|') + ")'!", 'g');
+  const isMonthCol = function (f) { refRe.lastIndex = 0; return !!f && refRe.test(f); };
+  const toNew = function (f) { return f.replace(refRe, function (all, n) { return "'" + y + '-' + n.replace(/^\d{4}-/, '') + "'!"; }); };
+  const changed = []; // [列, 欄, 新公式]
+  for (let i = 0; i < F.length; i++) {
+    const row = FIRST_ROW + i;
+    const monthExpr = {};
+    F[i].forEach(function (f, j) { if (isMonthCol(f)) monthExpr[colLetter_(j + 1)] = '(' + f.replace(/^=/, '') + ')'; });
+    if (!Object.keys(monthExpr).length) continue;
+    F[i].forEach(function (f, j) {
+      if (!f) return;
+      if (monthExpr[colLetter_(j + 1)]) { changed.push([row, j + 1, toNew(f)]); return; }
+      // 這一列的合計公式：用到哪些月份欄，就把那些欄去年的算式加上去
+      const used = [];
+      const tokenRe = /(^|[^A-Za-z0-9_!'.$])\$?([A-Z]{1,3})\$?(\d+)(?![0-9(])/g;
+      let t;
+      while ((t = tokenRe.exec(f))) if (Number(t[3]) === row && monthExpr[t[2]] && used.indexOf(t[2]) < 0) used.push(t[2]);
+      if (used.length) changed.push([row, j + 1, f + '+(' + used.map(function (c) { return monthExpr[c]; }).join('+') + ')']);
+    });
+  }
+  // 依欄寫回（同一欄連續的列一次寫，比一格一格快很多）
+  const byCol = {};
+  changed.forEach(function (c) { (byCol[c[1]] = byCol[c[1]] || []).push(c); });
+  Object.keys(byCol).forEach(function (col) {
+    const list = byCol[col].sort(function (a, b) { return a[0] - b[0]; });
+    let k = 0;
+    while (k < list.length) {
+      let e = k;
+      while (e + 1 < list.length && list[e + 1][0] === list[e][0] + 1) e++;
+      sh.getRange(list[k][0], Number(col), e - k + 1, 1).setFormulas(list.slice(k, e + 1).map(function (c) { return [c[2]]; }));
+      k = e + 1;
+    }
+  });
+  out.summaryCells = changed.length;
 }
 
 // ---------- 改記給別人（代抽記錯人、事後更正）：原本的人那格 -1、新的人那格 +1 ----------
