@@ -5,7 +5,7 @@
 })(typeof self !== 'undefined' ? self : this, function (LuckyCore) {
   const { PALETTE, randId } = LuckyCore;
 
-  // 試算表每天底下的欄名（照原本的試算表）
+  // 試算表每天底下的欄名（照原本的試算表）；還沒測試連線讀到實際欄名之前，選單先用這份
   const SHEET_COLUMNS = ['1點', '3點', '5點', 'Q版塗鴉', '正比塗鴉', '模板貼圖', '舔舔貼圖', '自選品項'];
 
   const DEFAULT_PRIZES = [
@@ -19,6 +19,7 @@
     rewardIds: [], // 觸發轉盤的忠誠點品項
     scriptUrl: '', // Apps Script 網頁應用程式網址
     sheetOk: '', // 最後一次「測試連線」成功的網址
+    sheetColumns: [], // 測試連線時從試算表讀到的欄名（每天底下那幾欄），給「寫到哪一欄」選單用
     sheetKey: '', // 寫進 Apps Script 的暗號
     cutoffHour: 0, // 凌晨幾點以前算前一天（跨夜直播用）
     prizes: DEFAULT_PRIZES,
@@ -62,6 +63,7 @@
     cfg.sync = cfg.sync !== false;
     cfg.broker = /^wss?:\/\//.test(cfg.broker || '') ? cfg.broker : DEFAULT_TW.broker;
     cfg.setupDone = cfg.setupDone === true;
+    cfg.sheetColumns = Array.isArray(cfg.sheetColumns) ? [...new Set(cfg.sheetColumns.map((c) => String(c).trim()).filter(Boolean))].slice(0, 50) : [];
     cfg.movedToObs = cfg.movedToObs === true;
     cfg.importedIds = Array.isArray(cfg.importedIds) ? cfg.importedIds.map(String).slice(-20) : [];
     return cfg;
@@ -93,7 +95,8 @@
       login: String(login).toLowerCase(), display: String(display || login),
       reward: String(reward || ''),
       prizeId: prize.id, prize: prize.name, column: prize.column, color: prize.color,
-      status: test ? 'test' : 'pending', // pending 待寫入 / ok 已寫入 / error 失敗 / undoing 撤銷中 / undone 已撤銷 / test 測試不寫入
+      // pending 待寫入 / ok 已寫入 / error 失敗 / undoing 撤銷中 / undone 已撤銷 / test 測試不寫入 / nowrite 這格設定成不寫進試算表
+      status: test ? 'test' : prize.column ? 'pending' : 'nowrite',
       cell: '', error: '', attempts: 0,
       rewardId: String(rewardId || ''),
       tw: rewardId && !test ? 'hold' : '', // hold 可退點期 / fulfilled 已完成 / to-cancel 退點中 / canceled 已退點 / cancel-failed 退點失敗

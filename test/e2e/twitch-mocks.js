@@ -61,7 +61,7 @@ function installMocks() {
       const req = JSON.parse(opts.body);
       M.sheetCalls.push(req);
       if (M.failSheet > 0) { M.failSheet--; return Promise.reject(new TypeError('Failed to fetch')); }
-      if (req.action === 'ping') return json({ ok: true, title: '轉盤紀錄', viewers: 216, sheet: '10月', columns: { '1點': 'AA', '3點': 'AB', '5點': 'AC' }, problems: [] });
+      if (req.action === 'ping') return json({ ok: true, title: '轉盤紀錄', viewers: 216, sheet: '10月', columns: { '1點': 'AA', '3點': 'AB', '5點': 'AC' }, heads: ['1點', '3點', '5點', 'Q版塗鴉', '新欄位'], problems: [] });
       return json({ ok: true, results: req.records.map((r, i) => (M.rowErrors[r.login] ? { id: r.id, ok: false, error: M.rowErrors[r.login] } : { id: r.id, ok: true, cell: `${Number(r.date.slice(5, 7))}月!AB${3 + i}`, name: `${r.display}(${r.login})`, isNew: r.login === 'newbie' })) });
     }
     return real(url, opts);

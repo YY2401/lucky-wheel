@@ -241,3 +241,21 @@ test('搬到 OBS 面板：設定與可退點紀錄打包進網址，同一份只
   assert.equal(tw.decodeMove('壞掉'), null);
   assert.equal(tw.decodeMove(Buffer.from('{"v":2}').toString('base64')), null);
 });
+
+test('測試連線回傳當天底下的欄名（給「寫到哪一欄」選單）', () => {
+  const { book } = makeBook({ names: NAMES });
+  const gas = loadScript(book);
+  const res = gas.post({ action: 'ping', date: '2026-10-04', columns: ['1點'] });
+  assert.deepEqual([...res.heads], COLS);
+  const none = gas.post({ action: 'ping', date: '2026-11-04', columns: [] }); // 沒有 11 月分頁
+  assert.equal(none.heads, undefined);
+});
+
+test('「不寫進試算表」的格子：紀錄狀態是 nowrite，不送去試算表', () => {
+  const r = tw.makeRecord({ id: 'x', rewardId: 'rw', prize: { id: 'm', name: '下次一定', column: '' } });
+  assert.equal(r.status, 'nowrite');
+  assert.equal(r.tw, 'hold'); // 一樣可以退點
+  assert.equal(tw.makeRecord({ id: 'y', prize: { id: 'a', name: '1點', column: '1點' } }).status, 'pending');
+  assert.deepEqual(tw.normalizeTwConfig({ sheetColumns: [' 1點 ', '1點', '', 'Q版塗鴉'] }).sheetColumns, ['1點', 'Q版塗鴉']);
+  assert.equal(tw.normalizeTwConfig({ prizes: [{ name: '下次一定', column: '' }] }).prizes[0].column, '');
+});

@@ -475,11 +475,13 @@
       ? queue.map((q) => `<li><span class="tw-li-main">${esc(q.display || q.login)}</span><span class="tw-li-sub">${esc(q.test ? '試轉' : q.reward)} · ${fmtTime(q.at)}</span></li>`).join('')
       : '<li class="tw-empty">目前沒有人排隊</li>';
   }
-  const STATUS_TEXT = { pending: '寫入中…', ok: '已寫入', error: '寫入失敗', undoing: '撤銷中…', undone: '已撤銷', test: '試轉（不記錄）' };
+  const STATUS_TEXT = { pending: '寫入中…', ok: '已寫入', error: '寫入失敗', undoing: '撤銷中…', undone: '已撤銷', test: '試轉（不記錄）', nowrite: '不寫進試算表' };
   function renderRecords() {
     const list = records.slice(0, 60);
     $('#recordList').innerHTML = list.length ? list.map((r) => {
-      const actions = r.status === 'error' ? `<button class="btn icon" data-retry="${esc(r.id)}">重試</button>` : r.status === 'ok' ? `<button class="btn icon ghost" data-undo="${esc(r.id)}" title="從試算表減回去">撤銷</button>` : '';
+      const actions = r.status === 'error' ? `<button class="btn icon" data-retry="${esc(r.id)}">重試</button>`
+        : r.status === 'ok' ? `<button class="btn icon ghost" data-undo="${esc(r.id)}" title="從試算表減回去">撤銷</button>`
+          : r.status === 'nowrite' && r.tw === 'hold' ? `<button class="btn icon ghost" data-undo="${esc(r.id)}" title="作廢這一筆，可選擇退點">撤銷</button>` : '';
       const tw = { canceled: ' · 已退還忠誠點', 'to-cancel': ' · 退點中…', 'cancel-failed': ' · 退點失敗' }[r.tw] || '';
       const detail = (r.status === 'ok' ? `${r.cell}${r.isNew ? ' · 新觀眾已加入名單' : ''}` : r.status === 'error' ? r.error : '') + tw;
       return `<li class="st-${r.status}">
@@ -498,7 +500,7 @@
       const r = records.find((x) => x.id === undo.dataset.undo); if (!r) return;
       const refund = await askUndo(r);
       if (refund === null) return;
-      r.status = 'undoing';
+      r.status = r.status === 'nowrite' ? 'undone' : 'undoing'; // 沒寫進試算表的就不用去試算表減
       if (refund) r.tw = 'to-cancel';
       saveRecords(); renderRecords(); Writer.kick(); if (refund) TwSync.kick();
     }
@@ -515,7 +517,7 @@
   function askUndo(r) {
     return new Promise((resolve) => {
       const block = refundBlocker(r);
-      $('#undoMsg').textContent = `把 ${T.viewerLabel(r)} 的「${r.prize}」從試算表（${r.cell}）減回去。`;
+      $('#undoMsg').textContent = r.status === 'nowrite' ? `作廢 ${T.viewerLabel(r)} 的「${r.prize}」（這格沒有寫進試算表）。` : `把 ${T.viewerLabel(r)} 的「${r.prize}」從試算表（${r.cell}）減回去。`;
       $('#undoRefundYes').disabled = !!block;
       $('#undoRefundYes').closest('label').classList.toggle('disabled', !!block);
       $('#undoRefundHint').textContent = block || `忠誠點會退回給 ${r.display}（可退到 ${fmtTime(new Date(r.holdUntil).toISOString())}）`;
@@ -633,7 +635,7 @@
     $('#testSheet').disabled = true;
     try {
       const date = todayKey();
-      const cols = [...new Set(cfg.prizes.map((p) => p.column))];
+      const cols = [...new Set(cfg.prizes.map((p) => p.column).filter(Boolean))];
       const res = await sheetPost({ action: 'ping', date, columns: cols }, url);
       if (!res.ok) throw new Error(res.error || '測試失敗');
       const [, m, d] = date.split('-').map(Number);
@@ -643,7 +645,9 @@
       box.innerHTML = `<b>${problems.length ? '⚠ 連上了，但有問題' : '✓ 連線成功'}</b>：「${esc(res.title)}」，名單目前 ${res.viewers ?? '?'} 人。` +
         (found ? `<br>今天（${m}/${d}）的結果會寫在「${esc(res.sheet)}」分頁的 ${esc(found)}。` : '') +
         (problems.length ? `<ul>${problems.map((p) => `<li>${esc(p)}</li>`).join('')}</ul>` : '');
-      cfg.scriptUrl = url; cfg.sheetOk = problems.length ? '' : url; saveCfg();
+      cfg.scriptUrl = url; cfg.sheetOk = problems.length ? '' : url;
+      if (Array.isArray(res.heads) && res.heads.length) cfg = T.normalizeTwConfig({ ...cfg, sheetColumns: res.heads }); // 「寫到哪一欄」改用試算表實際的欄名
+      saveCfg(); renderPrizes();
       Writer.state = 'idle'; Writer.kick();
     } catch (e) {
       box.classList.add('bad'); box.textContent = `✗ ${e.message}`;
@@ -653,7 +657,10 @@
   // 步驟 4：轉盤內容
   function renderPrizes() {
     const total = cfg.prizes.reduce((s, p) => s + p.weight, 0);
-    const colOpts = (cur) => [...new Set([...T.SHEET_COLUMNS, cur])].map((c) => `<option${c === cur ? ' selected' : ''}>${esc(c)}</option>`).join('');
+    // 選項：測試連線時從試算表讀到的欄名（還沒讀到就用預設那幾欄）＋目前的值＋不寫進試算表＋自己輸入
+    const known = sheetColumnList();
+    const colOpts = (cur) => [...new Set([...known, ...(cur ? [cur] : [])])].map((c) => `<option value="${esc(c)}"${c === cur ? ' selected' : ''}>${esc(c)}${known.includes(c) ? '' : '（試算表裡沒找到）'}</option>`).join('')
+      + `<option value=""${cur ? '' : ' selected'}>（不寫進試算表）</option><option value="${CUSTOM}">自己輸入…</option>`;
     $('#prizeRows').innerHTML = cfg.prizes.map((p, i) => `<tr data-i="${i}">
       <td><input type="color" data-k="color" value="${esc(p.color)}"></td>
       <td><input data-k="name" value="${esc(p.name)}" maxlength="30"></td>
@@ -662,19 +669,28 @@
       <td><select data-k="column">${colOpts(p.column)}</select></td>
       <td><button class="btn icon ghost" data-del="${i}" title="刪除"${cfg.prizes.length <= 1 ? ' disabled' : ''}>✕</button></td></tr>`).join('');
   }
+  const CUSTOM = '__custom__'; // 選單裡「自己輸入…」的值
+  const sheetColumnList = () => (cfg.sheetColumns.length ? cfg.sheetColumns : T.SHEET_COLUMNS);
   function prizesChanged() { cfg = T.normalizeTwConfig(cfg); saveCfg(); updateWheel(); sendConfig(); }
-  $('#prizeRows').addEventListener('change', (e) => {
+  $('#prizeRows').addEventListener('change', async (e) => {
     const tr = e.target.closest('tr'); const k = e.target.dataset.k; if (!tr || !k) return;
     const p = cfg.prizes[Number(tr.dataset.i)];
-    p[k] = k === 'weight' ? Math.max(0, Number(e.target.value) || 0) : e.target.value;
+    let v = e.target.value;
+    if (k === 'column' && v === CUSTOM) {
+      const typed = await dialog({ title: '寫到哪一欄', message: '輸入試算表每天底下的欄名（第 2 列），要一字不差，例如「Q版塗鴉」。', input: p.column || '', okLabel: '確定' });
+      if (typed === null || !typed.trim()) { renderPrizes(); return; }
+      v = typed.trim();
+    }
+    p[k] = k === 'weight' ? Math.max(0, Number(v) || 0) : v;
     prizesChanged(); renderPrizes();
-    if (k === 'column' && cfg.sheetOk) { cfg.sheetOk = ''; saveCfg(); renderSetup(); toast('改了寫入欄位，建議回步驟 3 再按一次「測試連線」確認找得到'); }
+    // 選了試算表裡沒讀到的欄名：提醒再測一次連線
+    if (k === 'column' && v && !sheetColumnList().includes(v) && cfg.sheetOk) { cfg.sheetOk = ''; saveCfg(); renderSetup(); toast('試算表裡沒讀到這個欄名，請回步驟 3 再按一次「測試連線」確認找得到', 6000); }
   });
   $('#prizeRows').addEventListener('click', (e) => {
     const b = e.target.closest('[data-del]'); if (!b) return;
     cfg.prizes.splice(Number(b.dataset.del), 1); prizesChanged(); renderPrizes();
   });
-  $('#addPrize').onclick = () => { cfg.prizes.push({ name: `獎項 ${cfg.prizes.length + 1}`, weight: 10, column: T.SHEET_COLUMNS[0] }); prizesChanged(); renderPrizes(); };
+  $('#addPrize').onclick = () => { cfg.prizes.push({ name: `獎項 ${cfg.prizes.length + 1}`, weight: 10, column: sheetColumnList()[0] }); prizesChanged(); renderPrizes(); };
   $('#resetPrizes').onclick = async () => {
     if (!(await dialog({ message: '把轉盤恢復成 1點 50%、3點 30%、5點 20%？' }))) return;
     cfg.prizes = T.DEFAULT_PRIZES.map((p) => ({ ...p })); prizesChanged(); renderPrizes();

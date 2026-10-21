@@ -357,4 +357,39 @@ if (!H.chromePath()) {
       assert.match(r, /^200 application\/pdf/, href);
     }
   });
+
+  test('寫到哪一欄：測試連線後選單列出試算表實際的欄；可選不寫進試算表、可自己輸入', async (t) => {
+    const prizes = [{ id: 'a', name: '1點', weight: 0, column: '1點' }, { id: 'miss', name: '下次一定', weight: 1, column: '1點' }]; // 一定轉到「下次一定」
+    const page = await open(t, { config: { ...READY, setupDone: false, prizes } });
+    const opts = () => page.$$eval('#prizeRows tr[data-i="1"] select option', (os) => os.map((o) => o.textContent));
+    assert.ok(!(await opts()).includes('新欄位'));
+    await page.click('#testSheet');
+    await waitFor(() => page.$eval('#sheetResult', (e) => e.classList.contains('ok')));
+    assert.deepEqual(await opts(), ['1點', '3點', '5點', 'Q版塗鴉', '新欄位', '（不寫進試算表）', '自己輸入…']);
+    assert.deepEqual((await H.readKey(page, 'tw.config')).sheetColumns, ['1點', '3點', '5點', 'Q版塗鴉', '新欄位']);
+    // 自己輸入一個試算表沒有的欄名：選單標示沒找到，並提醒重測
+    await page.select('#prizeRows tr[data-i="0"] select', '__custom__'); await H.sleep(200);
+    await page.$eval('#confirmInput', (e) => { e.value = ''; }); await page.type('#confirmInput', '特別獎'); await page.click('#confirmOk'); await H.sleep(200);
+    assert.equal((await H.readKey(page, 'tw.config')).prizes[0].column, '特別獎');
+    assert.match(await page.$eval('#prizeRows tr[data-i="0"] select', (s) => s.selectedOptions[0].textContent), /特別獎（試算表裡沒找到）/);
+    // 落空的格子不寫進試算表
+    await page.select('#prizeRows tr[data-i="1"] select', ''); await H.sleep(200);
+    assert.equal((await H.readKey(page, 'tw.config')).prizes[1].column, '');
+    await page.click('#finishSetup'); await H.sleep(200);
+    if (await page.$('#confirmModal:not(.hidden)')) await page.click('#confirmOk');
+    await waitFor(() => page.evaluate(() => window.__tw.subscribed));
+    await page.evaluate(() => { window.__tw.sheetCalls = []; window.__tw.redeem({ id: 'nw1', user_login: 'gabai', user_name: '嘎唄', reward: { id: 'rw1', title: '轉' } }); });
+    const rec = await waitFor(async () => (await records(page)).find((r) => r.id === 'nw1'));
+    assert.equal(rec.prize, '下次一定');
+    assert.equal(rec.status, 'nowrite');
+    await H.sleep(800);
+    assert.equal(await page.evaluate(() => window.__tw.sheetCalls.filter((c) => c.action === 'add').length), 0);
+    assert.match(await page.$eval('#recordList', (e) => e.textContent), /不寫進試算表/);
+    await page.click('[data-undo="nw1"]'); await H.sleep(200);
+    assert.match(await page.$eval('#undoMsg', (e) => e.textContent), /沒有寫進試算表/);
+    await page.click('#undoRefundNo'); await page.click('#undoOk');
+    await waitFor(async () => (await records(page)).find((r) => r.id === 'nw1').status === 'undone');
+    assert.equal(await page.evaluate(() => window.__tw.sheetCalls.filter((c) => c.action === 'undo').length), 0);
+    assert.deepEqual(page.errors, []);
+  });
 }

@@ -125,8 +125,8 @@ function sameDay_(v, m, d, tz) {
   return Number(x[1]) === m && Number(x[2]) === d; // 10/4、10月4日
 }
 
-// 回傳欄號（從 1 起算）
-function findColumn_(sh, date, column, tz) {
+// 某一天在月份分頁占的欄：{ start, end, heads }（start 從 0 起算、不含 end）
+function dayBlock_(sh, date, tz) {
   const parts = String(date).split('-').map(Number);
   const m = parts[1]; const d = parts[2];
   const lastCol = sh.getLastColumn();
@@ -137,9 +137,23 @@ function findColumn_(sh, date, column, tz) {
   if (start < 0) throw new Error('「' + sh.getName() + '」分頁第 1 列找不到 ' + m + '/' + d + ' 這一天');
   let end = lastCol;
   for (let i = start + 1; i < lastCol; i++) if (dates[i] !== '' && dates[i] != null) { end = i; break; }
+  return { start: start, end: end, heads: heads, label: m + '/' + d };
+}
+
+// 回傳欄號（從 1 起算）
+function findColumn_(sh, date, column, tz) {
+  const b = dayBlock_(sh, date, tz);
   const want = String(column).trim();
-  for (let i = start; i < end; i++) if (String(heads[i]).trim() === want) return i + 1;
-  throw new Error('「' + sh.getName() + '」分頁 ' + m + '/' + d + ' 底下找不到「' + want + '」欄');
+  for (let i = b.start; i < b.end; i++) if (String(b.heads[i]).trim() === want) return i + 1;
+  throw new Error('「' + sh.getName() + '」分頁 ' + b.label + ' 底下找不到「' + want + '」欄');
+}
+
+// 某一天底下有哪些欄名（給轉盤網頁的「寫到哪一欄」選單用）
+function dayHeads_(sh, date, tz) {
+  const b = dayBlock_(sh, date, tz);
+  const out = [];
+  for (let i = b.start; i < b.end; i++) { const h = String(b.heads[i]).trim(); if (h && out.indexOf(h) < 0) out.push(h); }
+  return out;
 }
 
 function colLetter_(n) {
@@ -211,6 +225,7 @@ function ping_(ss, req) {
       const sh = monthSheet_(ss, req.date);
       out.sheet = sh.getName();
       const tz = ss.getSpreadsheetTimeZone();
+      try { out.heads = dayHeads_(sh, req.date, tz); } catch (err) { /* 找不到這一天：下面檢查欄位時會回報 */ }
       (req.columns || []).forEach(function (c) {
         try { out.columns[c] = colLetter_(findColumn_(sh, req.date, c, tz)); } catch (err) { out.problems.push(err.message); }
       });
