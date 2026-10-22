@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>忠誠點轉盤 單頁說明</title>
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  /* 跟網頁（style.css）同一套色票：復古遊樂園票券風 */
+  :root { --bg: #f4efe4; --dot: rgba(17, 17, 17, .13); --paper: #fffdf7; --ink: #141414; --soft: #5c5850; --yellow: #ffcf33; --red: #e63b3b; --green: #22a06b; }
+  @page { size: 794px 1123px; margin: 0; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { width: 794px; min-height: 1123px; font-family: "Noto Sans TC", "Microsoft JhengHei", sans-serif; color: var(--ink);
+    background-color: var(--bg); background-image: radial-gradient(var(--dot) 1.2px, transparent 1.3px); background-size: 22px 22px; }
+  .page { padding: 34px 40px 26px; min-height: 1123px; display: flex; flex-direction: column; }
+  .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+  .badge { display: inline-block; background: var(--yellow); border: 3px solid var(--ink); border-radius: 12px; padding: 4px 16px; font-size: 22px; font-weight: 900; transform: rotate(-2deg); box-shadow: 4px 4px 0 var(--ink); }
+  .date { font-family: "Bungee", sans-serif; font-size: 13px; color: var(--soft); padding-top: 8px; }
+  h1 { font-size: 36px; font-weight: 900; margin: 18px 0 4px; letter-spacing: .5px; }
+  .sub { font-size: 16px; color: var(--soft); margin: 0 0 18px; font-weight: 500; }
+
+  .stats { display: grid; grid-template-columns: repeat(var(--n, 3), 1fr); gap: 14px; margin-bottom: 20px; }
+  .stat { background: var(--paper); border: 2.5px solid var(--ink); border-radius: 14px; padding: 12px 14px 11px; box-shadow: 4px 4px 0 var(--ink); }
+  .stat .v { font-size: 27px; font-weight: 900; line-height: 1.15; }
+  .stat .v .num { font-family: "Bungee", "Noto Sans TC", sans-serif; }
+  .stat .l { font-size: 13.5px; font-weight: 700; margin-top: 4px; }
+  .stat .n { font-size: 12px; color: var(--soft); margin-top: 3px; line-height: 1.45; }
+  .stat:nth-child(1) .v { color: var(--red); }
+
+  .h { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 900; margin: 0 0 9px; }
+  .h::before { content: ""; width: 6px; height: 17px; background: var(--yellow); border: 2px solid var(--ink); border-radius: 3px; }
+
+  .flow { display: flex; align-items: stretch; gap: 6px; margin-bottom: 20px; }
+  .flow .step { flex: 1; background: var(--ink); color: var(--paper); border: 2.5px solid var(--ink); border-radius: 12px; padding: 9px 8px; text-align: center; min-width: 0; }
+  .flow .step b { display: block; font-size: 14.5px; font-weight: 900; color: var(--yellow); }
+  .flow .step small { display: block; font-size: 11.5px; margin-top: 3px; line-height: 1.4; opacity: .92; }
+  .flow .arrow { align-self: center; font-weight: 900; font-size: 18px; }
+
+  .sections { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 18px; }
+  .card { background: var(--paper); border: 2.5px solid var(--ink); border-radius: 14px; padding: 12px 14px 8px; box-shadow: 4px 4px 0 var(--ink); }
+  .card.wide { grid-column: 1 / -1; }
+  .card h3 { display: flex; align-items: center; gap: 9px; margin: 0 0 6px; font-size: 17px; font-weight: 900; }
+  .card h3 .no { width: 26px; height: 26px; border-radius: 50%; background: var(--yellow); border: 2px solid var(--ink); font-family: "Bungee", sans-serif; font-size: 13px; display: flex; align-items: center; justify-content: center; flex: none; }
+  .card ul { margin: 0; padding-left: 18px; }
+  .card li { font-size: 13.5px; line-height: 1.6; margin-bottom: 3px; }
+  .card li::marker { color: var(--red); }
+  .card.warn { background: #fff4d6; border-color: var(--ink); box-shadow: 4px 4px 0 var(--red); }
+  .card.warn h3 .no { background: var(--red); color: #fff; }
+  .card.ok { background: #eaf7ef; }
+
+  .callout { display: flex; gap: 12px; align-items: center; background: var(--ink); color: var(--paper); border-radius: 12px; padding: 11px 16px; font-size: 13.5px; margin-bottom: 10px; }
+  .callout b { background: var(--yellow); color: var(--ink); border-radius: 6px; padding: 1px 9px; font-weight: 900; white-space: nowrap; }
+  .callout span { overflow-wrap: anywhere; }
+  .foot { margin-top: auto; display: flex; justify-content: space-between; gap: 12px; font-size: 11.5px; color: var(--soft); border-top: 2px dashed rgba(20, 20, 20, .25); padding-top: 9px; }
+</style>
+</head>
+<body>
+<div class="page" id="page"></div>
+<script>
+  // 資料由 docs/build-onepager.js 放進 window.DATA（同 deliverable-kit onepager 的 JSON 欄位）
+  const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const d = window.DATA;
+  // 數字部分用 Bungee 字型（例如「24 小時」的 24）
+  const val = (v) => esc(v).replace(/(\d+)/g, '<span class="num">$1</span>');
+  const step = (f) => (typeof f === 'string' ? { label: f } : f);
+  document.getElementById('page').innerHTML = `
+    <div class="top"><span class="badge">${esc(d.org || '')}</span><span class="date">${esc(d.date || '')}</span></div>
+    <h1>${esc(d.title)}</h1>
+    <p class="sub">${esc(d.subtitle || '')}</p>
+    ${d.stats ? `<div class="stats" style="--n:${d.stats.length}">${d.stats.map((s) => `<div class="stat"><div class="v">${val(s.value)}</div><div class="l">${esc(s.label)}</div>${s.note ? `<div class="n">${esc(s.note)}</div>` : ''}</div>`).join('')}</div>` : ''}
+    ${d.flow ? `<div class="h">${esc(d.flowTitle || '流程')}</div><div class="flow">${d.flow.map(step).map((f) => `<div class="step"><b>${esc(f.label)}</b>${f.note ? `<small>${esc(f.note)}</small>` : ''}</div>`).join('<div class="arrow">›</div>')}</div>` : ''}
+    ${d.sections ? `<div class="h">${esc(d.sectionsTitle || '')}</div><div class="sections">${d.sections.map((s, i) => `<div class="card${s.tone ? ` ${s.tone}` : ''}${s.wide ? ' wide' : ''}"><h3><span class="no">${i + 1}</span>${esc(s.title)}</h3><ul>${s.items.map((t) => `<li>${esc(t)}</li>`).join('')}</ul></div>`).join('')}</div>` : ''}
+    ${d.callout ? `<div class="callout"><b>${esc(d.callout.title)}</b><span>${esc(d.callout.text)}</span></div>` : ''}
+    <div class="foot"><span>${esc(d.footer || '')}</span><span>${esc(d.contact || '')}</span></div>`;
+</script>
+</body>
+</html>
