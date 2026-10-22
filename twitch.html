@@ -8,8 +8,8 @@
 <script>try { document.documentElement.dataset.theme = localStorage.getItem('tw.theme') || 'light'; } catch (e) { document.documentElement.dataset.theme = 'light'; }</script>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=65">
-<link rel="stylesheet" href="twitch.css?v=65">
+<link rel="stylesheet" href="style.css?v=66">
+<link rel="stylesheet" href="twitch.css?v=66">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.1/mqtt.min.js"></script>
 </head>
 <body class="tw">
@@ -147,7 +147,7 @@
       <ol class="tw-howto">
         <li><button class="btn primary" id="copyObs">複製「觀眾看的轉盤」網址</button> <small class="hint">（貼到 OBS 的<b>來源</b>，不是停駐視窗）</small></li>
         <li>OBS 下方「來源」區塊按 <b>＋ → 瀏覽器</b>，「URL」貼上，寬 1280、高 720，按確定。背景是透明的，平常看起來是空白，有人兌換才會出現轉盤。</li>
-        <li>按 <button class="btn icon" id="pingObs">測試 OBS</button>，OBS 畫面右下的小圓點會閃一下。</li>
+        <li>按 <button class="btn icon" id="pingObs">測試 OBS</button>，OBS 畫面右下角會閃出一個小圓點（平常是隱藏的，只有連不上時才會一直亮黃色或紅色）。</li>
       </ol>
       <div class="tw-grid">
         <label class="tw-field">轉動秒數 <input type="number" id="spinSeconds" min="1" max="20" step="0.5"></label>
@@ -304,12 +304,12 @@
 </div>
 <div id="toast"></div>
 
-<script src="core.js?v=65"></script>
-<script src="twitch-core.js?v=65"></script>
-<script src="wheel.js?v=65"></script>
-<script src="ui.js?v=65"></script>
-<script src="store.js?v=65"></script>
-<script src="sync.js?v=65"></script>
-<script src="twitch.js?v=65"></script>
+<script src="core.js?v=66"></script>
+<script src="twitch-core.js?v=66"></script>
+<script src="wheel.js?v=66"></script>
+<script src="ui.js?v=66"></script>
+<script src="store.js?v=66"></script>
+<script src="sync.js?v=66"></script>
+<script src="twitch.js?v=66"></script>
 </body>
 </html>
