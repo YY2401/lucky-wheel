@@ -876,6 +876,9 @@
   Twitch.takeRedirect();
   // 「看圖解」：直接打開說明書的那一頁（頁碼由 docs/guide_pages.py 在產生說明書時算好）
   const guidePdf = $('#openGuide').getAttribute('href');
+  $('#openHelp').onclick = () => $('#twHelpModal').classList.remove('hidden');
+  $('#closeHelp').onclick = () => $('#twHelpModal').classList.add('hidden');
+  $('#twHelpModal').addEventListener('click', (e) => { if (e.target.id === 'twHelpModal' || e.target.closest('.tw-help-item')) $('#twHelpModal').classList.add('hidden'); });
   const guideLinks = (pages) => $$('[data-guide]').forEach((a) => { const n = pages && pages[a.dataset.guide]; a.href = n ? `${guidePdf}#page=${n}` : guidePdf; });
   guideLinks(null);
   fetch('docs/guide-pages.json', { cache: 'no-cache' }).then((r) => (r.ok ? r.json() : null)).then(guideLinks).catch(() => {});

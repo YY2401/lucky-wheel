@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>忠誠點轉盤</title>
-<meta name="app-version" content="63">
+<meta name="app-version" content="64">
 <script>try { document.documentElement.dataset.theme = localStorage.getItem('tw.theme') || 'light'; } catch (e) { document.documentElement.dataset.theme = 'light'; }</script>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=63">
-<link rel="stylesheet" href="twitch.css?v=63">
+<link rel="stylesheet" href="style.css?v=64">
+<link rel="stylesheet" href="twitch.css?v=64">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.1/mqtt.min.js"></script>
 </head>
 <body class="tw">
@@ -27,7 +27,7 @@
     <button class="tw-pill" id="pillObs" data-step="5" title="OBS 畫面連線狀態，點一下到設定"><i></i><span>OBS</span></button>
     <button class="btn" id="toLive">直播畫面</button>
     <button class="btn" id="toSetup">設定</button>
-    <a class="btn" id="openGuide" href="docs/%E5%BF%A0%E8%AA%A0%E9%BB%9E%E8%BD%89%E7%9B%A4%E4%BD%BF%E7%94%A8%E8%AA%AA%E6%98%8E.pdf" target="_blank" rel="noopener" title="圖文使用說明書（PDF，另開分頁）">說明書</a>
+    <button class="btn" id="openHelp" title="功能總覽、快速上手、完整說明書">說明</button>
   </div>
 </header>
 
@@ -42,7 +42,7 @@
   <div class="tw-setup-head">
     <h1>3 個步驟就能開始</h1>
     <p class="hint">設定只要做一次，之後打開這個網頁就會自動連線。資料存在這台電腦的瀏覽器裡。</p>
-    <p class="tw-guide-link">第一次用？先看 <a href="docs/%E5%BF%A0%E8%AA%A0%E9%BB%9E%E8%BD%89%E7%9B%A4_%E5%BF%AB%E9%80%9F%E4%B8%8A%E6%89%8B.pdf" target="_blank" rel="noopener">一頁快速上手</a>。看不懂哪一步？<a href="docs/%E5%BF%A0%E8%AA%A0%E9%BB%9E%E8%BD%89%E7%9B%A4%E4%BD%BF%E7%94%A8%E8%AA%AA%E6%98%8E.pdf" target="_blank" rel="noopener">📖 打開圖文說明書</a>（每一步都有截圖）</p>
+    <p class="tw-guide-link">第一次用？先看 <a href="docs/onepager.html?doc=quickstart" target="_blank" rel="noopener">一頁快速上手</a>。看不懂哪一步？<a href="docs/%E5%BF%A0%E8%AA%A0%E9%BB%9E%E8%BD%89%E7%9B%A4%E4%BD%BF%E7%94%A8%E8%AA%AA%E6%98%8E.pdf" target="_blank" rel="noopener" id="openGuide">打開圖文說明書</a>（每一步都有截圖）。想知道有哪些功能？<a href="docs/onepager.html?doc=features" target="_blank" rel="noopener">功能總覽</a></p>
   </div>
 
   <section class="tw-step" id="step1">
@@ -224,6 +224,16 @@
     <div class="modal-actions"><button class="btn" id="undoCancel">取消</button><button class="btn danger" id="undoOk">撤銷</button></div>
   </div>
 </div>
+<div class="modal hidden" id="twHelpModal">
+  <div class="modal-box tw-help" style="width:min(520px,100%)">
+    <h3 style="margin:0 0 4px;font-size:22px">說明</h3>
+    <p class="hint" style="margin:0 0 12px">都會另開分頁，不影響這裡的轉盤。</p>
+    <a class="tw-help-item" href="docs/onepager.html?doc=quickstart" target="_blank" rel="noopener"><b>一頁快速上手</b><span>第一次用先看這個：要準備什麼、設定步驟、每次開台</span></a>
+    <a class="tw-help-item" href="docs/onepager.html?doc=features" target="_blank" rel="noopener"><b>功能總覽</b><span>有哪些功能、怎麼運作、目前的限制</span></a>
+    <a class="tw-help-item" href="docs/%E5%BF%A0%E8%AA%A0%E9%BB%9E%E8%BD%89%E7%9B%A4%E4%BD%BF%E7%94%A8%E8%AA%AA%E6%98%8E.pdf" target="_blank" rel="noopener"><b>完整說明書（PDF）</b><span>每一步都有截圖，還有「出問題怎麼辦」</span></a>
+    <div class="modal-actions"><button class="btn" id="closeHelp">關閉</button></div>
+  </div>
+</div>
 <div class="modal hidden" id="lockScreen">
   <div class="modal-box" style="text-align:center;width:min(520px,100%)">
     <h3 style="margin:0 0 10px;font-size:22px">這個網頁已經在另一個分頁開著</h3>
@@ -244,12 +254,12 @@
 </div>
 <div id="toast"></div>
 
-<script src="core.js?v=63"></script>
-<script src="twitch-core.js?v=63"></script>
-<script src="wheel.js?v=63"></script>
-<script src="ui.js?v=63"></script>
-<script src="store.js?v=63"></script>
-<script src="sync.js?v=63"></script>
-<script src="twitch.js?v=63"></script>
+<script src="core.js?v=64"></script>
+<script src="twitch-core.js?v=64"></script>
+<script src="wheel.js?v=64"></script>
+<script src="ui.js?v=64"></script>
+<script src="store.js?v=64"></script>
+<script src="sync.js?v=64"></script>
+<script src="twitch.js?v=64"></script>
 </body>
 </html>

@@ -361,7 +361,7 @@ if (!H.chromePath()) {
     const links = await page.$$eval('[data-guide]', (as) => as.map((a) => [a.dataset.guide, a.getAttribute('href')]));
     assert.equal(links.length, 7);
     for (const [k, href] of links) assert.ok(href.endsWith(`#page=${pages[k]}`), `${k} ${href}`);
-    for (const href of [links[0][1].split('#')[0], await page.$eval('.tw-guide-link a', (a) => a.getAttribute('href'))]) {
+    for (const href of [links[0][1].split('#')[0], await page.$eval('#openGuide', (a) => a.getAttribute('href'))]) {
       const r = await page.evaluate((u) => fetch(u).then((x) => x.status + ' ' + x.headers.get('content-type')), href);
       assert.match(r, /^200 application\/pdf/, href);
     }
@@ -458,5 +458,20 @@ if (!H.chromePath()) {
     await waitFor(async () => (await records(page)).find((r) => r.id === 'ny1').status === 'ok');
     assert.equal(await page.evaluate(() => window.__tw.newYear), 2027);
     assert.deepEqual(page.errors, []);
+  });
+
+  test('說明選單：功能總覽、快速上手可以直接用網頁看', async (t) => {
+    const page = await open(t);
+    await page.click('#openHelp'); await H.sleep(200);
+    const items = await page.$$eval('#twHelpModal .tw-help-item', (as) => as.map((a) => [a.querySelector('b').textContent, a.getAttribute('href')]));
+    assert.deepEqual(items.map((x) => x[0]), ['一頁快速上手', '功能總覽', '完整說明書（PDF）']);
+    const doc = await H.newPage(browser, { width: 390, height: 800 }); t.after(() => doc.close());
+    for (const [name, href] of items.slice(0, 2)) {
+      await doc.goto(`${srv.url}/${href}`, { waitUntil: 'networkidle0' });
+      assert.match(await doc.$eval('h1', (e) => e.textContent), new RegExp(name.replace('一頁', '')), name);
+      assert.ok(await doc.evaluate(() => document.querySelectorAll('.card').length >= 4));
+      assert.ok(await doc.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${name} 手機上不能出現橫向捲軸`);
+    }
+    assert.deepEqual(doc.errors, []);
   });
 }
