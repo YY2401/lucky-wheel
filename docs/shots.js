@@ -122,6 +122,11 @@ const BASE = { clientId: 'cid', sync: false, spinDuration: 2600, resultSeconds: 
   await browser.defaultBrowserContext().overridePermissions(srv.url, ['clipboard-read', 'clipboard-write', 'clipboard-sanitized-write']);
   await page.click('#toSetup'); await sleep(300);
   await shot('step6', '#step6');
+  // 步驟 7：小奇點、訂閱也轉盤（打開兩種，訂閱用第二個轉盤）
+  await page.click('#bitsOn'); await page.click('#subOn'); await sleep(200);
+  await page.select('#subWheel', 'bonus'); await sleep(600);
+  await shot('step7', '#step7');
+  await page.click('#bitsOn'); await page.click('#subOn'); await sleep(200);
   await page.click('#copyDock'); await sleep(400);
   const dockLink = await page.evaluate(() => navigator.clipboard.readText());
   await page.click('#confirmOk'); await sleep(400);

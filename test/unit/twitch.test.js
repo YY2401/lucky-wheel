@@ -438,3 +438,70 @@ test('連續兩年開新年度：累積點數疊加兩個舊年度；閏年 2 �
   assert.match(sheets['總表'].cell(3, 16).f, /^='2028-1月'!/);
   assert.ok(res.warnings.some((w) => /2028-2月 少了 2\/29/.test(w)), res.warnings.join('\n'));
 });
+
+// ---------- 小奇點、訂閱觸發轉盤 ----------
+const trig = (over = {}) => tw.normalizeTriggers({ ...over, bits: { on: true, ...(over.bits || {}) }, sub: { on: true, ...(over.sub || {}) } });
+const viewer = { user_login: 'Gabai', user_name: '嘎唄', user_id: '42' };
+
+test('小奇點：每滿 N 點轉一次，零頭幫觀眾累積', () => {
+  const t = trig();
+  let r = tw.triggerSpins('channel.cheer', { ...viewer, bits: 250 }, t, {});
+  assert.deepEqual([r.spins, r.carry, r.carryKey, r.source, r.who.login], [2, 50, '42', 'bits', 'gabai']);
+  const carry = tw.setCarry({}, r.carryKey, r.carry);
+  r = tw.triggerSpins('channel.cheer', { ...viewer, bits: 60 }, t, carry);
+  assert.deepEqual([r.spins, r.carry], [1, 10]);
+  assert.deepEqual(tw.setCarry(carry, '42', 0), {});
+});
+
+test('小奇點：不累積零頭、匿名不累積', () => {
+  let r = tw.triggerSpins('channel.cheer', { ...viewer, bits: 250 }, trig({ bits: { carry: false } }), { 42: 90 });
+  assert.equal(r.spins, 2); assert.equal(r.carryKey, undefined);
+  r = tw.triggerSpins('channel.cheer', { is_anonymous: true, bits: 150 }, trig(), { '': 90 });
+  assert.deepEqual([r.spins, r.who.display, r.carryKey], [1, '匿名', undefined]);
+  assert.equal(tw.triggerSpins('channel.cheer', { is_anonymous: true, bits: 150 }, trig({ anon: 'skip' })), null);
+});
+
+test('小奇點：分級門檻取達到的最高一級', () => {
+  const t = trig({ bits: { mode: 'tiers', tiers: [{ min: 500, spins: 6 }, { min: 100, spins: 1 }] } });
+  assert.equal(tw.triggerSpins('channel.cheer', { ...viewer, bits: 99 }, t).spins, 0);
+  assert.equal(tw.triggerSpins('channel.cheer', { ...viewer, bits: 499 }, t).spins, 1);
+  assert.equal(tw.triggerSpins('channel.cheer', { ...viewer, bits: 5000 }, t).spins, 6);
+});
+
+test('訂閱：新訂閱、續訂、Tier 倍數、一筆上限', () => {
+  const t = trig({ sub: { newSpins: 2, resubSpins: 1, t2: 2, t3: 5 }, maxSpins: 8 });
+  assert.equal(tw.triggerSpins('channel.subscribe', { ...viewer, tier: '1000' }, t).spins, 2);
+  assert.equal(tw.triggerSpins('channel.subscribe', { ...viewer, tier: '2000' }, t).spins, 4);
+  assert.equal(tw.triggerSpins('channel.subscribe', { ...viewer, tier: '3000' }, t).spins, 8); // 10 被上限 8 擋住
+  const re = tw.triggerSpins('channel.subscription.message', { ...viewer, tier: '1000', cumulative_months: 7 }, t);
+  assert.deepEqual([re.spins, re.label, re.source], [1, '續訂 7 個月（Tier 1）', 'sub']);
+});
+
+test('贈訂：記給送的人（送幾份轉幾次）或收到的人，不會重複算', () => {
+  const giver = trig();
+  const gift = { ...viewer, tier: '1000', total: 5 };
+  assert.equal(tw.triggerSpins('channel.subscription.gift', gift, giver).spins, 5);
+  assert.equal(tw.triggerSpins('channel.subscribe', { user_login: 'kid', user_name: 'kid', tier: '1000', is_gift: true }, giver), null);
+  const recv = trig({ sub: { gift: 'receiver' } });
+  assert.equal(tw.triggerSpins('channel.subscription.gift', gift, recv), null);
+  assert.equal(tw.triggerSpins('channel.subscribe', { user_login: 'kid', user_name: 'kid', tier: '1000', is_gift: true }, recv).who.login, 'kid');
+  const none = trig({ sub: { gift: 'none' } });
+  assert.equal(tw.triggerSpins('channel.subscription.gift', gift, none), null);
+  assert.equal(tw.triggerSpins('channel.subscription.gift', { is_anonymous: true, tier: '1000', total: 2 }, giver).who.display, '匿名');
+});
+
+test('沒打開的觸發方式不轉；設定正規化給預設值', () => {
+  const off = tw.normalizeTriggers({});
+  assert.equal(tw.triggerSpins('channel.cheer', { ...viewer, bits: 1000 }, off), null);
+  assert.equal(tw.triggerSpins('channel.subscribe', { ...viewer, tier: '1000' }, off), null);
+  const cfg = tw.normalizeTwConfig({ prizes: [{ id: 'b1', name: 'x', weight: 1 }] });
+  assert.equal(cfg.wheel2.name, '斗內轉盤');
+  assert.ok(!cfg.wheel2.prizes.some((p) => p.id === 'b1'), '第二個轉盤的格子 id 不能跟主轉盤撞');
+  assert.deepEqual(cfg.triggers.bits.tiers.map((x) => x.min), [100, 500]);
+});
+
+test('搬到 OBS 面板會帶上小奇點、訂閱設定與零頭', () => {
+  const cfg = tw.normalizeTwConfig({ triggers: { bits: { on: true, per: 300 } }, bitsCarry: { 42: 120 }, wheel2: { name: '加碼' } });
+  const res = tw.applyMove(tw.normalizeTwConfig({}), [], tw.decodeMove(tw.encodeMove(tw.buildMove(cfg, []))));
+  assert.deepEqual([res.cfg.triggers.bits.on, res.cfg.triggers.bits.per, res.cfg.bitsCarry[42], res.cfg.wheel2.name], [true, 300, 120, '加碼']);
+});

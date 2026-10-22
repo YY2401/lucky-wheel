@@ -14,6 +14,23 @@
     { id: 'pt5', name: '5點', weight: 20, column: '5點', color: PALETTE[1] },
   ];
 
+  // 第二個轉盤（給小奇點、訂閱用）：id 跟主轉盤不同，OBS 畫面才分得出是哪個轉盤
+  const DEFAULT_PRIZES2 = [
+    { id: 'b1', name: '1點', weight: 50, column: '1點', color: PALETTE[4] },
+    { id: 'b3', name: '3點', weight: 30, column: '3點', color: PALETTE[5] },
+    { id: 'b5', name: '5點', weight: 20, column: '5點', color: PALETTE[6] },
+  ];
+
+  // 小奇點、訂閱觸發轉盤的規則（每位實況主自己設定）
+  const DEFAULT_TRIGGERS = {
+    bits: { on: false, mode: 'per', per: 100, carry: true, tiers: [{ min: 100, spins: 1 }, { min: 500, spins: 6 }], wheel: 'main' },
+    sub: { on: false, newSpins: 1, resubSpins: 1, t2: 1, t3: 1, gift: 'giver', wheel: 'main' },
+    anon: 'name', // name：記在 anonName 底下 / skip：不轉
+    anonName: '匿名',
+    multi: 'flip', // 一次要轉好幾次時：flip 轉一次、翻牌揭曉全部 / each 每一次都轉
+    maxSpins: 50, // 一筆最多轉幾次（避免一次贈送幾百份訂閱把轉盤卡住好幾個小時）
+  };
+
   const DEFAULT_TW = {
     clientId: '', // 留空用網頁內建的 Twitch Client ID
     rewardIds: [], // 觸發轉盤的忠誠點品項
@@ -28,6 +45,9 @@
     setupDone: false,
     movedToObs: false, // 設定已搬到 OBS 面板：這裡不再接收兌換（避免兩邊同時轉）
     importedIds: [], // 已經匯入過的搬家碼（OBS 每次重開都會帶同一個網址，不能重複匯入）
+    triggers: DEFAULT_TRIGGERS,
+    wheel2: { name: '斗內轉盤', prizes: DEFAULT_PRIZES2 },
+    bitsCarry: {}, // 每位觀眾還沒湊滿一次的小奇點：{ 觀眾編號: 點數 }
   };
 
   const clampInt = (v, lo, hi, fb) => { const n = Math.trunc(Number(v)); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : fb; };
@@ -66,7 +86,103 @@
     cfg.sheetColumns = Array.isArray(cfg.sheetColumns) ? [...new Set(cfg.sheetColumns.map((c) => String(c).trim()).filter(Boolean))].slice(0, 50) : [];
     cfg.movedToObs = cfg.movedToObs === true;
     cfg.importedIds = Array.isArray(cfg.importedIds) ? cfg.importedIds.map(String).slice(-20) : [];
+    cfg.triggers = normalizeTriggers(cfg.triggers);
+    const w2 = cfg.wheel2 && typeof cfg.wheel2 === 'object' ? cfg.wheel2 : {};
+    cfg.wheel2 = {
+      name: String(w2.name || '').trim().slice(0, 20) || '斗內轉盤',
+      prizes: (Array.isArray(w2.prizes) && w2.prizes.length ? w2.prizes : DEFAULT_PRIZES2).map((p, i) => normalizeTwPrize(p, i)),
+    };
+    // 兩個轉盤的格子 id 不能撞（OBS 畫面靠 id 分辨是哪個轉盤）
+    const mainIds = new Set(cfg.prizes.map((p) => p.id));
+    cfg.wheel2.prizes.forEach((p) => { if (mainIds.has(p.id)) p.id = `tp_${randId(8)}`; });
+    const carry = cfg.bitsCarry && typeof cfg.bitsCarry === 'object' ? cfg.bitsCarry : {};
+    cfg.bitsCarry = Object.fromEntries(Object.entries(carry).filter(([k, v]) => k && Number(v) > 0).slice(-500).map(([k, v]) => [k, Math.trunc(Number(v))]));
     return cfg;
+  }
+
+  function normalizeTriggers(t) {
+    t = t && typeof t === 'object' ? t : {};
+    const d = DEFAULT_TRIGGERS;
+    const b = { ...d.bits, ...(t.bits || {}) };
+    const s = { ...d.sub, ...(t.sub || {}) };
+    const wheel = (w) => (w === 'bonus' ? 'bonus' : 'main');
+    const tiers = (Array.isArray(b.tiers) ? b.tiers : d.bits.tiers)
+      .map((x) => ({ min: clampInt(x && x.min, 1, 1000000, 0), spins: clampInt(x && x.spins, 0, 1000, 0) }))
+      .filter((x) => x.min > 0).sort((x, y) => x.min - y.min).slice(0, 10);
+    return {
+      bits: { on: b.on === true, mode: b.mode === 'tiers' ? 'tiers' : 'per', per: clampInt(b.per, 1, 1000000, 100), carry: b.carry !== false, tiers, wheel: wheel(b.wheel) },
+      sub: {
+        on: s.on === true,
+        newSpins: clampInt(s.newSpins, 0, 100, 1), resubSpins: clampInt(s.resubSpins, 0, 100, 1),
+        t2: clampInt(s.t2, 1, 20, 1), t3: clampInt(s.t3, 1, 20, 1),
+        gift: ['giver', 'receiver', 'none'].includes(s.gift) ? s.gift : 'giver',
+        wheel: wheel(s.wheel),
+      },
+      anon: t.anon === 'skip' ? 'skip' : 'name',
+      anonName: String(t.anonName || '').trim().slice(0, 25) || d.anonName,
+      multi: t.multi === 'each' ? 'each' : 'flip',
+      maxSpins: clampInt(t.maxSpins, 1, 200, d.maxSpins),
+    };
+  }
+
+  // ---------- 小奇點、訂閱 → 轉幾次 ----------
+  // 小奇點：per 模式每滿 per 點轉 1 次（carry＝零頭幫觀眾記著，下次加上去）；tiers 模式依達到的最高門檻轉固定次數
+  function bitsSpins(bits, prevCarry, rule) {
+    bits = Math.max(0, Math.trunc(Number(bits) || 0));
+    if (rule.mode === 'tiers') {
+      const hit = rule.tiers.filter((x) => bits >= x.min).pop();
+      return { spins: hit ? hit.spins : 0, carry: 0 };
+    }
+    const total = bits + (rule.carry ? Math.max(0, Math.trunc(Number(prevCarry) || 0)) : 0);
+    return { spins: Math.floor(total / rule.per), carry: rule.carry ? total % rule.per : 0 };
+  }
+  const TIER_NAME = { 1000: 'Tier 1', 2000: 'Tier 2', 3000: 'Tier 3' };
+  const tierMult = (tier, rule) => (String(tier) === '3000' ? rule.t3 : String(tier) === '2000' ? rule.t2 : 1);
+
+  // Twitch EventSub 通知 → 要轉幾次、記給誰。不觸發回 null
+  // 回傳 { source, spins, wheel, label, who: { login, display, userId }, carryKey?, carry? }
+  function triggerSpins(type, ev, trig, carryMap = {}) {
+    ev = ev || {};
+    const named = !!ev.user_login && ev.is_anonymous !== true;
+    let who = named ? { login: String(ev.user_login).toLowerCase(), display: ev.user_name || ev.user_login, userId: String(ev.user_id || '') } : null;
+    if (!who) {
+      if (trig.anon === 'skip') return null;
+      who = { login: '', display: trig.anonName, userId: '' };
+    }
+    const tierName = TIER_NAME[ev.tier] || 'Tier 1';
+    let out;
+    if (type === 'channel.cheer') {
+      if (!trig.bits.on) return null;
+      const key = named ? who.userId || who.login : ''; // 匿名的不幫忙累積（不知道是誰）
+      const r = bitsSpins(ev.bits, key ? carryMap[key] : 0, key ? trig.bits : { ...trig.bits, carry: false });
+      out = { source: 'bits', spins: r.spins, wheel: trig.bits.wheel, label: `小奇點 ${Number(ev.bits) || 0}` };
+      if (key && trig.bits.mode === 'per' && trig.bits.carry) Object.assign(out, { carryKey: key, carry: r.carry });
+    } else {
+      const s = trig.sub;
+      if (!s.on) return null;
+      const m = tierMult(ev.tier, s);
+      if (type === 'channel.subscribe') {
+        if (ev.is_gift && s.gift !== 'receiver') return null; // 贈訂預設記給送的人（由 channel.subscription.gift 處理）
+        out = { spins: s.newSpins * m, label: ev.is_gift ? `收到贈訂（${tierName}）` : `新訂閱（${tierName}）` };
+      } else if (type === 'channel.subscription.message') {
+        out = { spins: s.resubSpins * m, label: `續訂${ev.cumulative_months ? ` ${ev.cumulative_months} 個月` : ''}（${tierName}）` };
+      } else if (type === 'channel.subscription.gift') {
+        if (s.gift !== 'giver') return null;
+        const n = Math.max(1, Math.trunc(Number(ev.total) || 1));
+        out = { spins: s.newSpins * m * n, label: `贈送 ${n} 份訂閱（${tierName}）` };
+      } else return null;
+      Object.assign(out, { source: 'sub', wheel: s.wheel });
+    }
+    out.spins = Math.min(trig.maxSpins, Math.max(0, out.spins));
+    out.who = who;
+    return out;
+  }
+  // 更新某位觀眾的小奇點零頭（0 就刪掉）
+  function setCarry(map, key, n) {
+    const next = { ...map };
+    delete next[key];
+    if (n > 0) next[key] = n;
+    return next;
   }
 
   // 「嘎唄(gabai)」→ { display: '嘎唄', login: 'gabai' }；「gabai」→ { display: 'gabai', login: '' }
@@ -101,9 +217,11 @@
 
   // 一筆轉盤紀錄。id 用 Twitch 兌換編號（同一筆兌換不會轉兩次、不會寫兩次）
   // rewardId 有值＝來自 Twitch 兌換：先在 Twitch 保持「未完成」HOLD_MS（這段時間撤銷可退點），之後自動標成已完成
-  function makeRecord({ id, login = '', display = '', userId = '', by = null, note = '', reward = '', rewardId = '', prize, now = new Date(), cutoffHour = 0, test = false, processedAt = Date.now() }) {
+  function makeRecord({ id, src = '', source = '', login = '', display = '', userId = '', by = null, note = '', reward = '', rewardId = '', prize, now = new Date(), cutoffHour = 0, test = false, processedAt = Date.now() }) {
     return {
       id: String(id || `m-${randId(10)}`),
+      src: String(src || ''), // 一次轉好幾次（小奇點、訂閱）時，同一筆通知的編號
+      source: String(source || ''), // bits 小奇點 / sub 訂閱 / 空白＝忠誠點或手動
       time: now.toISOString(),
       date: dayKey(now, cutoffHour),
       login: String(login).toLowerCase(), display: String(display || login),
@@ -168,7 +286,7 @@
 
   // ---------- 搬到 OBS 面板：把設定和還在可退點期的紀錄包進網址（# 後面，不會送到伺服器） ----------
   // 不搬 Twitch 登入（在 OBS 面板裡重新連接一次）、不搬一般紀錄（留在原本的瀏覽器）
-  const MOVE_KEYS = ['clientId', 'rewardIds', 'scriptUrl', 'sheetKey', 'sheetOk', 'cutoffHour', 'prizes', 'spinDuration', 'turns', 'resultSeconds', 'sound', 'volume', 'theme', 'room', 'secret', 'sync', 'broker', 'setupDone'];
+  const MOVE_KEYS = ['clientId', 'rewardIds', 'scriptUrl', 'sheetKey', 'sheetOk', 'cutoffHour', 'prizes', 'spinDuration', 'turns', 'resultSeconds', 'sound', 'volume', 'theme', 'room', 'secret', 'sync', 'broker', 'setupDone', 'triggers', 'wheel2', 'bitsCarry'];
   function buildMove(cfg, records, now = Date.now()) {
     const c = {};
     MOVE_KEYS.forEach((k) => { c[k] = cfg[k]; });
@@ -204,5 +322,5 @@
     return { cfg: next, add: payload.hold.filter((r) => !have.has(r.id)) };
   }
 
-  return { proxyTarget, forMove, SHEET_COLUMNS, buildMove, encodeMove, decodeMove, applyMove, DEFAULT_PRIZES, DEFAULT_TW, HOLD_MS, normalizeTwPrize, normalizeTwConfig, parseViewer, dayKey, makeRecord, forSheet, viewerLabel, scriptWithKey, dueTwitchUpdates, nextHoldExpiry, missedRedemptions };
+  return { DEFAULT_TRIGGERS, DEFAULT_PRIZES2, normalizeTriggers, bitsSpins, triggerSpins, setCarry, proxyTarget, forMove, SHEET_COLUMNS, buildMove, encodeMove, decodeMove, applyMove, DEFAULT_PRIZES, DEFAULT_TW, HOLD_MS, normalizeTwPrize, normalizeTwConfig, parseViewer, dayKey, makeRecord, forSheet, viewerLabel, scriptWithKey, dueTwitchUpdates, nextHoldExpiry, missedRedemptions };
 });

@@ -44,7 +44,7 @@ if (!H.chromePath()) {
     await waitFor(() => authUrl);
     assert.equal(authUrl.searchParams.get('client_id'), 'cid');
     assert.equal(authUrl.searchParams.get('response_type'), 'token');
-    assert.equal(authUrl.searchParams.get('scope'), 'channel:read:redemptions channel:manage:redemptions');
+    assert.equal(authUrl.searchParams.get('scope'), 'channel:read:redemptions channel:manage:redemptions bits:read channel:read:subscriptions');
     assert.equal(authUrl.searchParams.get('redirect_uri'), `${srv.url}/twitch.html`);
     assert.ok(authUrl.searchParams.get('state'));
     assert.deepEqual(page.errors, []);
@@ -113,6 +113,61 @@ if (!H.chromePath()) {
     assert.equal(sent.find((r) => r.id === 'e1').uid, '1001'); // Twitch 永久編號：觀眾改帳號也認得
     await waitFor(() => page.$eval('#queueCount', (e) => e.textContent === '0'));
     assert.match(await page.$eval('#recordList', (e) => e.textContent), /新觀眾已加入名單/);
+    assert.deepEqual(page.errors, []);
+  });
+
+  test('小奇點：每滿 100 轉一次、零頭累積，一筆轉好幾次各寫一格；重送不重算；訂閱用第二個轉盤', async (t) => {
+    const triggers = { bits: { on: true, per: 100, carry: true }, sub: { on: true, newSpins: 1, t3: 3, wheel: 'bonus' } };
+    const page = await open(t, { config: { ...READY, triggers, wheel2: { name: '斗內轉盤', prizes: [{ id: 'bx', name: '大獎', weight: 1, column: '5點' }] } } });
+    await waitFor(() => page.evaluate(() => window.__tw.subs.includes('channel.cheer') && window.__tw.subs.includes('channel.subscription.gift')));
+    const viewer = { user_login: 'gabai', user_name: '嘎唄', user_id: '1001' };
+    await page.evaluate((v) => {
+      window.__tw.notify('channel.cheer', { ...v, bits: 250 }, 'c1');
+      window.__tw.notify('channel.cheer', { ...v, bits: 250 }, 'c1'); // Twitch 重送同一則
+    }, viewer);
+    await waitFor(() => page.$eval('#nowBanner', (e) => /小奇點 250.*轉 2 次/.test(e.textContent)));
+    let recs = await waitFor(async () => { const r = await records(page); return r.length === 2 && r.every((x) => x.status === 'ok') && r; });
+    assert.deepEqual(recs.map((r) => r.id).sort(), ['ev-c1.1', 'ev-c1.2']);
+    assert.ok(recs.every((r) => r.source === 'bits' && r.src === 'ev-c1' && r.login === 'gabai'));
+    assert.equal((await H.readKey(page, 'tw.config')).bitsCarry['1001'], 50);
+    // 再送 60：加上零頭 50 湊滿一次，剩 10
+    await page.evaluate((v) => window.__tw.notify('channel.cheer', { ...v, bits: 60 }, 'c2'), viewer);
+    await waitFor(async () => (await records(page)).some((r) => r.id === 'ev-c2'));
+    assert.equal((await H.readKey(page, 'tw.config')).bitsCarry['1001'], 10);
+    // Tier 3 新訂閱：乘 3 倍，轉第二個轉盤
+    await page.evaluate(() => window.__tw.notify('channel.subscribe', { user_login: 'subber', user_name: '訂閱者', user_id: '77', tier: '3000', is_gift: false }, 's1'));
+    recs = await waitFor(async () => { const r = (await records(page)).filter((x) => x.src === 'ev-s1'); return r.length === 3 && r.every((x) => x.status === 'ok') && r; }, 15000);
+    assert.ok(recs.every((r) => r.prize === '大獎' && r.column === '5點' && r.source === 'sub'));
+    const sent = await page.evaluate(() => window.__tw.sheetCalls.flatMap((c) => c.records || []));
+    assert.equal(sent.filter((r) => r.id.startsWith('ev-c1')).length, 2);
+    assert.match(await page.$eval('#recordList', (e) => e.textContent), /新訂閱（Tier 3）/);
+    // 撤銷：沒有忠誠點可退
+    await page.click(`[data-undo="${recs[0].id}"]`);
+    assert.match(await page.$eval('#undoRefundHint', (e) => e.textContent), /沒有忠誠點可退/);
+    await page.click('#undoCancel');
+    assert.deepEqual(page.errors, []);
+  });
+
+  test('小奇點、訂閱：舊授權缺權限時提醒重新連接；設定頁可模擬一次（不寫進試算表）', async (t) => {
+    const page = await open(t, { before: (p) => p.evaluate(() => localStorage.setItem('mock.scopes', 'nobits')) });
+    await waitFor(() => page.evaluate(() => window.__tw.subscribed));
+    assert.equal(await page.$eval('#alert', (e) => e.classList.contains('hidden')), true); // 沒打開就不打擾
+    await page.click('#toSetup');
+    await page.click('#bitsOn');
+    await waitFor(() => page.$eval('#alertText', (e) => /小奇點、訂閱通知.*重新連接/.test(e.textContent)));
+    assert.match(await page.$eval('#trigState', (e) => e.textContent), /重新連接 Twitch/);
+    assert.equal((await H.readKey(page, 'tw.config')).triggers.bits.on, true);
+    // 依門檻模式 + 模擬 600 小奇點：門檻 500 轉 6 次
+    await page.click('input[name="bitsMode"][value="tiers"]');
+    assert.equal((await H.readKey(page, 'tw.config')).triggers.bits.mode, 'tiers');
+    await page.click('#simBits');
+    await page.waitForSelector('#confirmModal:not(.hidden)');
+    await page.$eval('#confirmInput', (i) => { i.value = '600'; });
+    await page.click('#confirmOk');
+    await waitFor(() => page.$eval('#nowBanner', (e) => /轉 6 次/.test(e.textContent)));
+    const recs = await waitFor(async () => { const r = await records(page); return r.length === 6 && r; });
+    assert.ok(recs.every((r) => r.status === 'test'));
+    assert.equal(await page.evaluate(() => window.__tw.sheetCalls.filter((c) => c.action === 'add').length), 0);
     assert.deepEqual(page.errors, []);
   });
 
@@ -359,7 +414,7 @@ if (!H.chromePath()) {
     const pages = JSON.parse(require('node:fs').readFileSync(require('node:path').join(H.ROOT, 'docs/guide-pages.json'), 'utf8'));
     await waitFor(() => page.$eval('[data-guide="step3"]', (a) => a.getAttribute('href').includes('#page=')));
     const links = await page.$$eval('[data-guide]', (as) => as.map((a) => [a.dataset.guide, a.getAttribute('href')]));
-    assert.equal(links.length, 7);
+    assert.equal(links.length, 8);
     for (const [k, href] of links) assert.ok(href.endsWith(`#page=${pages[k]}`), `${k} ${href}`);
     for (const href of [links[0][1].split('#')[0], await page.$eval('#openGuide', (a) => a.getAttribute('href'))]) {
       const r = await page.evaluate((u) => fetch(u).then((x) => x.status + ' ' + x.headers.get('content-type')), href);

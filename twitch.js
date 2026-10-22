@@ -1,7 +1,7 @@
 /* 忠誠點轉盤：Twitch 忠誠點兌換 → 自動轉盤 → 寫進 Google 試算表 */
 (async () => {
   const { Store, Sync, ui } = LW;
-  const { $, $$, wait, esc, toast, dialog, applyTheme } = ui;
+  const { $, $$, wait, esc, toast, dialog, applyTheme, flipTotal } = ui;
   const { Wheel, Sfx } = LuckyWheel;
   const { drawOne, normalizeConfig, normalizePrize, tierOf, probabilities, randId } = LuckyCore;
   const T = TwitchCore;
@@ -10,7 +10,10 @@
   const BUILTIN_CLIENT_ID = 'owgfsq6jkw61bh7l7cvtbmkfjvbfhf';
   const REDEEM_TYPE = 'channel.channel_points_custom_reward_redemption.add';
   // read：收到兌換通知；manage：建立品項、補抓漏掉的兌換、標成已完成 / 退點（只對這個網頁建立的品項有效）
-  const SCOPES = 'channel:read:redemptions channel:manage:redemptions';
+  // bits:read、channel:read:subscriptions：小奇點、訂閱也轉盤（步驟 7）
+  const SCOPES = 'channel:read:redemptions channel:manage:redemptions bits:read channel:read:subscriptions';
+  const CHEER_TYPE = 'channel.cheer';
+  const SUB_TYPES = ['channel.subscribe', 'channel.subscription.message', 'channel.subscription.gift'];
   const K = { config: 'tw.config', records: 'tw.records', queue: 'tw.queue', auth: 'tw.auth' };
   const MAX_RECORDS = 1000;
 
@@ -50,7 +53,9 @@
   }
   const clientId = () => cfg.clientId || BUILTIN_CLIENT_ID;
   const fmtTime = (iso) => { const d = new Date(iso); return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
-  const corePrizes = () => cfg.prizes.map((p, i) => normalizePrize({ id: p.id, name: p.name, weight: p.weight, color: p.color, quantity: -1 }, i));
+  // 兩個轉盤：main＝步驟 4 的忠誠點轉盤，bonus＝步驟 7 的第二個轉盤
+  const prizesOf = (w) => (w === 'bonus' ? cfg.wheel2.prizes : cfg.prizes);
+  const corePrizes = (w = 'main') => prizesOf(w).map((p, i) => normalizePrize({ id: p.id, name: p.name, weight: p.weight, color: p.color, quantity: -1 }, i));
 
   // ---------- 只允許一個分頁運作（兩個分頁會把同一筆兌換轉兩次） ----------
   async function becomeLeader() {
@@ -193,6 +198,8 @@
         const j = await r.json();
         Object.assign(auth, { userId: j.user_id, login: j.login, clientId: j.client_id || auth.clientId, scopes: j.scopes || [], expiresAt: j.expires_in ? Date.now() + j.expires_in * 1000 : 0 });
         this.canManage = auth.scopes.includes('channel:manage:redemptions');
+        this.canBits = auth.scopes.includes('bits:read');
+        this.canSubs = auth.scopes.includes('channel:read:subscriptions');
         if (!auth.name) { const u = await this.helix('/users'); if (u.json && u.json.data && u.json.data[0]) auth.name = u.json.data[0].display_name; }
         saveAuth();
         return true;
@@ -306,11 +313,13 @@
           this.ws = ws; this.session = m.payload.session.id; this.kaSec = m.payload.session.keepalive_timeout_seconds || 10; this.retry = 0;
           this.keepalive();
           if (reconnecting && old && old !== ws) { old.onclose = null; old.close(); this.setState('online'); } // Twitch 要求換線：訂閱會自動帶過來
-          else this.subscribe();
+          else { this.subscribed = new Set(); this.subscribe(); }
         } else if (type === 'session_reconnect') {
           this.connect(m.payload.session.reconnect_url, true);
-        } else if (type === 'notification' && m.payload.subscription.type === REDEEM_TYPE) {
-          onRedemption(m.payload.event);
+        } else if (type === 'notification') {
+          const st = m.payload.subscription.type;
+          if (st === REDEEM_TYPE) onRedemption(m.payload.event);
+          else onTrigger(st, m.payload.event, m.metadata.message_id);
         } else if (type === 'revocation') {
           this.expire();
         }
@@ -329,9 +338,28 @@
     },
     async subscribe() {
       const r = await this.helix('/eventsub/subscriptions', { method: 'POST', body: { type: REDEEM_TYPE, version: '1', condition: { broadcaster_user_id: auth.userId }, transport: { method: 'websocket', session_id: this.session } } });
-      if (r.status === 202 || r.status === 409) { this.setState('online'); this.loadRewards().then(() => this.catchUp()); TwSync.kick(); } // 連上（含斷線重連）就檢查有沒有漏掉的
+      if (r.status === 202 || r.status === 409) { this.setState('online'); this.loadRewards().then(() => this.catchUp()); TwSync.kick(); this.subscribeExtras(); } // 連上（含斷線重連）就檢查有沒有漏掉的
       else if (r.status === 403) this.setState('error', '沒有權限讀取忠誠點兌換：頻道需要是 Twitch 聯盟或合作夥伴');
       else if (r.status !== 401) { this.setState('offline', `訂閱兌換通知失敗（${r.status}），稍後重試`); if (this.ws) this.ws.close(); }
+    },
+    // 步驟 7 打開的小奇點、訂閱通知。失敗不影響忠誠點兌換
+    subscribed: new Set(), extraError: '', extraTimer: null,
+    async subscribeExtras() {
+      clearTimeout(this.extraTimer);
+      if (!this.session || !auth || !auth.userId || this.state !== 'online') { renderTriggers(); return; }
+      const want = [...(cfg.triggers.bits.on ? [[CHEER_TYPE, this.canBits]] : []), ...(cfg.triggers.sub.on ? SUB_TYPES.map((t) => [t, this.canSubs]) : [])];
+      let scope = false; let fail = 0;
+      for (const [type, can] of want) {
+        if (this.subscribed.has(type)) continue;
+        if (!can) { scope = true; continue; }
+        const r = await this.helix('/eventsub/subscriptions', { method: 'POST', body: { type, version: '1', condition: { broadcaster_user_id: auth.userId }, transport: { method: 'websocket', session_id: this.session } } });
+        if (r.status === 202 || r.status === 409) this.subscribed.add(type);
+        else if (r.status === 403) scope = true;
+        else if (r.status !== 401) fail = fail || r.status;
+      }
+      this.extraError = scope ? 'scope' : fail ? `收不到小奇點／訂閱通知（Twitch 回應 ${fail}），稍後自動重試` : '';
+      if (fail) this.extraTimer = setTimeout(() => this.subscribeExtras(), 60000);
+      renderStatus(); renderTriggers();
     },
     setState(s, err = '') { this.state = s; this.error = err; renderStatus(); renderSetup(); },
   };
@@ -342,6 +370,23 @@
     if (queue.some((q) => q.id === ev.id) || records.some((r) => r.id === ev.id)) return; // Twitch 偶爾會重送
     queue.push({ id: ev.id, login: ev.user_login, display: ev.user_name, userId: ev.user_id || '', input: ev.user_input || '', reward: ev.reward.title, rewardId: ev.reward.id, at: ev.redeemed_at || new Date().toISOString() });
     missed = missed.filter((m) => m.id !== ev.id);
+    saveQueue(); renderQueue(); pump();
+  }
+
+  // ---------- 小奇點、訂閱 → 依步驟 7 的規則轉幾次 ----------
+  const seenEvents = new Set(); // Twitch 偶爾會重送同一則通知（小奇點零頭不能算兩次）
+  function onTrigger(type, ev, msgId) {
+    const id = `ev-${msgId}`;
+    if (!msgId || seenEvents.has(id) || queue.some((q) => q.id === id) || records.some((r) => r.id === id || r.src === id)) return;
+    seenEvents.add(id);
+    const res = T.triggerSpins(type, ev, cfg.triggers, cfg.bitsCarry);
+    if (!res) return;
+    if (res.carryKey) { cfg.bitsCarry = T.setCarry(cfg.bitsCarry, res.carryKey, res.carry); saveCfg(); }
+    if (!res.spins) {
+      if (res.source === 'bits') toast(`${res.who.display} 送了 ${ev.bits} 小奇點${res.carryKey ? `，累積 ${res.carry}／${cfg.triggers.bits.per}，還不到一次` : '，沒達到門檻'}`, 5000);
+      return;
+    }
+    queue.push({ id, ...res.who, reward: res.label, rewardId: '', source: res.source, wheel: res.wheel, count: res.spins, at: new Date().toISOString() });
     saveQueue(); renderQueue(); pump();
   }
 
@@ -428,16 +473,23 @@
     try {
       while (queue.length) {
         const q = queue[0];
-        const core = drawOne(corePrizes());
-        const prize = core && cfg.prizes.find((p) => p.id === core.id);
-        if (!prize) { toast('轉盤沒有可抽的獎項：請到設定的步驟 4 檢查權重', 8000); break; }
+        const w = q.wheel === 'bonus' ? 'bonus' : 'main';
+        const n = Math.max(1, Math.trunc(q.count) || 1); // 小奇點、訂閱一次可能轉好幾次
+        const picks = [];
+        for (let k = 0; k < n; k++) {
+          const core = drawOne(corePrizes(w));
+          const prize = core && prizesOf(w).find((p) => p.id === core.id);
+          if (!prize) break;
+          picks.push(prize);
+        }
+        if (picks.length < n) { toast(`${w === 'bonus' ? '第二個轉盤' : '轉盤'}沒有可抽的獎項：請到設定的步驟 ${w === 'bonus' ? 7 : 4} 檢查權重`, 8000); break; }
         const at = new Date(q.at); const when = Number.isNaN(at.getTime()) ? new Date() : at; // 用兌換當下的時間決定日期（排隊跨過午夜也不會記錯天）
         const who = await proxyFor(q);
-        const rec = T.makeRecord({ id: q.id, login: who.login, display: who.display, userId: who.userId, by: who.by, note: who.note, reward: q.reward, rewardId: q.rewardId, prize, now: when, cutoffHour: cfg.cutoffHour, test: !!q.test });
-        records.unshift(rec); queue.shift();
+        const recs = picks.map((prize, k) => T.makeRecord({ id: n > 1 ? `${q.id}.${k + 1}` : q.id, src: n > 1 ? q.id : '', source: q.source, login: who.login, display: who.display, userId: who.userId, by: who.by, note: who.note, reward: q.reward, rewardId: q.rewardId, prize, now: when, cutoffHour: cfg.cutoffHour, test: !!q.test }));
+        records.unshift(...recs); queue.shift();
         saveRecords(); saveQueue(); renderQueue(); renderRecords();
         Writer.kick(); // 先寫入再播動畫：就算中途關掉網頁也不會漏記
-        await animate(rec);
+        await animate(recs, w);
       }
     } finally { spinning = false; }
   }
@@ -457,24 +509,34 @@
     return { login: u.login, display: u.display, userId: u.userId, by: { login: q.login, display: q.display }, note: '' };
   }
 
-  async function animate(rec) {
-    const probs = probabilities(corePrizes());
-    const p = corePrizes().find((x) => x.id === rec.prizeId);
-    const tier = p ? tierOf(p, probs[p.id]) : 'normal';
+  async function animate(recs, w = 'main') {
+    const rec = recs[0]; const n = recs.length;
+    const cp = corePrizes(w);
+    const probs = probabilities(cp);
+    const tierFor = (r) => { const p = cp.find((x) => x.id === r.prizeId); return p ? tierOf(p, probs[p.id]) : 'normal'; };
+    const tiers = recs.map(tierFor);
     const who = T.viewerLabel(rec);
-    $('#nowBanner').innerHTML = `<span class="tw-now-who">${esc(rec.display || rec.login)}</span><span class="tw-now-label">${rec.status === 'test' ? '試轉中…' : rec.by ? `${esc(rec.by.display)} 幫忙抽「${esc(rec.reward)}」` : `兌換了「${esc(rec.reward)}」`}</span>`;
+    const what = rec.status === 'test' ? `試轉中…${rec.source ? `（模擬${esc(rec.reward)}）` : ''}` : rec.by ? `${esc(rec.by.display)} 幫忙抽「${esc(rec.reward)}」` : rec.source ? esc(rec.reward) : `兌換了「${esc(rec.reward)}」`;
+    $('#nowBanner').innerHTML = `<span class="tw-now-who">${esc(rec.display || rec.login)}</span><span class="tw-now-label">${what}${n > 1 ? ` · 轉 ${n} 次` : ''}</span>`;
     $('#nowBanner').classList.add('active');
     $('#lastResult').classList.add('hidden');
-    Sync.send({ type: 'spin', batchId: rec.id, batchType: '', count: 1, player: rec.by ? `${who}（${rec.by.display} 代抽）` : who, results: [{ rid: rec.id, index: 1, prizeId: rec.prizeId, name: rec.prize, image: '', color: rec.color, tier }], prizes: overlayConfig().prizes, reveal: 'flip', pity: '', countdown: 0 });
+    if (w === 'bonus') await wheel.setPrizes(cp, 'weight', 0.04);
+    const each = n > 1 && cfg.triggers.multi === 'each';
+    const ovPrizes = normalizeConfig({ prizes: cp }).prizes;
+    Sync.send({ type: 'spin', batchId: rec.src || rec.id, batchType: n > 1 ? `${n} 連抽` : '', count: n, player: rec.by ? `${who}（${rec.by.display} 代抽）` : rec.source ? `${who}（${rec.reward}）` : who, results: recs.map((r, i) => ({ rid: r.id, index: i + 1, prizeId: r.prizeId, name: r.prize, image: '', color: r.color, tier: tiers[i] })), prizes: ovPrizes, reveal: each ? 'each' : 'flip', pity: '', countdown: 0 });
     // 視窗縮小或分頁在背景時瀏覽器會暫停動畫，spinTo 不會結束；用時間保底，排隊才不會卡住
     await Promise.race([wheel.spinTo(rec.prizeId, { duration: cfg.spinDuration, turns: cfg.turns }), wait(cfg.spinDuration + 800)]);
-    if (tier === 'big') Sfx.fanfare(); else Sfx.win();
+    if (tiers.includes('big')) Sfx.fanfare(); else Sfx.win();
     wheel.focus(1400);
     const last = $('#lastResult');
     last.style.setProperty('--c', rec.color || '#888');
-    last.innerHTML = `<span class="tw-last-who">${esc(rec.display || rec.login)}</span> 轉到 <b>${esc(rec.prize)}</b>`;
+    const counts = new Map(); recs.forEach((r) => counts.set(r.prize, (counts.get(r.prize) || 0) + 1));
+    last.innerHTML = `<span class="tw-last-who">${esc(rec.display || rec.login)}</span> 轉到 ${[...counts].map(([name, c]) => `<b>${esc(name)}</b>${n > 1 ? ` ×${c}` : ''}`).join('、')}`;
     last.classList.remove('hidden');
-    await wait(cfg.resultSeconds * 1000 + 400);
+    // 一次轉好幾次時 OBS 畫面要播比較久：控制面板跟著等，下一位才不會把它快轉掉
+    const extra = n > 1 ? (each ? (n - 1) * (overlayConfig().multiSpinDuration + 350) : flipTotal(n, true)) : 0;
+    await wait(cfg.resultSeconds * 1000 + 400 + extra);
+    if (w === 'bonus') updateWheel();
     $('#nowBanner').classList.remove('active');
     $('#nowBanner').innerHTML = '<span class="tw-now-label">等待兌換中…</span>';
   }
@@ -511,6 +573,8 @@
       alert = yearErr ? { text: `有 ${failed} 筆沒寫進試算表：${yearErr.error}`, btn: '開新年度', act: () => openNewYear(Number(yearErr.date.slice(0, 4))) }
         : { text: `有 ${failed} 筆沒寫進試算表：${err.error}`, btn: '全部重新寫入', act: retryAll };
     }
+    else if (Twitch.extraError === 'scope') alert = { text: '要收到小奇點、訂閱通知，請重新連接 Twitch 一次（多兩項讀取權限）', btn: '重新連接 Twitch', act: () => Twitch.login() };
+    else if (Twitch.extraError) alert = { text: Twitch.extraError, btn: '到設定', act: () => showSetup(7) };
     else if (auth && auth.userId && auth.scopes && !Twitch.canManage) alert = { text: '新功能：重新連接 Twitch 一次，就能補抓網頁關著時的兌換、撤銷時退點', btn: '重新連接 Twitch', act: () => Twitch.login() };
     $('#alert').classList.toggle('hidden', !alert);
     if (alert) { $('#alertText').textContent = alert.text; $('#alertBtn').textContent = alert.btn; $('#alertBtn').onclick = alert.act; }
@@ -521,7 +585,7 @@
   function renderQueue() {
     $('#queueCount').textContent = queue.length;
     $('#queueList').innerHTML = queue.length
-      ? queue.map((q) => `<li><span class="tw-li-main">${esc(q.display || q.login)}</span><span class="tw-li-sub">${esc(q.test ? '試轉' : q.reward)} · ${fmtTime(q.at)}</span></li>`).join('')
+      ? queue.map((q) => `<li><span class="tw-li-main">${esc(q.display || q.login)}</span><span class="tw-li-sub">${esc(q.test ? '試轉' : q.reward)}${q.count > 1 ? ` · 轉 ${q.count} 次` : ''} · ${fmtTime(q.at)}</span></li>`).join('')
       : '<li class="tw-empty">目前沒有人排隊</li>';
   }
   const STATUS_TEXT = { moving: '改記中…', pending: '寫入中…', ok: '已寫入', error: '寫入失敗', undoing: '撤銷中…', undone: '已撤銷', test: '試轉（不記錄）', nowrite: '不寫進試算表' };
@@ -533,7 +597,7 @@
           : r.status === 'nowrite' && r.tw === 'hold' ? `<button class="btn icon ghost" data-undo="${esc(r.id)}" title="作廢這一筆，可選擇退點">撤銷</button>` : '';
       const canMove = ['ok', 'pending', 'error', 'nowrite'].includes(r.status);
       const move = canMove ? `<button class="btn icon ghost" data-move="${esc(r.id)}" title="代抽記錯人：改記到另一位觀眾">改記給…</button>` : '';
-      const extra = (r.by ? ` · ${r.by.display} 代抽` : '') + (r.note ? ` · ${r.note}` : '') + (r.movedFrom ? ` · 由 ${r.movedFrom} 改記` : '');
+      const extra = (r.source ? ` · ${r.reward}` : '') + (r.by ? ` · ${r.by.display} 代抽` : '') + (r.note ? ` · ${r.note}` : '') + (r.movedFrom ? ` · 由 ${r.movedFrom} 改記` : '');
       const tw = { canceled: ' · 已退還忠誠點', 'to-cancel': ' · 退點中…', 'cancel-failed': ' · 退點失敗' }[r.tw] || '';
       const detail = extra + (r.status === 'ok' ? ` · ${r.cell}${r.isNew ? ' · 新觀眾已加入名單' : ''}${r.renamedFrom ? ` · 改過帳號，名單已從 ${r.renamedFrom} 更新` : ''}` : r.status === 'error' ? ` · ${r.error}` : '') + tw;
       return `<li class="st-${r.status}">
@@ -581,6 +645,7 @@
   }
   // 撤銷視窗：回傳 true（退點）/ false（不退）/ null（取消）
   function refundBlocker(r) {
+    if (r.source) return '小奇點、訂閱觸發的轉盤沒有忠誠點可退（Twitch 也不提供退小奇點、訂閱）。';
     if (!r.rewardId) return '這筆不是觀眾兌換來的（手動補登），沒有忠誠點可退。';
     if (!Twitch.canManage) return '要先重新連接 Twitch 一次，才能從這裡退點。';
     if (!Twitch.managed.has(r.rewardId) || r.tw === '') return '這個品項是在 Twitch 後台手動建立的，網頁不能退點；請到 Twitch 的獎勵請求佇列處理。';
@@ -747,47 +812,131 @@
     } finally { $('#testSheet').disabled = false; renderSetup(); renderStatus(); }
   };
 
-  // 步驟 4：轉盤內容
+  // 步驟 4：轉盤內容（步驟 7 的第二個轉盤用同一套表格）
+  const prizeTables = () => [$('#prizeRows'), $('#prizeRows2')];
   function renderPrizes() {
-    const total = cfg.prizes.reduce((s, p) => s + p.weight, 0);
     // 選項：測試連線時從試算表讀到的欄名（還沒讀到就用預設那幾欄）＋目前的值＋不寫進試算表＋自己輸入
     const known = sheetColumnList();
     const colOpts = (cur) => [...new Set([...known, ...(cur ? [cur] : [])])].map((c) => `<option value="${esc(c)}"${c === cur ? ' selected' : ''}>${esc(c)}${known.includes(c) ? '' : '（試算表裡沒找到）'}</option>`).join('')
       + `<option value=""${cur ? '' : ' selected'}>（不寫進試算表）</option><option value="${CUSTOM}">自己輸入…</option>`;
-    $('#prizeRows').innerHTML = cfg.prizes.map((p, i) => `<tr data-i="${i}">
+    for (const tb of prizeTables()) {
+      const list = prizesOf(tb.dataset.w);
+      const total = list.reduce((sum, p) => sum + p.weight, 0);
+      tb.innerHTML = list.map((p, i) => `<tr data-i="${i}">
       <td><input type="color" data-k="color" value="${esc(p.color)}"></td>
       <td><input data-k="name" value="${esc(p.name)}" maxlength="30"></td>
       <td><input type="number" data-k="weight" value="${p.weight}" min="0" step="1"></td>
       <td class="tw-prob">${total ? ((p.weight / total) * 100).toFixed(1) : '0'}%</td>
       <td><select data-k="column">${colOpts(p.column)}</select></td>
-      <td><button class="btn icon ghost" data-del="${i}" title="刪除"${cfg.prizes.length <= 1 ? ' disabled' : ''}>✕</button></td></tr>`).join('');
+      <td><button class="btn icon ghost" data-del="${i}" title="刪除"${list.length <= 1 ? ' disabled' : ''}>✕</button></td></tr>`).join('');
+    }
   }
   const CUSTOM = '__custom__'; // 選單裡「自己輸入…」的值
   const sheetColumnList = () => (cfg.sheetColumns.length ? cfg.sheetColumns : T.SHEET_COLUMNS);
   function prizesChanged() { cfg = T.normalizeTwConfig(cfg); saveCfg(); updateWheel(); sendConfig(); }
-  $('#prizeRows').addEventListener('change', async (e) => {
-    const tr = e.target.closest('tr'); const k = e.target.dataset.k; if (!tr || !k) return;
-    const p = cfg.prizes[Number(tr.dataset.i)];
-    let v = e.target.value;
-    if (k === 'column' && v === CUSTOM) {
-      const typed = await dialog({ title: '寫到哪一欄', message: '輸入試算表每天底下的欄名（第 2 列），要一字不差，例如「Q版塗鴉」。', input: p.column || '', okLabel: '確定' });
-      if (typed === null || !typed.trim()) { renderPrizes(); return; }
-      v = typed.trim();
-    }
-    p[k] = k === 'weight' ? Math.max(0, Number(v) || 0) : v;
-    prizesChanged(); renderPrizes();
-    // 選了試算表裡沒讀到的欄名：提醒再測一次連線
-    if (k === 'column' && v && !sheetColumnList().includes(v) && cfg.sheetOk) { cfg.sheetOk = ''; saveCfg(); renderSetup(); toast('試算表裡沒讀到這個欄名，請回步驟 3 再按一次「測試連線」確認找得到', 6000); }
+  prizeTables().forEach((tb) => {
+    tb.addEventListener('change', async (e) => {
+      const tr = e.target.closest('tr'); const k = e.target.dataset.k; if (!tr || !k) return;
+      const p = prizesOf(tb.dataset.w)[Number(tr.dataset.i)];
+      let v = e.target.value;
+      if (k === 'column' && v === CUSTOM) {
+        const typed = await dialog({ title: '寫到哪一欄', message: '輸入試算表每天底下的欄名（第 2 列），要一字不差，例如「Q版塗鴉」。', input: p.column || '', okLabel: '確定' });
+        if (typed === null || !typed.trim()) { renderPrizes(); return; }
+        v = typed.trim();
+      }
+      p[k] = k === 'weight' ? Math.max(0, Number(v) || 0) : v;
+      prizesChanged(); renderPrizes();
+      // 選了試算表裡沒讀到的欄名：提醒再測一次連線
+      if (k === 'column' && v && !sheetColumnList().includes(v) && cfg.sheetOk) { cfg.sheetOk = ''; saveCfg(); renderSetup(); toast('試算表裡沒讀到這個欄名，請回步驟 3 再按一次「測試連線」確認找得到', 6000); }
+    });
+    tb.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-del]'); if (!b) return;
+      prizesOf(tb.dataset.w).splice(Number(b.dataset.del), 1); prizesChanged(); renderPrizes();
+    });
   });
-  $('#prizeRows').addEventListener('click', (e) => {
-    const b = e.target.closest('[data-del]'); if (!b) return;
-    cfg.prizes.splice(Number(b.dataset.del), 1); prizesChanged(); renderPrizes();
-  });
-  $('#addPrize').onclick = () => { cfg.prizes.push({ name: `獎項 ${cfg.prizes.length + 1}`, weight: 10, column: sheetColumnList()[0] }); prizesChanged(); renderPrizes(); };
+  const addPrizeTo = (w) => { const list = prizesOf(w); list.push({ name: `獎項 ${list.length + 1}`, weight: 10, column: sheetColumnList()[0] }); prizesChanged(); renderPrizes(); };
+  $('#addPrize').onclick = () => addPrizeTo('main');
+  $('#addPrize2').onclick = () => addPrizeTo('bonus');
   $('#resetPrizes').onclick = async () => {
     if (!(await dialog({ message: '把轉盤恢復成 1點 50%、3點 30%、5點 20%？' }))) return;
     cfg.prizes = T.DEFAULT_PRIZES.map((p) => ({ ...p })); prizesChanged(); renderPrizes();
   };
+
+  // 步驟 7：小奇點、訂閱也轉盤
+  function renderTriggers() {
+    const t = cfg.triggers;
+    $('#bitsOn').checked = t.bits.on; $('#bitsBox').classList.toggle('on', t.bits.on);
+    $$('input[name="bitsMode"]').forEach((r) => { r.checked = r.value === t.bits.mode; });
+    $('#bitsPer').value = t.bits.per; $('#bitsCarry').checked = t.bits.carry;
+    $('#bitsTiers').innerHTML = t.bits.tiers.map((x, i) => `<span class="tw-tier" data-i="${i}">一次送滿 <input type="number" class="tw-num" data-k="min" min="1" step="1" value="${x.min}"> 小奇點，轉 <input type="number" class="tw-num" data-k="spins" min="0" step="1" value="${x.spins}"> 次 <button type="button" class="btn icon ghost" data-del-tier="${i}" title="刪除這個門檻">✕</button></span>`).join('') || '<span class="hint">還沒有門檻</span>';
+    $('#subOn').checked = t.sub.on; $('#subBox').classList.toggle('on', t.sub.on);
+    $('#subNew').value = t.sub.newSpins; $('#subResub').value = t.sub.resubSpins; $('#subT2').value = t.sub.t2; $('#subT3').value = t.sub.t3; $('#subGift').value = t.sub.gift;
+    $$('[data-wheel-select]').forEach((sel) => { sel.innerHTML = `<option value="main">忠誠點轉盤（步驟 4 的獎項）</option><option value="bonus">第二個轉盤：${esc(cfg.wheel2.name)}</option>`; });
+    $('#bitsWheel').value = t.bits.wheel; $('#subWheel').value = t.sub.wheel;
+    $('#anonMode').value = t.anon; $('#anonName').value = t.anonName; $('#anonName').classList.toggle('hidden', t.anon === 'skip');
+    $('#multiMode').value = t.multi; $('#maxSpins').value = t.maxSpins;
+    $('#wheel2Name').value = cfg.wheel2.name;
+    $('#wheel2Box').classList.toggle('hidden', !((t.bits.on && t.bits.wheel === 'bonus') || (t.sub.on && t.sub.wheel === 'bonus')));
+    // 目前收不收得到
+    const box = $('#trigState');
+    const on = t.bits.on || t.sub.on;
+    let msg = ''; let cls = '';
+    if (!on) msg = '';
+    else if (!auth || !auth.userId) { msg = '先完成步驟 1 連接 Twitch。'; cls = 'bad'; }
+    else if (Twitch.extraError === 'scope') { msg = '還差一步：按步驟 1 的「換一個帳號」用同一個帳號重新連接 Twitch 一次，才收得到小奇點、訂閱通知。'; cls = 'bad'; }
+    else if (Twitch.extraError) { msg = Twitch.extraError; cls = 'bad'; }
+    else if (Twitch.state === 'online') { msg = `✓ 正在接收${[t.bits.on && '小奇點', t.sub.on && '訂閱'].filter(Boolean).join('、')}通知。`; cls = 'ok'; }
+    else msg = '連上 Twitch 後就會開始接收。';
+    box.textContent = msg; box.className = `tw-check${cls ? ` ${cls}` : ''}${msg ? '' : ' hidden'}`;
+  }
+  function triggersChanged() {
+    cfg = T.normalizeTwConfig(cfg); saveCfg(); renderTriggers();
+    Twitch.subscribeExtras();
+  }
+  const num = (sel) => Number($(sel).value);
+  $('#bitsOn').onchange = () => { cfg.triggers.bits.on = $('#bitsOn').checked; triggersChanged(); };
+  $('#subOn').onchange = () => { cfg.triggers.sub.on = $('#subOn').checked; triggersChanged(); };
+  $$('input[name="bitsMode"]').forEach((r) => { r.onchange = () => { cfg.triggers.bits.mode = r.value; triggersChanged(); }; });
+  $('#bitsPer').onchange = () => { cfg.triggers.bits.per = num('#bitsPer'); triggersChanged(); };
+  $('#bitsCarry').onchange = () => { cfg.triggers.bits.carry = $('#bitsCarry').checked; if (!cfg.triggers.bits.carry) cfg.bitsCarry = {}; triggersChanged(); };
+  $('#bitsTiers').addEventListener('change', (e) => {
+    const row = e.target.closest('[data-i]'); if (!row || !e.target.dataset.k) return;
+    cfg.triggers.bits.tiers[Number(row.dataset.i)][e.target.dataset.k] = Number(e.target.value); triggersChanged();
+  });
+  $('#bitsTiers').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-del-tier]'); if (!b) return;
+    e.preventDefault(); cfg.triggers.bits.tiers.splice(Number(b.dataset.delTier), 1); triggersChanged();
+  });
+  $('#addTier').onclick = (e) => {
+    e.preventDefault();
+    const last = cfg.triggers.bits.tiers[cfg.triggers.bits.tiers.length - 1];
+    cfg.triggers.bits.tiers.push(last ? { min: last.min * 2, spins: last.spins * 2 || 1 } : { min: 100, spins: 1 }); triggersChanged();
+  };
+  [['#subNew', 'newSpins'], ['#subResub', 'resubSpins'], ['#subT2', 't2'], ['#subT3', 't3']].forEach(([sel, k]) => { $(sel).onchange = () => { cfg.triggers.sub[k] = num(sel); triggersChanged(); }; });
+  $('#subGift').onchange = () => { cfg.triggers.sub.gift = $('#subGift').value; triggersChanged(); };
+  $('#bitsWheel').onchange = () => { cfg.triggers.bits.wheel = $('#bitsWheel').value; triggersChanged(); renderPrizes(); };
+  $('#subWheel').onchange = () => { cfg.triggers.sub.wheel = $('#subWheel').value; triggersChanged(); renderPrizes(); };
+  $('#anonMode').onchange = () => { cfg.triggers.anon = $('#anonMode').value; triggersChanged(); };
+  $('#anonName').onchange = () => { cfg.triggers.anonName = $('#anonName').value; triggersChanged(); };
+  $('#multiMode').onchange = () => { cfg.triggers.multi = $('#multiMode').value; triggersChanged(); };
+  $('#maxSpins').onchange = () => { cfg.triggers.maxSpins = num('#maxSpins'); triggersChanged(); };
+  $('#wheel2Name').onchange = () => { cfg.wheel2.name = $('#wheel2Name').value; triggersChanged(); };
+  // 模擬：照目前的規則算次數、轉給實況主看，不寫進試算表、不動小奇點零頭
+  function simulate(type, ev, label) {
+    const t = { ...cfg.triggers, bits: { ...cfg.triggers.bits, on: true }, sub: { ...cfg.triggers.sub, on: true } };
+    const res = T.triggerSpins(type, { user_login: 'test', user_name: '測試', user_id: '', ...ev }, t, {});
+    if (!res || !res.spins) { toast(`${label}：照目前的規則不會轉盤`, 5000); return; }
+    queue.push({ id: `t-${randId(10)}`, login: '', display: '測試', reward: res.label, source: res.source, wheel: res.wheel, count: res.spins, at: new Date().toISOString(), test: true });
+    saveQueue(); renderQueue(); showLive(); pump();
+  }
+  $('#simBits').onclick = async () => {
+    const v = await dialog({ title: '模擬一次小奇點', message: '輸入觀眾送了多少小奇點：', input: String(cfg.triggers.bits.mode === 'tiers' && cfg.triggers.bits.tiers[0] ? cfg.triggers.bits.tiers[0].min : cfg.triggers.bits.per * 3), okLabel: '轉！' });
+    if (v === null) return;
+    const bits = Math.trunc(Number(v));
+    if (!(bits > 0)) { toast('請輸入大於 0 的數字'); return; }
+    simulate('channel.cheer', { bits }, `${bits} 小奇點`);
+  };
+  $('#simSub').onclick = () => simulate('channel.subscribe', { tier: '1000', is_gift: false }, '新訂閱');
   $('#cutoffHour').innerHTML = Array.from({ length: 9 }, (_, h) => `<option value="${h}">${h === 0 ? '0 點（不跨夜，照日曆）' : `${h} 點`}</option>`).join('');
   $('#cutoffHour').value = cfg.cutoffHour;
   $('#cutoffHour').onchange = () => { cfg.cutoffHour = Number($('#cutoffHour').value); saveCfg(); };
@@ -835,7 +984,7 @@
   function showSetup(step) {
     $('#setupView').classList.remove('hidden'); $('#liveView').classList.add('hidden');
     $('#toSetup').classList.add('hidden'); $('#toLive').classList.remove('hidden');
-    renderSetup(); renderRewards(); renderPrizes();
+    renderSetup(); renderRewards(); renderPrizes(); renderTriggers();
     if (step) setTimeout(() => $(`#step${step}`).scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
   }
   function showLive() {

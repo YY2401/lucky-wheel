@@ -6,7 +6,15 @@ function installMocks() {
   const ls = (k, fb) => { try { const v = localStorage.getItem(k); return v == null ? fb : JSON.parse(v); } catch { return fb; } };
   const M = (window.__tw = {
     sockets: [], sheetCalls: [], patches: [], created: [], validateStatus: Number(localStorage.getItem('mock.validate')) || 200, subscribeStatus: 202, failSheet: 0, rowErrors: {},
-    scopes: localStorage.getItem('mock.scopes') === 'read' ? ['channel:read:redemptions'] : ['channel:manage:redemptions', 'channel:read:redemptions'],
+    // mock.scopes：read＝最舊的授權、nobits＝還沒有小奇點／訂閱權限的授權
+    scopes: { read: ['channel:read:redemptions'], nobits: ['channel:manage:redemptions', 'channel:read:redemptions'] }[localStorage.getItem('mock.scopes')] || ['channel:manage:redemptions', 'channel:read:redemptions', 'bits:read', 'channel:read:subscriptions'],
+    subs: [], // 訂閱過的 EventSub 類型
+    seq: 0,
+    // 小奇點、訂閱等其他 EventSub 通知（msgId 一樣＝Twitch 重送）
+    notify(type, event, msgId = `m${++M.seq}`) {
+      const ws = M.sockets[M.sockets.length - 1];
+      ws.onmessage({ data: JSON.stringify({ metadata: { message_type: 'notification', message_id: msgId }, payload: { subscription: { type }, event } }) });
+    },
     rewards: [
       { id: 'rw1', title: '忠誠點轉盤', cost: 500, is_enabled: true, background_color: '#00C7AC', managed: true },
       { id: 'rw2', title: '喝水', cost: 100, is_enabled: true, background_color: '#9146FF' },
@@ -62,7 +70,7 @@ function installMocks() {
       const list = q.get('only_manageable_rewards') === 'true' ? M.rewards.filter((r) => r.managed) : M.rewards;
       return json({ data: list.map(pub) });
     }
-    if (url.startsWith('https://api.twitch.tv/helix/eventsub/subscriptions')) { M.subscribed = JSON.parse(opts.body); return json({}, M.subscribeStatus); }
+    if (url.startsWith('https://api.twitch.tv/helix/eventsub/subscriptions')) { M.subscribed = JSON.parse(opts.body); M.subs.push(M.subscribed.type); return json({}, M.subscribed.type === 'channel.channel_points_custom_reward_redemption.add' ? M.subscribeStatus : M.extraStatus || 202); }
     if (url.startsWith('https://script.google.com/')) {
       const req = JSON.parse(opts.body);
       M.sheetCalls.push(req);

@@ -8,8 +8,8 @@
 <script>try { document.documentElement.dataset.theme = localStorage.getItem('tw.theme') || 'light'; } catch (e) { document.documentElement.dataset.theme = 'light'; }</script>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=64">
-<link rel="stylesheet" href="twitch.css?v=64">
+<link rel="stylesheet" href="style.css?v=65">
+<link rel="stylesheet" href="twitch.css?v=65">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.1/mqtt.min.js"></script>
 </head>
 <body class="tw">
@@ -129,7 +129,7 @@
       <div class="table-scroll">
         <table class="tw-prizes">
           <thead><tr><th>顏色</th><th>名稱</th><th>權重</th><th>機率</th><th>寫到哪一欄</th><th></th></tr></thead>
-          <tbody id="prizeRows"></tbody>
+          <tbody id="prizeRows" data-w="main"></tbody>
         </table>
       </div>
       <div class="tw-row"><button class="btn" id="addPrize">＋ 新增一格</button><button class="btn ghost" id="resetPrizes">恢復成 1 / 3 / 5 點</button></div>
@@ -174,6 +174,56 @@
           <li>回到這裡，在「貼到 OBS 了嗎？」按 <b>搬好了</b>。這個分頁就會停止接收兌換（避免兩邊同時轉），可以關掉了。</li>
         </ol>
       </div>
+    </div>
+  </section>
+
+  <section class="tw-step optional" id="step7">
+    <div class="tw-step-num">7</div>
+    <div class="tw-step-body">
+      <h2>加碼：小奇點、訂閱也轉盤 <small>（可略過）</small> <a class="tw-guide-step" data-guide="step7" target="_blank" rel="noopener" title="打開說明書的這一步（有截圖）">看圖解</a></h2>
+      <p class="hint">觀眾送小奇點或訂閱時自動轉盤，結果一樣寫進試算表，規則照你的頻道自己訂。<b>只有這個網頁（或 OBS 面板）開著時收得到</b>；關著時送的，Twitch 沒有提供補抓的方式，要用「＋ 手動補一筆」。第一次打開要重新連接 Twitch 一次（多兩項讀取權限）。</p>
+      <p class="tw-check hidden" id="trigState"></p>
+      <div class="tw-trig" id="bitsBox">
+        <label class="tw-trig-head"><input type="checkbox" id="bitsOn"> 小奇點（Bits）</label>
+        <div class="tw-trig-body">
+          <label class="tw-choice"><input type="radio" name="bitsMode" value="per"><span>每滿 <input type="number" id="bitsPer" min="1" step="1" class="tw-num"> 小奇點轉 1 次（送 1000 就轉 10 次）<br>
+            <span class="tw-sub-opt"><input type="checkbox" id="bitsCarry"> 沒湊滿的零頭幫觀眾記著，下次送的加上去</span></span></label>
+          <label class="tw-choice"><input type="radio" name="bitsMode" value="tiers"><span>依門檻：一次送滿多少就轉幾次（零頭不累積）
+            <span class="tw-tiers" id="bitsTiers"></span>
+            <button type="button" class="btn icon" id="addTier">＋ 新增門檻</button></span></label>
+          <label class="tw-field">轉哪個轉盤 <select id="bitsWheel" data-wheel-select></select></label>
+        </div>
+      </div>
+      <div class="tw-trig" id="subBox">
+        <label class="tw-trig-head"><input type="checkbox" id="subOn"> 訂閱</label>
+        <div class="tw-trig-body">
+          <div class="tw-grid">
+            <label class="tw-field">新訂閱轉 <input type="number" id="subNew" min="0" max="100" step="1" class="tw-num"> 次</label>
+            <label class="tw-field">續訂轉 <input type="number" id="subResub" min="0" max="100" step="1" class="tw-num"> 次</label>
+            <label class="tw-field">Tier 2 次數乘以 <input type="number" id="subT2" min="1" max="20" step="1" class="tw-num"></label>
+            <label class="tw-field">Tier 3 次數乘以 <input type="number" id="subT3" min="1" max="20" step="1" class="tw-num"></label>
+          </div>
+          <label class="tw-field">贈送訂閱 <select id="subGift"><option value="giver">記給送的人（送幾份就轉幾次）</option><option value="receiver">記給收到的人（每人各轉）</option><option value="none">不轉</option></select></label>
+          <label class="tw-field">轉哪個轉盤 <select id="subWheel" data-wheel-select></select></label>
+        </div>
+      </div>
+      <div class="tw-grid">
+        <label class="tw-field">匿名送的 <select id="anonMode"><option value="name">記在這個名字底下</option><option value="skip">不轉</option></select> <input id="anonName" maxlength="25" class="tw-short"></label>
+        <label class="tw-field">一次要轉好幾次時 <select id="multiMode"><option value="flip">轉一次，翻牌揭曉全部結果</option><option value="each">每一次都轉</option></select></label>
+        <label class="tw-field">一筆最多轉 <input type="number" id="maxSpins" min="1" max="200" step="1" class="tw-num"> 次</label>
+      </div>
+      <div id="wheel2Box" class="hidden">
+        <h3 class="tw-sub">第二個轉盤：<input id="wheel2Name" maxlength="20" class="tw-short"></h3>
+        <p class="hint">跟步驟 4 一樣設定獎項、機率、寫到哪一欄。只有選了「第二個轉盤」的觸發方式會用到。</p>
+        <div class="table-scroll">
+          <table class="tw-prizes">
+            <thead><tr><th>顏色</th><th>名稱</th><th>權重</th><th>機率</th><th>寫到哪一欄</th><th></th></tr></thead>
+            <tbody id="prizeRows2" data-w="bonus"></tbody>
+          </table>
+        </div>
+        <div class="tw-row"><button class="btn" id="addPrize2">＋ 新增一格</button></div>
+      </div>
+      <div class="tw-row"><button class="btn ghost" id="simBits">模擬一次小奇點</button><button class="btn ghost" id="simSub">模擬一次訂閱</button><small class="hint">照上面的規則轉給你看，不寫進試算表</small></div>
     </div>
   </section>
 
@@ -254,12 +304,12 @@
 </div>
 <div id="toast"></div>
 
-<script src="core.js?v=64"></script>
-<script src="twitch-core.js?v=64"></script>
-<script src="wheel.js?v=64"></script>
-<script src="ui.js?v=64"></script>
-<script src="store.js?v=64"></script>
-<script src="sync.js?v=64"></script>
-<script src="twitch.js?v=64"></script>
+<script src="core.js?v=65"></script>
+<script src="twitch-core.js?v=65"></script>
+<script src="wheel.js?v=65"></script>
+<script src="ui.js?v=65"></script>
+<script src="store.js?v=65"></script>
+<script src="sync.js?v=65"></script>
+<script src="twitch.js?v=65"></script>
 </body>
 </html>

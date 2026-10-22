@@ -196,3 +196,22 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; }
   .tw-setup-head h1 { font-size: 24px; }
   .tw-row input { min-width: 0; width: 100%; }
 }
+
+/* ---------- 步驟 7：小奇點、訂閱 ---------- */
+.tw-trig { border: var(--border-w) solid var(--ink); border-radius: 12px; padding: 10px 14px; margin: 10px 0; background: var(--paper); }
+.tw-trig-head { display: flex; align-items: center; gap: 10px; font-weight: 900; font-size: 17px; cursor: pointer; }
+.tw-trig-head input { width: 18px; height: 18px; }
+.tw-trig:not(.on) .tw-trig-body { display: none; }
+.tw-trig.on { background: color-mix(in srgb, var(--yellow) 18%, var(--paper)); }
+.tw-trig .tw-choice { cursor: default; line-height: 2; }
+.tw-num { width: 84px; }
+.tw-short { width: 140px; }
+.tw-sub-opt { align-items: center; gap: 6px; line-height: 1.5; margin-top: 4px; }
+.tw-tiers { display: grid; gap: 4px; margin: 4px 0; }
+.tw-tier { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.tw-choice:has(input[name="bitsMode"]:not(:checked)) .tw-tiers,
+.tw-choice:has(input[name="bitsMode"]:not(:checked)) #addTier,
+.tw-choice:has(input[name="bitsMode"]:not(:checked)) .tw-sub-opt { opacity: .45; }
+.tw-trig .tw-choice > span { flex: 1; min-width: 0; }
+.tw-sub-opt { display: flex; }
+@media (max-width: 560px) { .tw-trig { padding: 10px; } .tw-trig .tw-choice { padding: 8px; } .tw-num { width: 70px; } }
