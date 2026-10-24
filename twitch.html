@@ -8,8 +8,8 @@
 <script>try { document.documentElement.dataset.theme = localStorage.getItem('tw.theme') || 'light'; } catch (e) { document.documentElement.dataset.theme = 'light'; }</script>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=66">
-<link rel="stylesheet" href="twitch.css?v=66">
+<link rel="stylesheet" href="style.css?v=67">
+<link rel="stylesheet" href="twitch.css?v=67">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.1/mqtt.min.js"></script>
 </head>
 <body class="tw">
@@ -227,6 +227,32 @@
     </div>
   </section>
 
+  <section class="tw-step optional" id="step8">
+    <div class="tw-step-num">8</div>
+    <div class="tw-step-body">
+      <h2>排隊陪玩 <small>（可略過）</small> <a class="tw-guide-step" data-guide="step8" target="_blank" rel="noopener" title="打開說明書的這一步（有截圖）">看圖解</a></h2>
+      <p class="hint">觀眾兌換「排隊陪玩」品項就加入隊伍，你在直播畫面按「下一輪」叫人。同一位觀眾同時只能排一次、隊伍滿了，都會自動退還忠誠點；被你移出隊伍的人可以選擇退點。網頁關著時兌換的人，下次打開會自動排進隊伍。</p>
+      <div class="tw-create">
+        <label class="tw-field">品項名稱 <input id="partyRewardTitle" value="排隊陪玩" maxlength="45" style="width:200px"></label>
+        <label class="tw-field">要花多少忠誠點 <input type="number" id="partyRewardCost" value="1000" min="1" step="1"></label>
+        <label class="tw-field" title="勾了之後，觀眾兌換時要填遊戲裡的名字或 ID"><input type="checkbox" id="partyRewardInput" checked> 要觀眾填遊戲 ID</label>
+        <button class="btn primary" id="createPartyReward">建立品項</button>
+        <p class="tw-err hidden" id="partyErr"></p>
+      </div>
+      <label class="tw-field">用哪個品項排隊 <select id="partyReward"></select></label>
+      <div class="tw-grid">
+        <label class="tw-field">隊伍最多 <input type="number" id="partyMax" min="1" max="200" step="1" class="tw-num"> 人</label>
+        <label class="tw-field">每輪叫 <input type="number" id="partyBatch" min="1" max="20" step="1" class="tw-num"> 位</label>
+        <label class="tw-field">OBS 上顯示前 <input type="number" id="partyShow" min="1" max="20" step="1" class="tw-num"> 位</label>
+        <label class="tw-field">標題 <input id="partyTitleInput" maxlength="20" class="tw-short"></label>
+        <label class="tw-field"><input type="checkbox" id="partyShowInput"> OBS 上顯示觀眾填的遊戲 ID</label>
+      </div>
+      <ol class="tw-howto">
+        <li><button class="btn primary" id="copyPartyObs">複製「排隊名單」網址</button> <small class="hint">（貼到 OBS 的<b>來源 → 瀏覽器</b>，寬 400、高 600；背景透明）</small></li>
+      </ol>
+    </div>
+  </section>
+
   <div class="tw-setup-foot">
     <button class="btn primary big" id="finishSetup">完成，開始直播 →</button>
     <p class="hint" id="finishHint"></p>
@@ -245,8 +271,18 @@
     </div>
   </section>
   <aside class="tw-side">
+    <div class="tw-box tw-party hidden" id="partyBox">
+      <h3><span id="partyTitle">排隊陪玩</span> <span class="tw-count" id="partyCount">0</span> <span class="tw-tag meh hidden" id="partyPaused">已暫停</span></h3>
+      <div class="tw-party-now"><b>正在玩</b><ul class="tw-list" id="partyPlaying"></ul></div>
+      <div class="tw-row">
+        <button class="btn primary" id="partyNext" title="正在玩的都算玩完，從隊伍叫下一批">下一輪 →</button>
+        <button class="btn ghost" id="partyPause">暫停排隊</button>
+      </div>
+      <b class="tw-party-label">排隊中</b>
+      <ol class="tw-list" id="partyWaiting"></ol>
+    </div>
     <div class="tw-box">
-      <h3>排隊中 <span class="tw-count" id="queueCount">0</span></h3>
+      <h3>等待轉盤 <span class="tw-count" id="queueCount">0</span></h3>
       <ul class="tw-list" id="queueList"></ul>
     </div>
     <div class="tw-box">
@@ -304,12 +340,12 @@
 </div>
 <div id="toast"></div>
 
-<script src="core.js?v=66"></script>
-<script src="twitch-core.js?v=66"></script>
-<script src="wheel.js?v=66"></script>
-<script src="ui.js?v=66"></script>
-<script src="store.js?v=66"></script>
-<script src="sync.js?v=66"></script>
-<script src="twitch.js?v=66"></script>
+<script src="core.js?v=67"></script>
+<script src="twitch-core.js?v=67"></script>
+<script src="wheel.js?v=67"></script>
+<script src="ui.js?v=67"></script>
+<script src="store.js?v=67"></script>
+<script src="sync.js?v=67"></script>
+<script src="twitch.js?v=67"></script>
 </body>
 </html>

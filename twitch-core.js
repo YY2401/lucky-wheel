@@ -48,6 +48,7 @@
     triggers: DEFAULT_TRIGGERS,
     wheel2: { name: '斗內轉盤', prizes: DEFAULT_PRIZES2 },
     bitsCarry: {}, // 每位觀眾還沒湊滿一次的小奇點：{ 觀眾編號: 點數 }
+    party: null, // 排隊陪玩（見 DEFAULT_PARTY）
   };
 
   const clampInt = (v, lo, hi, fb) => { const n = Math.trunc(Number(v)); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : fb; };
@@ -87,6 +88,7 @@
     cfg.movedToObs = cfg.movedToObs === true;
     cfg.importedIds = Array.isArray(cfg.importedIds) ? cfg.importedIds.map(String).slice(-20) : [];
     cfg.triggers = normalizeTriggers(cfg.triggers);
+    cfg.party = normalizeParty(cfg.party);
     const w2 = cfg.wheel2 && typeof cfg.wheel2 === 'object' ? cfg.wheel2 : {};
     cfg.wheel2 = {
       name: String(w2.name || '').trim().slice(0, 20) || '斗內轉盤',
@@ -177,6 +179,43 @@
     out.who = who;
     return out;
   }
+  // ---------- 排隊陪玩 ----------
+  // 觀眾兌換「排隊陪玩」品項就加入隊伍；兌換在 Twitch 上保持「未完成」，玩完標成已完成、被移出可退點
+  const DEFAULT_PARTY = { rewardId: '', title: '排隊陪玩', max: 20, batch: 1, show: 5, showInput: false };
+  function normalizeParty(p) {
+    p = { ...DEFAULT_PARTY, ...(p && typeof p === 'object' ? p : {}) };
+    return {
+      rewardId: String(p.rewardId || ''),
+      title: String(p.title || '').trim().slice(0, 20) || DEFAULT_PARTY.title,
+      max: clampInt(p.max, 1, 200, DEFAULT_PARTY.max),
+      batch: clampInt(p.batch, 1, 20, DEFAULT_PARTY.batch),
+      show: clampInt(p.show, 1, 20, DEFAULT_PARTY.show),
+      showInput: p.showInput === true, // OBS 畫面上要不要顯示觀眾填的遊戲 ID
+    };
+  }
+  const partyEntry = (ev) => ({ id: String(ev.id), login: String(ev.user_login || '').toLowerCase(), display: ev.user_name || ev.user_login || '', userId: String(ev.user_id || ''), input: String(ev.user_input || '').trim().slice(0, 60), rewardId: (ev.reward && ev.reward.id) || '', at: ev.redeemed_at || new Date().toISOString() });
+  // 加入隊伍。回傳 { state, added } 或 { state, reason }（要退點的原因）；同一筆兌換重送回 { state, dup: true }
+  function admitParty(state, entry, rule) {
+    const all = [...state.playing, ...state.waiting];
+    if (all.some((e) => e.id === entry.id)) return { state, dup: true };
+    const same = (e) => (entry.userId && e.userId === entry.userId) || (entry.login && e.login === entry.login);
+    if (all.some(same)) return { state, reason: '已經在隊伍裡了' };
+    if (state.waiting.length >= rule.max) return { state, reason: `隊伍滿了（上限 ${rule.max} 人）` };
+    return { state: { ...state, waiting: [...state.waiting, entry] }, added: entry };
+  }
+  // 下一輪：正在玩的都算玩完（done），再從隊伍叫 batch 位上來
+  function nextRound(state, batch) {
+    const called = state.waiting.slice(0, batch);
+    return { state: { playing: called, waiting: state.waiting.slice(batch) }, done: state.playing, called };
+  }
+  // 從隊伍或正在玩的名單拿掉一位
+  const removeParty = (state, id) => ({ playing: state.playing.filter((e) => e.id !== id), waiting: state.waiting.filter((e) => e.id !== id) });
+  // 送給 OBS 排隊畫面的內容
+  function partyView(state, rule) {
+    const show = (e) => ({ name: e.display || e.login, input: rule.showInput ? e.input : '' });
+    return { type: 'party', title: rule.title, playing: state.playing.map(show), waiting: state.waiting.slice(0, rule.show).map(show), more: Math.max(0, state.waiting.length - rule.show), total: state.waiting.length };
+  }
+
   // 更新某位觀眾的小奇點零頭（0 就刪掉）
   function setCarry(map, key, n) {
     const next = { ...map };
@@ -286,7 +325,7 @@
 
   // ---------- 搬到 OBS 面板：把設定和還在可退點期的紀錄包進網址（# 後面，不會送到伺服器） ----------
   // 不搬 Twitch 登入（在 OBS 面板裡重新連接一次）、不搬一般紀錄（留在原本的瀏覽器）
-  const MOVE_KEYS = ['clientId', 'rewardIds', 'scriptUrl', 'sheetKey', 'sheetOk', 'cutoffHour', 'prizes', 'spinDuration', 'turns', 'resultSeconds', 'sound', 'volume', 'theme', 'room', 'secret', 'sync', 'broker', 'setupDone', 'triggers', 'wheel2', 'bitsCarry'];
+  const MOVE_KEYS = ['clientId', 'rewardIds', 'scriptUrl', 'sheetKey', 'sheetOk', 'cutoffHour', 'prizes', 'spinDuration', 'turns', 'resultSeconds', 'sound', 'volume', 'theme', 'room', 'secret', 'sync', 'broker', 'setupDone', 'triggers', 'wheel2', 'bitsCarry', 'party'];
   function buildMove(cfg, records, now = Date.now()) {
     const c = {};
     MOVE_KEYS.forEach((k) => { c[k] = cfg[k]; });
@@ -322,5 +361,5 @@
     return { cfg: next, add: payload.hold.filter((r) => !have.has(r.id)) };
   }
 
-  return { DEFAULT_TRIGGERS, DEFAULT_PRIZES2, normalizeTriggers, bitsSpins, triggerSpins, setCarry, proxyTarget, forMove, SHEET_COLUMNS, buildMove, encodeMove, decodeMove, applyMove, DEFAULT_PRIZES, DEFAULT_TW, HOLD_MS, normalizeTwPrize, normalizeTwConfig, parseViewer, dayKey, makeRecord, forSheet, viewerLabel, scriptWithKey, dueTwitchUpdates, nextHoldExpiry, missedRedemptions };
+  return { DEFAULT_PARTY, normalizeParty, partyEntry, admitParty, nextRound, removeParty, partyView, DEFAULT_TRIGGERS, DEFAULT_PRIZES2, normalizeTriggers, bitsSpins, triggerSpins, setCarry, proxyTarget, forMove, SHEET_COLUMNS, buildMove, encodeMove, decodeMove, applyMove, DEFAULT_PRIZES, DEFAULT_TW, HOLD_MS, normalizeTwPrize, normalizeTwConfig, parseViewer, dayKey, makeRecord, forSheet, viewerLabel, scriptWithKey, dueTwitchUpdates, nextHoldExpiry, missedRedemptions };
 });

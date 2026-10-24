@@ -505,3 +505,35 @@ test('搬到 OBS 面板會帶上小奇點、訂閱設定與零頭', () => {
   const res = tw.applyMove(tw.normalizeTwConfig({}), [], tw.decodeMove(tw.encodeMove(tw.buildMove(cfg, []))));
   assert.deepEqual([res.cfg.triggers.bits.on, res.cfg.triggers.bits.per, res.cfg.bitsCarry[42], res.cfg.wheel2.name], [true, 300, 120, '加碼']);
 });
+
+// ---------- 排隊陪玩 ----------
+const pe = (id, login, extra = {}) => tw.partyEntry({ id, user_login: login, user_name: login.toUpperCase(), user_id: `u${login}`, reward: { id: 'rq' }, ...extra });
+
+test('排隊：加入、同一人不能重複排、滿了不收、重送不重複', () => {
+  const rule = tw.normalizeParty({ max: 2 });
+  let s = { playing: [], waiting: [] };
+  let r = tw.admitParty(s, pe('a1', 'amy', { user_input: ' Amy#123 ' }), rule); s = r.state;
+  assert.equal(r.added.input, 'Amy#123');
+  assert.equal(tw.admitParty(s, pe('a1', 'amy'), rule).dup, true);
+  assert.match(tw.admitParty(s, pe('a2', 'amy'), rule).reason, /已經在隊伍裡/);
+  s = tw.admitParty(s, pe('b1', 'bob'), rule).state;
+  assert.match(tw.admitParty(s, pe('c1', 'cat'), rule).reason, /隊伍滿了/);
+  assert.deepEqual(s.waiting.map((e) => e.login), ['amy', 'bob']);
+});
+
+test('排隊：下一輪把正在玩的算玩完、依序叫下一批；移出', () => {
+  let s = { playing: [], waiting: ['a', 'b', 'c'].map((x) => pe(x, x)) };
+  let r = tw.nextRound(s, 2); s = r.state;
+  assert.deepEqual([r.done.length, r.called.map((e) => e.login), s.waiting.map((e) => e.login)], [0, ['a', 'b'], ['c']]);
+  r = tw.nextRound(s, 2); s = r.state;
+  assert.deepEqual([r.done.map((e) => e.login), s.playing.map((e) => e.login), s.waiting.length], [['a', 'b'], ['c'], 0]);
+  assert.deepEqual(tw.removeParty(s, 'c'), { playing: [], waiting: [] });
+});
+
+test('排隊：OBS 畫面只送前幾位，預設不公開遊戲 ID', () => {
+  const s = { playing: [pe('p', 'pat', { user_input: 'Pat#1' })], waiting: ['a', 'b', 'c'].map((x) => pe(x, x)) };
+  let v = tw.partyView(s, tw.normalizeParty({ show: 2 }));
+  assert.deepEqual([v.playing[0], v.waiting.map((e) => e.name), v.more, v.total], [{ name: 'PAT', input: '' }, ['A', 'B'], 1, 3]);
+  v = tw.partyView(s, tw.normalizeParty({ showInput: true }));
+  assert.equal(v.playing[0].input, 'Pat#1');
+});

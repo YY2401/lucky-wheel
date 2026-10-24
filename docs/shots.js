@@ -160,6 +160,26 @@ const BASE = { clientId: 'cid', sync: false, spinDuration: 2600, resultSeconds: 
   await ov.screenshot({ path: path.join(OUT, 'obs-spin.png') });
   await sleep(3200);
   await ov.screenshot({ path: path.join(OUT, 'obs-result.png') });
+  await ov.close();
+
+  // 8. 排隊陪玩：設定步驟 8、直播畫面的排隊名單、OBS 排隊名單
+  await page.evaluate(() => localStorage.setItem('mock.party', '1'));
+  const pe = (id, n, input) => ({ id, login: n.toLowerCase(), display: n, userId: '', input, rewardId: 'rwq', at: '2026-10-25T13:05:00Z' });
+  await reset({ 'tw.config': { ...READY, party: { rewardId: 'rwq', batch: 1, show: 5 } }, 'tw.auth': { token: 'tok', clientId: 'cid' },
+    'tw.party': { playing: [pe('p1', '小明', 'Ming#1234')], waiting: [pe('w1', '嘎唄', 'Gabai#22'), pe('w2', 'HaruneUka', 'Uka#8'), pe('w3', '秋野貼鐵', 'AKN#7')] } });
+  await sleep(600);
+  await shot('party-live', '#partyBox', 10);
+  await page.click('#toSetup'); await sleep(400);
+  await shot('step8', '#step8');
+  const cfg2 = await H.readKey(page, 'tw.config');
+  const qv = await browser.newPage();
+  await qv.setViewport({ width: 400, height: 380, deviceScaleFactor: 2 });
+  await qv.goto(`${srv.url}/queue.html?room=${cfg2.room}&key=${cfg2.secret}&sync=0`, { waitUntil: 'networkidle0' });
+  await qv.evaluate(() => { document.body.style.background = 'repeating-conic-gradient(#d8d8d8 0 25%, #f3f3f3 0 50%) 0 0 / 32px 32px'; });
+  await qv.waitForSelector('#card:not(.hidden)', { timeout: 10000 }); await sleep(800);
+  await qv.screenshot({ path: path.join(OUT, 'obs-party.png') });
+  console.log('shot obs-party');
+  await page.evaluate(() => localStorage.removeItem('mock.party'));
 
   await browser.close(); srv.server.close();
 })();

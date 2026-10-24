@@ -18,6 +18,7 @@ function installMocks() {
     rewards: [
       { id: 'rw1', title: '忠誠點轉盤', cost: 500, is_enabled: true, background_color: '#00C7AC', managed: true },
       { id: 'rw2', title: '喝水', cost: 100, is_enabled: true, background_color: '#9146FF' },
+      ...(localStorage.getItem('mock.party') ? [{ id: 'rwq', title: '排隊陪玩', cost: 1000, is_enabled: true, background_color: '#22A06B', managed: true }] : []), // mock.party：頻道裡有排隊用的品項
     ],
     unfulfilled: ls('mock.unfulfilled', []), // Twitch 上狀態還是「未完成」的兌換
     redeem(ev) {
@@ -67,6 +68,7 @@ function installMocks() {
         M.rewards.push(r); M.created.push(b);
         return json({ data: [pub(r)] });
       }
+      if (method === 'PATCH') { const r = M.rewards.find((x) => x.id === q.get('id')); if (!r || !r.managed) return json({ message: 'forbidden' }, 403); Object.assign(r, JSON.parse(opts.body)); return json({ data: [pub(r)] }); }
       const list = q.get('only_manageable_rewards') === 'true' ? M.rewards.filter((r) => r.managed) : M.rewards;
       return json({ data: list.map(pub) });
     }

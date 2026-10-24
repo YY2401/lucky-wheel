@@ -14,7 +14,7 @@
   const SCOPES = 'channel:read:redemptions channel:manage:redemptions bits:read channel:read:subscriptions';
   const CHEER_TYPE = 'channel.cheer';
   const SUB_TYPES = ['channel.subscribe', 'channel.subscription.message', 'channel.subscription.gift'];
-  const K = { config: 'tw.config', records: 'tw.records', queue: 'tw.queue', auth: 'tw.auth' };
+  const K = { config: 'tw.config', records: 'tw.records', queue: 'tw.queue', auth: 'tw.auth', party: 'tw.party' };
   const MAX_RECORDS = 1000;
 
   Store.onError = (e) => toast(`儲存失敗：${e.message}`, 6000);
@@ -23,10 +23,12 @@
   const records = Store.get(K.records, []);
   const queue = Store.get(K.queue, []);
   let auth = Store.get(K.auth, null); // { token, clientId, userId, login, name }
+  let party = Store.get(K.party, null) || { playing: [], waiting: [] }; // 排隊陪玩：正在玩、排隊中
   const saveCfg = () => Store.set(K.config, cfg);
   const saveRecords = () => { if (records.length > MAX_RECORDS) records.length = MAX_RECORDS; Store.set(K.records, records); };
   const saveQueue = () => Store.set(K.queue, queue);
   const saveAuth = () => Store.set(K.auth, auth);
+  const saveParty = () => Store.set(K.party, party);
   saveCfg(); // 第一次開啟時把產生的暗號、頻道代碼存下來
 
   // 放在 OBS 自訂瀏覽器停駐視窗裡：網址帶 ?dock=1（登入 Twitch 回來網址會變，所以記在 sessionStorage）
@@ -223,10 +225,10 @@
       if (r.status === 200) {
         const m = await this.helix(`${base}&only_manageable_rewards=true`);
         this.managed = new Set(m.status === 200 ? (m.json.data || []).map((x) => x.id) : []);
-        this.rewards = (r.json.data || []).map((x) => ({ id: x.id, title: x.title, cost: x.cost, enabled: x.is_enabled, color: x.background_color, skipQueue: !!x.should_redemptions_skip_request_queue, managed: this.managed.has(x.id) }));
+        this.rewards = (r.json.data || []).map((x) => ({ id: x.id, title: x.title, cost: x.cost, enabled: x.is_enabled, paused: !!x.is_paused, color: x.background_color, skipQueue: !!x.should_redemptions_skip_request_queue, managed: this.managed.has(x.id) }));
       } else if (r.status === 403) { this.rewards = []; this.rewardError = '這個頻道還沒有忠誠點功能（需要是 Twitch 聯盟或合作夥伴）'; }
       else { this.rewards = []; this.rewardError = `讀取品項失敗（${r.status}）`; }
-      renderRewards(); renderStatus();
+      renderRewards(); renderStatus(); renderParty(); renderPartySetup();
     },
     // 用英文帳號查觀眾：回傳 { login, display, userId }；查不到回 null；連不到 Twitch 回 undefined
     async lookupUser(login) {
@@ -250,9 +252,10 @@
       } catch { return undefined; }
     },
     // 由這個網頁建立品項：之後才能補抓漏掉的兌換、退點。proxy＝代抽用（觀眾兌換時要輸入幫誰抽）
-    async createReward(title, cost, proxy = false) {
+    async createReward(title, cost, proxy = false, prompt = '') {
       const body = { title, cost, is_enabled: true, should_redemptions_skip_request_queue: false };
       if (proxy) Object.assign(body, { is_user_input_required: true, prompt: '幫別人抽：輸入 @對方的名字或英文帳號（幫自己抽就隨便打一個字）' });
+      if (prompt) Object.assign(body, { is_user_input_required: true, prompt });
       const r = await this.helix(`/channel_points/custom_rewards?broadcaster_id=${auth.userId}`, { method: 'POST', body });
       if (r.status === 200 && r.json && r.json.data && r.json.data[0]) return r.json.data[0];
       const msg = (r.json && r.json.message) || '';
@@ -261,21 +264,31 @@
       if (r.status === 401) throw new Error('Twitch 登入過期了，請重新連接');
       throw new Error(`建立失敗（${r.status}${msg ? `：${msg}` : ''}）`);
     },
+    // 暫停／恢復品項（只對這個網頁建立的品項有效）
+    async pauseReward(id, paused) {
+      const r = await this.helix(`/channel_points/custom_rewards?broadcaster_id=${auth.userId}&id=${id}`, { method: 'PATCH', body: { is_paused: paused } });
+      if (r.status !== 200) throw new Error(r.status === 403 ? '這個品項是在 Twitch 後台手動建立的，網頁不能暫停它' : `Twitch 回應 ${r.status}`);
+    },
+    async unfulfilled(rid) {
+      const found = [];
+      let after = '';
+      for (let page = 0; page < 20; page++) {
+        const r = await this.helix(`/channel_points/custom_rewards/redemptions?broadcaster_id=${auth.userId}&reward_id=${rid}&status=UNFULFILLED&sort=OLDEST&first=50${after ? `&after=${after}` : ''}`);
+        if (r.status !== 200) break;
+        found.push(...(r.json.data || []));
+        after = r.json.pagination && r.json.pagination.cursor;
+        if (!after) break;
+      }
+      return found;
+    },
     // 補抓：Twitch 上還是「未完成」、但這個網頁沒處理過的兌換
     async catchUp() {
       if (!auth || !auth.userId || !this.canManage) return;
       const found = [];
-      for (const rid of cfg.rewardIds.filter((id) => this.managed.has(id))) {
-        let after = '';
-        for (let page = 0; page < 20; page++) {
-          const r = await this.helix(`/channel_points/custom_rewards/redemptions?broadcaster_id=${auth.userId}&reward_id=${rid}&status=UNFULFILLED&sort=OLDEST&first=50${after ? `&after=${after}` : ''}`);
-          if (r.status !== 200) break;
-          found.push(...(r.json.data || []));
-          after = r.json.pagination && r.json.pagination.cursor;
-          if (!after) break;
-        }
-      }
+      for (const rid of cfg.rewardIds.filter((id) => this.managed.has(id))) found.push(...(await this.unfulfilled(rid)));
       addMissed(found);
+      // 排隊陪玩：網頁關著時兌換的人直接排進隊伍（照兌換順序）
+      if (cfg.party.rewardId && this.managed.has(cfg.party.rewardId)) (await this.unfulfilled(cfg.party.rewardId)).forEach((x) => onPartyRedeem(x, true));
     },
     // 把兌換標成已完成 / 退點。回傳 Twitch 確認改好的 id
     async setRedemptions(rewardId, ids, status) {
@@ -366,12 +379,84 @@
 
   // ---------- 兌換 → 排隊 → 轉盤 ----------
   function onRedemption(ev) {
+    if (cfg.party.rewardId && ev.reward && ev.reward.id === cfg.party.rewardId) { onPartyRedeem(ev); return; }
     if (!cfg.rewardIds.includes(ev.reward && ev.reward.id)) return;
     if (queue.some((q) => q.id === ev.id) || records.some((r) => r.id === ev.id)) return; // Twitch 偶爾會重送
     queue.push({ id: ev.id, login: ev.user_login, display: ev.user_name, userId: ev.user_id || '', input: ev.user_input || '', reward: ev.reward.title, rewardId: ev.reward.id, at: ev.redeemed_at || new Date().toISOString() });
     missed = missed.filter((m) => m.id !== ev.id);
     saveQueue(); renderQueue(); pump();
   }
+
+  // ---------- 排隊陪玩 ----------
+  function onPartyRedeem(ev, quiet = false) {
+    const entry = T.partyEntry(ev);
+    const res = T.admitParty(party, entry, cfg.party);
+    if (res.dup) return;
+    if (res.reason) {
+      toast(`${entry.display} 的排隊沒有加入（${res.reason}），忠誠點已退還`, 6000);
+      partySet([entry], 'CANCELED');
+      return;
+    }
+    party = res.state; saveParty(); renderParty(); sendParty();
+    if (!quiet) toast(`${entry.display} 加入排隊（第 ${party.waiting.length} 位）`, 4000);
+  }
+  // 在 Twitch 上把兌換標成已完成（玩完）或退點（被移出）
+  async function partySet(entries, status) {
+    if (!entries.length || !auth || !auth.userId) return;
+    const byReward = new Map();
+    entries.forEach((e) => { if (!byReward.has(e.rewardId)) byReward.set(e.rewardId, []); byReward.get(e.rewardId).push(e.id); });
+    try {
+      for (const [rid, ids] of byReward) {
+        const res = await Twitch.setRedemptions(rid, ids, status);
+        if (res.notOurs && status === 'CANCELED') toast('這個品項是在 Twitch 後台手動建立的，網頁不能退點，請到 Twitch 的獎勵請求佇列處理', 8000);
+      }
+    } catch (e) { toast(`Twitch 沒有更新成功（${e.message}），可以到 Twitch 的獎勵請求佇列手動處理`, 8000); }
+  }
+  const sendParty = () => { if (cfg.party.rewardId) Sync.send(T.partyView(party, cfg.party)); };
+  function renderParty() {
+    const on = !!cfg.party.rewardId;
+    $('#partyBox').classList.toggle('hidden', !on);
+    if (!on) return;
+    const rw = Twitch.rewards && Twitch.rewards.find((r) => r.id === cfg.party.rewardId);
+    $('#partyTitle').textContent = cfg.party.title;
+    $('#partyCount').textContent = party.waiting.length;
+    $('#partyPaused').classList.toggle('hidden', !(rw && rw.paused));
+    $('#partyPause').textContent = rw && rw.paused ? '恢復排隊' : '暫停排隊';
+    $('#partyPause').disabled = !rw;
+    const row = (e, i, act) => `<li><span class="tw-li-main">${i != null ? `<span class="tw-no">${i + 1}</span>` : ''}${esc(e.display || e.login)}</span><span class="tw-li-sub">${e.input ? `遊戲 ID：${esc(e.input)} · ` : ''}${fmtTime(e.at)}</span><span class="tw-li-act">${act}</span></li>`;
+    $('#partyPlaying').innerHTML = party.playing.length
+      ? party.playing.map((e) => row(e, null, `<button class="btn icon" data-party-done="${esc(e.id)}" title="玩完了">完成</button>`)).join('')
+      : '<li class="tw-empty">按「下一輪」從隊伍叫人</li>';
+    $('#partyWaiting').innerHTML = party.waiting.length
+      ? party.waiting.map((e, i) => row(e, i, `<button class="btn icon ghost" data-party-remove="${esc(e.id)}" title="移出隊伍，可選擇退點">移出</button>`)).join('')
+      : '<li class="tw-empty">目前沒有人排隊</li>';
+    $('#partyNext').disabled = !party.playing.length && !party.waiting.length;
+  }
+  $('#partyNext').onclick = () => {
+    const res = T.nextRound(party, cfg.party.batch);
+    party = res.state; saveParty(); renderParty(); sendParty();
+    partySet(res.done, 'FULFILLED');
+    if (res.called.length) toast(`輪到：${res.called.map((e) => e.display).join('、')}`, 5000);
+  };
+  $('#partyBox').addEventListener('click', async (e) => {
+    const done = e.target.closest('[data-party-done]'); const rm = e.target.closest('[data-party-remove]');
+    const id = (done && done.dataset.partyDone) || (rm && rm.dataset.partyRemove);
+    const entry = id && [...party.playing, ...party.waiting].find((x) => x.id === id);
+    if (!entry) return;
+    let status = 'FULFILLED';
+    if (rm) {
+      if (!(await dialog({ title: `把 ${entry.display} 移出隊伍？`, message: '移出後會從排隊名單拿掉。', okLabel: '移出' }))) return;
+      const refund = await dialog({ title: '要退還忠誠點嗎？', message: `退還 ${entry.display} 兌換排隊花的忠誠點。`, okLabel: '退點' });
+      status = refund ? 'CANCELED' : 'FULFILLED';
+    }
+    party = T.removeParty(party, id); saveParty(); renderParty(); sendParty();
+    partySet([entry], status);
+  });
+  $('#partyPause').onclick = async () => {
+    const rw = Twitch.rewards && Twitch.rewards.find((r) => r.id === cfg.party.rewardId); if (!rw) return;
+    try { await Twitch.pauseReward(rw.id, !rw.paused); rw.paused = !rw.paused; toast(rw.paused ? '已暫停：觀眾暫時不能兌換排隊' : '已恢復排隊'); } catch (err) { toast(err.message, 6000); }
+    renderParty();
+  };
 
   // ---------- 小奇點、訂閱 → 依步驟 7 的規則轉幾次 ----------
   const seenEvents = new Set(); // Twitch 偶爾會重送同一則通知（小奇點零頭不能算兩次）
@@ -937,6 +1022,42 @@
     simulate('channel.cheer', { bits }, `${bits} 小奇點`);
   };
   $('#simSub').onclick = () => simulate('channel.subscribe', { tier: '1000', is_gift: false }, '新訂閱');
+
+  // 步驟 8：排隊陪玩
+  function renderPartySetup() {
+    const p = cfg.party;
+    const list = (Twitch.rewards || []).filter((r) => r.managed && !cfg.rewardIds.includes(r.id));
+    const cur = p.rewardId && !list.some((r) => r.id === p.rewardId) ? `<option value="${esc(p.rewardId)}" selected>（目前的品項，清單裡找不到）</option>` : '';
+    $('#partyReward').innerHTML = `<option value="">（不使用排隊）</option>${cur}${list.map((r) => `<option value="${esc(r.id)}"${r.id === p.rewardId ? ' selected' : ''}>${esc(r.title)}（${r.cost.toLocaleString()} 點）</option>`).join('')}`;
+    $('#partyMax').value = p.max; $('#partyBatch').value = p.batch; $('#partyShow').value = p.show; $('#partyTitleInput').value = p.title; $('#partyShowInput').checked = p.showInput;
+    $('#createPartyReward').disabled = !(auth && auth.userId && Twitch.canManage);
+    $('#step8').classList.toggle('done', !!p.rewardId);
+  }
+  const partyChanged = () => { cfg = T.normalizeTwConfig(cfg); saveCfg(); renderPartySetup(); renderParty(); sendParty(); };
+  $('#partyReward').onchange = () => { cfg.party.rewardId = $('#partyReward').value; partyChanged(); };
+  [['#partyMax', 'max'], ['#partyBatch', 'batch'], ['#partyShow', 'show']].forEach(([sel, k]) => { $(sel).onchange = () => { cfg.party[k] = Number($(sel).value); partyChanged(); }; });
+  $('#partyTitleInput').onchange = () => { cfg.party.title = $('#partyTitleInput').value; partyChanged(); };
+  $('#partyShowInput').onchange = () => { cfg.party.showInput = $('#partyShowInput').checked; partyChanged(); };
+  $('#createPartyReward').onclick = async () => {
+    const title = $('#partyRewardTitle').value.trim();
+    const cost = Math.trunc(Number($('#partyRewardCost').value));
+    const err = $('#partyErr');
+    const fail = (m) => { err.textContent = m; err.classList.remove('hidden'); };
+    if (!title) return fail('請填品項名稱');
+    if (!(cost >= 1)) return fail('忠誠點至少要 1 點');
+    $('#createPartyReward').disabled = true;
+    try {
+      const r = await Twitch.createReward(title, cost, false, $('#partyRewardInput').checked ? '填你在遊戲裡的名字或 ID' : '');
+      cfg.party.rewardId = r.id; err.classList.add('hidden');
+      toast(`已在 Twitch 建立「${r.title}」，排隊功能開始了`);
+      await Twitch.loadRewards(); partyChanged();
+    } catch (e) { fail(e.message); } finally { renderPartySetup(); }
+  };
+  function partyObsUrl() {
+    const base = location.href.split(/[?#]/)[0].replace(/twitch\.html$/, '');
+    return `${base}queue.html?${new URLSearchParams({ room: cfg.room, key: cfg.secret })}`;
+  }
+  $('#copyPartyObs').onclick = async () => { if (await copyText(partyObsUrl(), '「排隊名單」網址')) toast('已複製「排隊名單」網址：貼到 OBS 的「來源 → 瀏覽器」', 5000); };
   $('#cutoffHour').innerHTML = Array.from({ length: 9 }, (_, h) => `<option value="${h}">${h === 0 ? '0 點（不跨夜，照日曆）' : `${h} 點`}</option>`).join('');
   $('#cutoffHour').value = cfg.cutoffHour;
   $('#cutoffHour').onchange = () => { cfg.cutoffHour = Number($('#cutoffHour').value); saveCfg(); };
@@ -984,7 +1105,7 @@
   function showSetup(step) {
     $('#setupView').classList.remove('hidden'); $('#liveView').classList.add('hidden');
     $('#toSetup').classList.add('hidden'); $('#toLive').classList.remove('hidden');
-    renderSetup(); renderRewards(); renderPrizes(); renderTriggers();
+    renderSetup(); renderRewards(); renderPrizes(); renderTriggers(); renderPartySetup();
     if (step) setTimeout(() => $(`#step${step}`).scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
   }
   function showLive() {
@@ -1036,7 +1157,7 @@
   $('#scriptUrl').value = cfg.scriptUrl;
   $('#clientId').value = cfg.clientId;
   renderMoved();
-  renderQueue(); renderRecords(); renderStatus();
+  renderQueue(); renderRecords(); renderStatus(); renderParty();
   if (cfg.setupDone && !Twitch.error) showLive(); else showSetup();
 
   if (!(await becomeLeader())) {
@@ -1048,7 +1169,7 @@
 
   Sync.onStatus = () => renderStatus();
   Sync.on((msg) => {
-    if (msg.type === 'hello') { obsSeen = Date.now(); sendConfig(); renderStatus(); }
+    if (msg.type === 'hello') { obsSeen = Date.now(); sendConfig(); sendParty(); renderStatus(); }
     else if (msg.type === 'pong') { obsSeen = Date.now(); renderStatus(); toast('OBS 畫面有回應 ✓'); }
   });
   Sync.start(cfg.room, { sync: cfg.sync, broker: cfg.broker, secret: cfg.secret });

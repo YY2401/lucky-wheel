@@ -215,3 +215,9 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; }
 .tw-trig .tw-choice > span { flex: 1; min-width: 0; }
 .tw-sub-opt { display: flex; }
 @media (max-width: 560px) { .tw-trig { padding: 10px; } .tw-trig .tw-choice { padding: 8px; } .tw-num { width: 70px; } }
+
+/* ---------- 排隊陪玩 ---------- */
+.tw-party .tw-party-now { padding: 8px 10px; border: var(--border-w) solid var(--ink); border-radius: 10px; background: color-mix(in srgb, var(--green) 14%, var(--surface)); }
+.tw-party .tw-party-now .tw-list { margin-top: 4px; }
+.tw-party .tw-party-label { display: block; margin: 10px 0 2px; }
+.tw-party .tw-no { font-weight: 900; color: var(--muted); margin-right: 6px; }

@@ -171,6 +171,53 @@ if (!H.chromePath()) {
     assert.deepEqual(page.errors, []);
   });
 
+  test('排隊陪玩：兌換加入、重複排退點、下一輪叫號並標成完成、移出可退點、OBS 排隊名單同步、暫停', async (t) => {
+    const page = await open(t, { config: { ...READY, party: { rewardId: 'rwq', batch: 1, show: 5 } }, before: (p) => p.evaluate(() => localStorage.setItem('mock.party', '1')) });
+    await waitFor(() => page.evaluate(() => window.__tw.subscribed));
+    assert.equal(await page.$eval('#partyBox', (e) => e.classList.contains('hidden')), false);
+    const q = (id, login, input = '') => ({ id, user_login: login, user_name: login.toUpperCase(), user_id: `u${login}`, user_input: input, reward: { id: 'rwq', title: '排隊陪玩' } });
+    await page.evaluate((a, b, c) => { window.__tw.redeem(a); window.__tw.redeem(b); window.__tw.redeem(c); }, q('q1', 'amy', 'Amy#1'), q('q2', 'bob'), q('q3', 'amy'));
+    await waitFor(() => page.$eval('#partyCount', (e) => e.textContent === '2'));
+    await waitFor(() => page.evaluate(() => window.__tw.patches.some((x) => x.status === 'CANCELED' && x.ids.includes('q3')))); // 同一人重複排：退點
+    assert.match(await page.$eval('#partyWaiting', (e) => e.textContent), /1AMY.*Amy#1.*2BOB/s);
+    assert.equal((await records(page)).length, 0); // 不會轉盤
+    // OBS 排隊名單（同一個瀏覽器）
+    const cfg = await H.readKey(page, 'tw.config');
+    const ov = await H.newPage(browser); t.after(() => ov.close());
+    await ov.goto(`${srv.url}/queue.html?room=${cfg.room}&key=${cfg.secret}&sync=0`, { waitUntil: 'networkidle0' });
+    await waitFor(() => ov.$eval('#waiting', (e) => /AMY.*BOB/s.test(e.textContent)));
+    assert.ok(!(await ov.$eval('#card', (e) => e.textContent)).includes('Amy#1'), '預設不公開遊戲 ID');
+    // 下一輪：amy 上場；再下一輪：amy 標成完成、bob 上場（背景分頁點不到按鈕，先切回控制面板）
+    await page.bringToFront();
+    await page.click('#partyNext');
+    await waitFor(() => page.$eval('#partyPlaying', (e) => /AMY/.test(e.textContent)));
+    await waitFor(() => ov.$eval('#playing', (e) => /AMY/.test(e.textContent)));
+    await page.click('#partyNext');
+    await waitFor(() => page.evaluate(() => window.__tw.patches.some((x) => x.status === 'FULFILLED' && x.ids.includes('q1'))));
+    assert.match(await page.$eval('#partyPlaying', (e) => e.textContent), /BOB/);
+    // 移出並退點
+    await page.evaluate((c) => window.__tw.redeem(c), q('q4', 'cat'));
+    await waitFor(() => page.$('[data-party-remove="q4"]'));
+    await page.click('[data-party-remove="q4"]'); await page.click('#confirmOk'); await H.sleep(200); await page.click('#confirmOk');
+    await waitFor(() => page.evaluate(() => window.__tw.patches.some((x) => x.status === 'CANCELED' && x.ids.includes('q4'))));
+    assert.equal(await page.$eval('#partyCount', (e) => e.textContent), '0');
+    // 暫停排隊
+    await page.click('#partyPause');
+    await waitFor(() => page.$eval('#partyPaused', (e) => !e.classList.contains('hidden')));
+    assert.equal(await page.evaluate(() => window.__tw.rewards.find((r) => r.id === 'rwq').is_paused), true);
+    assert.deepEqual(page.errors, []); assert.deepEqual(ov.errors || [], []);
+  });
+
+  test('排隊陪玩：網頁關著時兌換的人，打開後自動排進隊伍', async (t) => {
+    const page = await open(t, { config: { ...READY, party: { rewardId: 'rwq' } }, before: (p) => p.evaluate(() => {
+      localStorage.setItem('mock.party', '1');
+      localStorage.setItem('mock.unfulfilled', JSON.stringify([{ id: 'off1', user_login: 'zed', user_name: 'Zed', user_id: 'uz', user_input: 'Z#9', redeemed_at: '2026-10-24T10:00:00Z', reward: { id: 'rwq', title: '排隊陪玩' } }]));
+    }) });
+    await waitFor(() => page.$eval('#partyWaiting', (e) => /Zed.*Z#9/s.test(e.textContent)));
+    assert.deepEqual(await page.evaluate(() => window.__tw.patches), []);
+    assert.deepEqual(page.errors, []);
+  });
+
   test('試算表連不上：紀錄留著、自動重試，恢復後補寫；單筆錯誤可按重試', async (t) => {
     const page = await open(t);
     await waitFor(() => page.evaluate(() => window.__tw.subscribed));
@@ -414,7 +461,7 @@ if (!H.chromePath()) {
     const pages = JSON.parse(require('node:fs').readFileSync(require('node:path').join(H.ROOT, 'docs/guide-pages.json'), 'utf8'));
     await waitFor(() => page.$eval('[data-guide="step3"]', (a) => a.getAttribute('href').includes('#page=')));
     const links = await page.$$eval('[data-guide]', (as) => as.map((a) => [a.dataset.guide, a.getAttribute('href')]));
-    assert.equal(links.length, 8);
+    assert.equal(links.length, 9);
     for (const [k, href] of links) assert.ok(href.endsWith(`#page=${pages[k]}`), `${k} ${href}`);
     for (const href of [links[0][1].split('#')[0], await page.$eval('#openGuide', (a) => a.getAttribute('href'))]) {
       const r = await page.evaluate((u) => fetch(u).then((x) => x.status + ' ' + x.headers.get('content-type')), href);

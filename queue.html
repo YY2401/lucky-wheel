@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>排隊名單</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Noto+Sans+TC:wght@500;700;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.1/mqtt.min.js"></script>
+<style>
+  /* OBS 的「排隊名單」畫面：背景透明，跟轉盤同一套色票 */
+  :root { --ink: #141414; --paper: #fffdf7; --muted: #5c5850; --yellow: #ffcf33; --green: #22a06b; --red: #e63b3b; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: transparent; }
+  body { font-family: "Noto Sans TC", "Microsoft JhengHei", sans-serif; color: var(--ink); padding: 14px; }
+  .card { background: var(--paper); border: 3px solid var(--ink); border-radius: 16px; box-shadow: 5px 5px 0 var(--ink); padding: 12px 16px 14px; max-width: 420px; }
+  .head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+  .title { background: var(--yellow); border: 3px solid var(--ink); border-radius: 10px; padding: 2px 12px; font-size: 22px; font-weight: 900; transform: rotate(-2deg); }
+  .count { font-size: 15px; font-weight: 700; color: var(--muted); white-space: nowrap; }
+  .count b { font-family: "Bungee", sans-serif; font-size: 20px; color: var(--ink); }
+  .label { font-size: 13px; font-weight: 900; color: var(--muted); margin: 8px 0 4px; letter-spacing: 1px; }
+  .now { background: color-mix(in srgb, var(--green) 18%, var(--paper)); border: 2px solid var(--ink); border-radius: 10px; padding: 6px 10px; }
+  ul, ol { list-style: none; margin: 0; padding: 0; }
+  li { display: flex; align-items: baseline; gap: 10px; padding: 5px 0; font-size: 20px; font-weight: 700; border-top: 1.5px dashed rgba(20, 20, 20, .2); overflow: hidden; }
+  li:first-child { border-top: 0; }
+  .no { font-family: "Bungee", sans-serif; font-size: 18px; color: var(--muted); min-width: 1.4em; text-align: right; }
+  .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .id { font-size: 14px; font-weight: 500; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .empty { color: var(--muted); font-size: 15px; font-weight: 500; }
+  .more { font-size: 14px; color: var(--muted); margin-top: 4px; }
+  li.new { animation: pop .5s ease-out; }
+  @keyframes pop { from { transform: translateX(-12px); opacity: 0; } }
+  .hidden { display: none !important; }
+  /* 收不到控制面板訊息時才顯示（連線正常時不出現在直播畫面上） */
+  .warn { margin-top: 8px; font-size: 13px; color: #fff; background: var(--red); border-radius: 8px; padding: 6px 10px; max-width: 420px; }
+</style>
+</head>
+<body>
+<div class="card hidden" id="card">
+  <div class="head"><span class="title" id="title">排隊陪玩</span><span class="count">排隊 <b id="total">0</b> 人</span></div>
+  <div class="label">正在玩</div>
+  <div class="now"><ul id="playing"></ul></div>
+  <div class="label">接下來</div>
+  <ol id="waiting"></ol>
+  <div class="more hidden" id="more"></div>
+</div>
+<div class="warn hidden" id="warn"></div>
+<script src="core.js?v=67"></script>
+<script src="sync.js?v=67"></script>
+<script src="queue.js?v=67"></script>
+</body>
+</html>
