@@ -6,7 +6,7 @@ import pypdfium2 as pdfium
 HERE = os.path.dirname(os.path.abspath(__file__))
 PDF = os.path.join(HERE, '忠誠點轉盤使用說明.pdf')
 # 章節標題開頭 → 網頁上的步驟
-WANT = {'step1': '設定步驟 1', 'step2': '設定步驟 2', 'step3': '設定步驟 3', 'step4': '設定步驟 4', 'step5': '設定步驟 5', 'step6': '設定步驟 6', 'step7': '設定步驟 7', 'step8': '設定步驟 8', 'faq': '出問題怎麼辦'}
+WANT = {'step1': '設定步驟 1', 'step2': '設定步驟 2', 'step3': '設定步驟 3', 'step4': '設定步驟 4', 'step5': '設定步驟 5', 'step6': '設定步驟 6', 'step7': '設定步驟 7', 'step8': '設定步驟 8', 'step9': '設定步驟 9', 'faq': '出問題怎麼辦'}
 
 doc = pdfium.PdfDocument(PDF)
 found = {}

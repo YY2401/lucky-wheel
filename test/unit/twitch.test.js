@@ -537,3 +537,28 @@ test('排隊：OBS 畫面只送前幾位，預設不公開遊戲 ID', () => {
   v = tw.partyView(s, tw.normalizeParty({ showInput: true }));
   assert.equal(v.playing[0].input, 'Pat#1');
 });
+
+// ---------- 小奇點點歌 ----------
+test('點歌：從訊息找 YouTube 影片編號', () => {
+  const id = 'dQw4w9WgXcQ';
+  for (const t of [`Cheer100 https://www.youtube.com/watch?v=${id}`, `cheer200 https://youtu.be/${id}?si=abc`, `Cheer100 https://m.youtube.com/watch?feature=share&v=${id}`, `Cheer100 https://youtube.com/shorts/${id}`, `Cheer100 https://music.youtube.com/watch?v=${id}&list=x`, `Cheer100 ${id} 謝謝`]) assert.equal(tw.youtubeId(t), id, t);
+  assert.equal(tw.youtubeId('Cheer100 加油加油'), '');
+  assert.equal(tw.youtubeId('Cheer100 abcdefghijk'), ''); // 一般英文字不當成編號
+});
+
+test('點歌：門檻、封鎖、同一首、每人上限都不排，列進「沒播的點歌」；照時間排、播下一首', () => {
+  const rule = tw.normalizeSongs({ on: true, minBits: 100, perUser: 1, blocked: ['BBBBBBBBBB1'] });
+  const r = (id, login, videoId, bits = 100) => ({ id, login, display: login, userId: `u${login}`, videoId, bits, at: '' });
+  let s = { now: null, queue: [], missed: [] };
+  s = tw.admitSong(s, r('1', 'amy', 'AAAAAAAAAA1'), rule).state;
+  assert.equal(tw.admitSong(s, r('1', 'amy', 'AAAAAAAAAA1'), rule).dup, true);
+  for (const [req, why] of [[r('2', 'bob', 'CCCCCCCCCC1', 99), /不到 100/], [r('3', 'bob', 'BBBBBBBBBB1'), /封鎖/], [r('4', 'bob', 'AAAAAAAAAA1'), /已經在隊伍/], [r('5', 'amy', 'DDDDDDDDDD1'), /最多點 1 首/], [r('6', 'bob', ''), /沒有 YouTube/]]) {
+    const x = tw.admitSong(s, req, rule); assert.match(x.reason, why); s = x.state;
+  }
+  assert.equal(s.missed.length, 5);
+  s = tw.admitSong(s, r('7', 'bob', 'EEEEEEEEEE1'), rule).state;
+  s = tw.nextSong(s);
+  assert.deepEqual([s.now.id, s.queue.map((x) => x.id)], ['1', ['7']]);
+  const v = tw.songView(s, rule);
+  assert.deepEqual([v.now.videoId, v.next.length, v.maxSec], ['AAAAAAAAAA1', 1, 360]);
+});

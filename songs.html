@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>點歌播放器</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Noto+Sans+TC:wght@500;700;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.1/mqtt.min.js"></script>
+<style>
+  /* OBS「點歌播放器」：背景透明。播放 YouTube（聲音從這個來源出來），顯示正在播的歌和接下來幾首 */
+  :root { --ink: #141414; --paper: #fffdf7; --muted: #5c5850; --yellow: #ffcf33; --green: #22a06b; --red: #e63b3b; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: transparent; }
+  body { font-family: "Noto Sans TC", "Microsoft JhengHei", sans-serif; color: var(--ink); padding: 14px; }
+  .card { background: var(--paper); border: 3px solid var(--ink); border-radius: 16px; box-shadow: 5px 5px 0 var(--ink); padding: 12px 16px 14px; max-width: 460px; }
+  .head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+  .title { background: var(--yellow); border: 3px solid var(--ink); border-radius: 10px; padding: 2px 12px; font-size: 22px; font-weight: 900; transform: rotate(-2deg); }
+  .count { font-size: 15px; font-weight: 700; color: var(--muted); white-space: nowrap; }
+  .count b { font-family: "Bungee", sans-serif; font-size: 20px; color: var(--ink); }
+  .video { position: relative; width: 100%; aspect-ratio: 16 / 9; border: 2px solid var(--ink); border-radius: 10px; overflow: hidden; background: #000; }
+  .video.off { position: absolute; width: 320px; height: 180px; opacity: 0; pointer-events: none; } /* 不顯示影片時還是要留著播放器（YouTube 要求播放器有大小） */
+  .video iframe { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .now { margin-top: 8px; background: color-mix(in srgb, var(--green) 18%, var(--paper)); border: 2px solid var(--ink); border-radius: 10px; padding: 6px 10px; }
+  .now .song { font-size: 19px; font-weight: 900; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .now .who, .label { font-size: 13px; font-weight: 700; color: var(--muted); }
+  .label { margin: 8px 0 2px; font-weight: 900; letter-spacing: 1px; }
+  ol { list-style: none; margin: 0; padding: 0; }
+  li { display: flex; align-items: baseline; gap: 10px; padding: 4px 0; font-size: 16px; font-weight: 700; border-top: 1.5px dashed rgba(20, 20, 20, .2); }
+  li:first-child { border-top: 0; }
+  .no { font-family: "Bungee", sans-serif; color: var(--muted); min-width: 1.4em; text-align: right; }
+  .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .by { font-size: 13px; font-weight: 500; color: var(--muted); white-space: nowrap; }
+  .more { font-size: 13px; color: var(--muted); margin-top: 2px; }
+  .paused { color: var(--red); }
+  .hidden { display: none !important; }
+  .warn { margin-top: 8px; font-size: 13px; color: #fff; background: var(--red); border-radius: 8px; padding: 6px 10px; max-width: 460px; }
+</style>
+</head>
+<body>
+<div class="card hidden" id="card">
+  <div class="head"><span class="title">點歌</span><span class="count">接下來 <b id="total">0</b> 首</span></div>
+  <div class="video" id="video"><div id="player"></div></div>
+  <div class="now" id="nowBox"><div class="song" id="song"></div><div class="who" id="who"></div></div>
+  <div id="nextBox"><div class="label">接下來</div><ol id="next"></ol><div class="more hidden" id="more"></div></div>
+</div>
+<div class="warn hidden" id="warn"></div>
+<script src="core.js?v=68"></script>
+<script src="sync.js?v=68"></script>
+<script src="songs.js?v=68"></script>
+<script src="https://www.youtube.com/iframe_api"></script>
+</body>
+</html>

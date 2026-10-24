@@ -8,8 +8,8 @@
 <script>try { document.documentElement.dataset.theme = localStorage.getItem('tw.theme') || 'light'; } catch (e) { document.documentElement.dataset.theme = 'light'; }</script>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=67">
-<link rel="stylesheet" href="twitch.css?v=67">
+<link rel="stylesheet" href="style.css?v=68">
+<link rel="stylesheet" href="twitch.css?v=68">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.1/mqtt.min.js"></script>
 </head>
 <body class="tw">
@@ -253,6 +253,29 @@
     </div>
   </section>
 
+  <section class="tw-step optional" id="step9">
+    <div class="tw-step-num">9</div>
+    <div class="tw-step-body">
+      <h2>小奇點點歌 <small>（可略過）</small> <a class="tw-guide-step" data-guide="step9" target="_blank" rel="noopener" title="打開說明書的這一步（有截圖）">看圖解</a></h2>
+      <p class="hint">觀眾送小奇點時在訊息貼 YouTube 連結，送到門檻就照時間排隊，在 OBS 的「點歌播放器」自動一首接一首播。</p>
+      <p class="tw-check bad"><b>版權請自己把關</b>：網頁沒辦法判斷歌有沒有版權。在 Twitch 播有版權的音樂可能被檢舉（DMCA）。請公告「只能點免版權歌」，播到不對的歌就按「下一首」，按「封鎖這首」以後就不會再播。</p>
+      <p class="tw-check hidden" id="songState"></p>
+      <label class="tw-trig-head"><input type="checkbox" id="songOn"> 開放小奇點點歌</label>
+      <div class="tw-grid">
+        <label class="tw-field">每首最少 <input type="number" id="songMin" min="1" step="1" class="tw-num"> 小奇點</label>
+        <label class="tw-field">每人同時最多 <input type="number" id="songPerUser" min="1" max="50" step="1" class="tw-num"> 首</label>
+        <label class="tw-field">每首最長播 <input type="number" id="songMaxMin" min="0" max="60" step="1" class="tw-num"> 分鐘（0＝不限）</label>
+        <label class="tw-field">OBS 上顯示接下來 <input type="number" id="songShow" min="1" max="20" step="1" class="tw-num"> 首</label>
+        <label class="tw-field">音量 <input type="range" id="songVolume" min="0" max="100"></label>
+      </div>
+      <p class="hint">送小奇點的訊息有貼 YouTube 連結，就只算點歌、不會觸發步驟 7 的轉盤；沒貼連結的照步驟 7 的規則轉盤。小奇點不到門檻、同一首已經在隊伍裡、超過每人上限的，不會播，會列在直播畫面的「沒播的點歌」給你處理（小奇點不能退）。</p>
+      <ol class="tw-howto">
+        <li><button class="btn primary" id="copySongObs">複製「點歌播放器」網址</button> <small class="hint">（貼到 OBS 的<b>來源 → 瀏覽器</b>，寬 500、高 600，勾「使用 OBS 控制音訊」；聲音從這個來源出來）</small></li>
+        <li><button class="btn" id="copySongRule">複製點歌說明</button> <small class="hint">（貼到 Twitch 的資訊面板或聊天室，告訴觀眾怎麼點）</small></li>
+      </ol>
+    </div>
+  </section>
+
   <div class="tw-setup-foot">
     <button class="btn primary big" id="finishSetup">完成，開始直播 →</button>
     <p class="hint" id="finishHint"></p>
@@ -271,6 +294,22 @@
     </div>
   </section>
   <aside class="tw-side">
+    <div class="tw-box tw-party hidden" id="songBox">
+      <h3>小奇點點歌 <span class="tw-count" id="songCount">0</span> <span class="tw-tag meh hidden" id="songPausedTag">暫停中</span></h3>
+      <div class="tw-party-now"><b>正在播</b><ul class="tw-list" id="songNow"></ul></div>
+      <div class="tw-row">
+        <button class="btn primary" id="songSkip" title="切到下一首">下一首 →</button>
+        <button class="btn ghost" id="songPause">暫停</button>
+        <button class="btn ghost" id="songBlock" title="跳過，以後有人再點這首也不播">封鎖這首</button>
+        <button class="btn ghost" id="songAdd" title="自己貼一個 YouTube 連結排進隊伍">＋ 加一首</button>
+      </div>
+      <b class="tw-party-label">接下來</b>
+      <ol class="tw-list" id="songQueue"></ol>
+      <details class="tw-song-missed hidden" id="songMissedBox"><summary>沒播的點歌 <span class="tw-count" id="songMissedCount">0</span></summary>
+        <p class="hint">小奇點不能退。這些沒有排進隊伍（原因寫在旁邊），可以按「播」照樣排進去，或刪掉。</p>
+        <ul class="tw-list" id="songMissed"></ul>
+      </details>
+    </div>
     <div class="tw-box tw-party hidden" id="partyBox">
       <h3><span id="partyTitle">排隊陪玩</span> <span class="tw-count" id="partyCount">0</span> <span class="tw-tag meh hidden" id="partyPaused">已暫停</span></h3>
       <div class="tw-party-now"><b>正在玩</b><ul class="tw-list" id="partyPlaying"></ul></div>
@@ -340,12 +379,12 @@
 </div>
 <div id="toast"></div>
 
-<script src="core.js?v=67"></script>
-<script src="twitch-core.js?v=67"></script>
-<script src="wheel.js?v=67"></script>
-<script src="ui.js?v=67"></script>
-<script src="store.js?v=67"></script>
-<script src="sync.js?v=67"></script>
-<script src="twitch.js?v=67"></script>
+<script src="core.js?v=68"></script>
+<script src="twitch-core.js?v=68"></script>
+<script src="wheel.js?v=68"></script>
+<script src="ui.js?v=68"></script>
+<script src="store.js?v=68"></script>
+<script src="sync.js?v=68"></script>
+<script src="twitch.js?v=68"></script>
 </body>
 </html>

@@ -14,7 +14,7 @@
   const SCOPES = 'channel:read:redemptions channel:manage:redemptions bits:read channel:read:subscriptions';
   const CHEER_TYPE = 'channel.cheer';
   const SUB_TYPES = ['channel.subscribe', 'channel.subscription.message', 'channel.subscription.gift'];
-  const K = { config: 'tw.config', records: 'tw.records', queue: 'tw.queue', auth: 'tw.auth', party: 'tw.party' };
+  const K = { config: 'tw.config', records: 'tw.records', queue: 'tw.queue', auth: 'tw.auth', party: 'tw.party', songs: 'tw.songs' };
   const MAX_RECORDS = 1000;
 
   Store.onError = (e) => toast(`儲存失敗：${e.message}`, 6000);
@@ -29,6 +29,8 @@
   const saveQueue = () => Store.set(K.queue, queue);
   const saveAuth = () => Store.set(K.auth, auth);
   const saveParty = () => Store.set(K.party, party);
+  let songs = Store.get(K.songs, null) || { now: null, queue: [], missed: [], paused: false }; // 小奇點點歌：正在播、接下來、沒播的
+  const saveSongs = () => Store.set(K.songs, songs);
   saveCfg(); // 第一次開啟時把產生的暗號、頻道代碼存下來
 
   // 放在 OBS 自訂瀏覽器停駐視窗裡：網址帶 ?dock=1（登入 Twitch 回來網址會變，所以記在 sessionStorage）
@@ -360,7 +362,7 @@
     async subscribeExtras() {
       clearTimeout(this.extraTimer);
       if (!this.session || !auth || !auth.userId || this.state !== 'online') { renderTriggers(); return; }
-      const want = [...(cfg.triggers.bits.on ? [[CHEER_TYPE, this.canBits]] : []), ...(cfg.triggers.sub.on ? SUB_TYPES.map((t) => [t, this.canSubs]) : [])];
+      const want = [...(cfg.triggers.bits.on || cfg.songs.on ? [[CHEER_TYPE, this.canBits]] : []), ...(cfg.triggers.sub.on ? SUB_TYPES.map((t) => [t, this.canSubs]) : [])];
       let scope = false; let fail = 0;
       for (const [type, can] of want) {
         if (this.subscribed.has(type)) continue;
@@ -372,7 +374,7 @@
       }
       this.extraError = scope ? 'scope' : fail ? `收不到小奇點／訂閱通知（Twitch 回應 ${fail}），稍後自動重試` : '';
       if (fail) this.extraTimer = setTimeout(() => this.subscribeExtras(), 60000);
-      renderStatus(); renderTriggers();
+      renderStatus(); renderTriggers(); renderSongSetup();
     },
     setState(s, err = '') { this.state = s; this.error = err; renderStatus(); renderSetup(); },
   };
@@ -458,12 +460,83 @@
     renderParty();
   };
 
+  // ---------- 小奇點點歌 ----------
+  function onSongCheer(ev, msgId) {
+    const named = !!ev.user_login && ev.is_anonymous !== true;
+    const req = { id: `song-${msgId}`, videoId: T.youtubeId(ev.message), bits: Number(ev.bits) || 0, login: named ? String(ev.user_login).toLowerCase() : '', display: named ? ev.user_name || ev.user_login : '匿名', userId: named ? String(ev.user_id || '') : '', title: '', at: new Date().toISOString() };
+    const res = T.admitSong(songs, req, cfg.songs);
+    if (res.dup) return;
+    songs = res.state;
+    if (res.reason) toast(`${req.display} 的點歌沒有排進去（${res.reason}），列在「沒播的點歌」`, 7000);
+    else { if (!songs.now) songs = T.nextSong(songs); toast(`${req.display} 點了一首歌（${songs.now && songs.now.id === req.id ? '馬上播' : `排第 ${songs.queue.length} 首`}）`, 4000); }
+    songsChanged();
+  }
+  const songsChanged = () => { saveSongs(); renderSongs(); sendSongs(); };
+  const sendSongs = () => { if (cfg.songs.on || songs.now || songs.queue.length) Sync.send({ ...T.songView(songs, cfg.songs), paused: songs.paused }); };
+  // OBS 點歌播放器回報：讀到歌名、播完、播不了
+  const YT_ERR = { 2: '連結格式不對', 5: '這部影片播不了', 100: '影片不存在或已經刪除', 101: '影片作者不允許在其他網站播放', 150: '影片作者不允許在其他網站播放' };
+  function onSongEvent(msg) {
+    if (!songs.now || msg.id !== songs.now.id) return; // 好幾個 OBS 來源同時回報時只算一次
+    if (msg.event === 'title') { if (songs.now.title !== msg.title) { songs.now.title = String(msg.title || '').slice(0, 120); songsChanged(); } return; }
+    if (msg.event === 'error') songs.missed = [{ ...songs.now, reason: YT_ERR[msg.code] || `播放失敗（${msg.code}）` }, ...songs.missed].slice(0, 50);
+    songs = { ...T.nextSong(songs), paused: false };
+    songsChanged();
+  }
+  function renderSongs() {
+    const on = cfg.songs.on || !!songs.now || songs.queue.length > 0 || songs.missed.length > 0;
+    $('#songBox').classList.toggle('hidden', !on);
+    if (!on) return;
+    const ytLink = (x) => `https://youtu.be/${x.videoId}`;
+    const row = (x, i, act, sub) => `<li><span class="tw-li-main">${i != null ? `<span class="tw-no">${i + 1}</span>` : ''}${esc(x.title || ytLink(x))}</span><span class="tw-li-sub">${esc(sub || `${x.display}${x.bits ? ` · ${x.bits} 小奇點` : ''} · ${fmtTime(x.at)}`)}</span><span class="tw-li-act">${act}</span></li>`;
+    $('#songCount').textContent = songs.queue.length;
+    $('#songPausedTag').classList.toggle('hidden', !songs.paused);
+    $('#songPause').textContent = songs.paused ? '繼續' : '暫停';
+    $('#songNow').innerHTML = songs.now ? row(songs.now, null, '') : '<li class="tw-empty">目前沒有歌</li>';
+    $('#songQueue').innerHTML = songs.queue.length ? songs.queue.map((x, i) => row(x, i, `<button class="btn icon ghost" data-song-remove="${esc(x.id)}">刪除</button>`)).join('') : '<li class="tw-empty">沒有排隊的歌</li>';
+    $('#songMissedBox').classList.toggle('hidden', !songs.missed.length);
+    $('#songMissedCount').textContent = songs.missed.length;
+    $('#songMissed').innerHTML = songs.missed.map((x) => row(x, null, `${x.videoId ? `<button class="btn icon" data-song-play="${esc(x.id)}">播</button>` : ''}<button class="btn icon ghost" data-song-drop="${esc(x.id)}">刪除</button>`, `${x.display}${x.bits ? ` · ${x.bits} 小奇點` : ''} · ${x.reason}`)).join('');
+    ['#songSkip', '#songPause', '#songBlock'].forEach((sel) => { $(sel).disabled = !songs.now; });
+  }
+  $('#songSkip').onclick = () => { songs = { ...T.nextSong(songs), paused: false }; songsChanged(); };
+  $('#songPause').onclick = () => { songs.paused = !songs.paused; songsChanged(); };
+  $('#songBlock').onclick = async () => {
+    if (!songs.now) return;
+    if (!(await dialog({ title: '封鎖這首？', message: `「${songs.now.title || songs.now.videoId}」會馬上跳過，以後有人再點也不會播。`, okLabel: '封鎖' }))) return;
+    cfg.songs.blocked = [...cfg.songs.blocked, songs.now.videoId]; cfg = T.normalizeTwConfig(cfg); saveCfg();
+    songs = { ...T.nextSong(songs), paused: false }; songsChanged();
+  };
+  $('#songAdd').onclick = async () => {
+    const v = await dialog({ title: '加一首歌', message: '貼上 YouTube 連結：', input: '', okLabel: '加入' });
+    if (v === null) return;
+    const videoId = T.youtubeId(v);
+    if (!videoId) { toast('看不出是 YouTube 連結'); return; }
+    const me = (auth && (auth.name || auth.login)) || '實況主';
+    const res = T.admitSong(songs, { id: `song-m-${randId(8)}`, videoId, bits: 0, login: '', display: me, userId: '', title: '', at: new Date().toISOString() }, { ...cfg.songs, minBits: 0, blocked: [] });
+    if (res.reason) { toast(res.reason); return; }
+    songs = res.state; if (!songs.now) songs = T.nextSong(songs); songsChanged();
+  };
+  $('#songBox').addEventListener('click', (e) => {
+    const rm = e.target.closest('[data-song-remove]'); const play = e.target.closest('[data-song-play]'); const drop = e.target.closest('[data-song-drop]');
+    if (rm) songs = { ...songs, queue: songs.queue.filter((x) => x.id !== rm.dataset.songRemove) };
+    else if (drop) songs = { ...songs, missed: songs.missed.filter((x) => x.id !== drop.dataset.songDrop) };
+    else if (play) { // 實況主決定照樣播：排到隊伍最後面
+      const x = songs.missed.find((m) => m.id === play.dataset.songPlay); if (!x) return;
+      const { reason, ...item } = x; void reason;
+      songs = { ...songs, missed: songs.missed.filter((m) => m.id !== x.id), queue: [...songs.queue, item] };
+      if (!songs.now) songs = T.nextSong(songs);
+    } else return;
+    songsChanged();
+  });
+
   // ---------- 小奇點、訂閱 → 依步驟 7 的規則轉幾次 ----------
   const seenEvents = new Set(); // Twitch 偶爾會重送同一則通知（小奇點零頭不能算兩次）
   function onTrigger(type, ev, msgId) {
     const id = `ev-${msgId}`;
     if (!msgId || seenEvents.has(id) || queue.some((q) => q.id === id) || records.some((r) => r.id === id || r.src === id)) return;
     seenEvents.add(id);
+    // 訊息裡有 YouTube 連結：算點歌，不轉盤
+    if (type === CHEER_TYPE && cfg.songs.on && T.youtubeId(ev.message)) { onSongCheer(ev, msgId); return; }
     const res = T.triggerSpins(type, ev, cfg.triggers, cfg.bitsCarry);
     if (!res) return;
     if (res.carryKey) { cfg.bitsCarry = T.setCarry(cfg.bitsCarry, res.carryKey, res.carry); saveCfg(); }
@@ -1058,6 +1131,34 @@
     return `${base}queue.html?${new URLSearchParams({ room: cfg.room, key: cfg.secret })}`;
   }
   $('#copyPartyObs').onclick = async () => { if (await copyText(partyObsUrl(), '「排隊名單」網址')) toast('已複製「排隊名單」網址：貼到 OBS 的「來源 → 瀏覽器」', 5000); };
+
+  // 步驟 9：小奇點點歌
+  function renderSongSetup() {
+    const p = cfg.songs;
+    $('#songOn').checked = p.on; $('#songMin').value = p.minBits; $('#songPerUser').value = p.perUser; $('#songMaxMin').value = p.maxMinutes; $('#songShow').value = p.show; $('#songVolume').value = p.volume;
+    $('#step9').classList.toggle('done', p.on);
+    const box = $('#songState');
+    let msg = ''; let cls = '';
+    if (!p.on) msg = '';
+    else if (!auth || !auth.userId) { msg = '先完成步驟 1 連接 Twitch。'; cls = 'bad'; }
+    else if (Twitch.extraError === 'scope') { msg = '還差一步：重新連接 Twitch 一次，才收得到小奇點通知。'; cls = 'bad'; }
+    else if (Twitch.extraError) { msg = Twitch.extraError; cls = 'bad'; }
+    else if (Twitch.state === 'online') { msg = '✓ 正在接收小奇點點歌。'; cls = 'ok'; }
+    else msg = '連上 Twitch 後就會開始接收。';
+    box.textContent = msg; box.className = `tw-check${cls ? ` ${cls}` : ''}${msg ? '' : ' hidden'}`;
+  }
+  const songSetupChanged = () => { cfg = T.normalizeTwConfig(cfg); saveCfg(); renderSongSetup(); renderSongs(); sendSongs(); };
+  $('#songOn').onchange = () => { cfg.songs.on = $('#songOn').checked; songSetupChanged(); Twitch.subscribeExtras(); };
+  [['#songMin', 'minBits'], ['#songPerUser', 'perUser'], ['#songMaxMin', 'maxMinutes'], ['#songShow', 'show'], ['#songVolume', 'volume']].forEach(([sel, k]) => { $(sel).onchange = () => { cfg.songs[k] = Number($(sel).value); songSetupChanged(); }; });
+  function songObsUrl() {
+    const base = location.href.split(/[?#]/)[0].replace(/twitch\.html$/, '');
+    return `${base}songs.html?${new URLSearchParams({ room: cfg.room, key: cfg.secret })}`;
+  }
+  $('#copySongObs').onclick = async () => { if (await copyText(songObsUrl(), '「點歌播放器」網址')) toast('已複製「點歌播放器」網址：貼到 OBS 的「來源 → 瀏覽器」', 5000); };
+  $('#copySongRule').onclick = async () => {
+    const text = `【小奇點點歌】送 ${cfg.songs.minBits} 小奇點以上，訊息裡貼 YouTube 連結就能點歌，照順序播放。只能點免版權的歌，不適合的歌會被跳過。每人同時最多 ${cfg.songs.perUser} 首${cfg.songs.maxMinutes ? `，每首最多播 ${cfg.songs.maxMinutes} 分鐘` : ''}。小奇點送出後無法退還，請確認連結正確。`;
+    if (await copyText(text, '點歌說明')) toast('已複製點歌說明', 4000);
+  };
   $('#cutoffHour').innerHTML = Array.from({ length: 9 }, (_, h) => `<option value="${h}">${h === 0 ? '0 點（不跨夜，照日曆）' : `${h} 點`}</option>`).join('');
   $('#cutoffHour').value = cfg.cutoffHour;
   $('#cutoffHour').onchange = () => { cfg.cutoffHour = Number($('#cutoffHour').value); saveCfg(); };
@@ -1105,7 +1206,7 @@
   function showSetup(step) {
     $('#setupView').classList.remove('hidden'); $('#liveView').classList.add('hidden');
     $('#toSetup').classList.add('hidden'); $('#toLive').classList.remove('hidden');
-    renderSetup(); renderRewards(); renderPrizes(); renderTriggers(); renderPartySetup();
+    renderSetup(); renderRewards(); renderPrizes(); renderTriggers(); renderPartySetup(); renderSongSetup();
     if (step) setTimeout(() => $(`#step${step}`).scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
   }
   function showLive() {
@@ -1157,7 +1258,7 @@
   $('#scriptUrl').value = cfg.scriptUrl;
   $('#clientId').value = cfg.clientId;
   renderMoved();
-  renderQueue(); renderRecords(); renderStatus(); renderParty();
+  renderQueue(); renderRecords(); renderStatus(); renderParty(); renderSongs();
   if (cfg.setupDone && !Twitch.error) showLive(); else showSetup();
 
   if (!(await becomeLeader())) {
@@ -1169,7 +1270,8 @@
 
   Sync.onStatus = () => renderStatus();
   Sync.on((msg) => {
-    if (msg.type === 'hello') { obsSeen = Date.now(); sendConfig(); sendParty(); renderStatus(); }
+    if (msg.type === 'hello') { obsSeen = Date.now(); sendConfig(); sendParty(); sendSongs(); renderStatus(); }
+    else if (msg.type === 'songEvent') onSongEvent(msg);
     else if (msg.type === 'pong') { obsSeen = Date.now(); renderStatus(); toast('OBS 畫面有回應 ✓'); }
   });
   Sync.start(cfg.room, { sync: cfg.sync, broker: cfg.broker, secret: cfg.secret });

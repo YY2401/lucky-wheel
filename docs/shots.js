@@ -180,6 +180,26 @@ const BASE = { clientId: 'cid', sync: false, spinDuration: 2600, resultSeconds: 
   await qv.screenshot({ path: path.join(OUT, 'obs-party.png') });
   console.log('shot obs-party');
   await page.evaluate(() => localStorage.removeItem('mock.party'));
+  await qv.close(); await page.bringToFront(); // 背景分頁截不了圖
+
+  // 9. 小奇點點歌：設定步驟 9、直播畫面的點歌清單、OBS 點歌播放器
+  const song = (id, videoId, who, bits, title) => ({ id, videoId, bits, login: who.toLowerCase(), display: who, userId: '', title, at: '2026-10-25T13:10:00Z' });
+  await reset({ 'tw.config': { ...READY, songs: { on: true, minBits: 100 } }, 'tw.auth': { token: 'tok', clientId: 'cid' },
+    'tw.songs': { now: song('s1', 'jNQXAC9IVRw', '嘎唄', 200, '晨光散步（免版權鋼琴）'), queue: [song('s2', 'aqz-KE-bpKQ', 'HaruneUka', 100, '夏日海風 Lo-fi'), song('s3', 'YE7VzlLtp-4', '小明', 300, '雨天咖啡館 BGM')], missed: [{ ...song('s4', 'CCCCCCCCCC3', 'Cat', 50, ''), reason: '小奇點不到 100' }], paused: false } });
+  await sleep(600);
+  await shot('song-live', '#songBox', 10);
+  await page.click('#toSetup'); await sleep(400);
+  await shot('step9', '#step9');
+  const cfg3 = await H.readKey(page, 'tw.config');
+  const sv = await browser.newPage();
+  await sv.setViewport({ width: 500, height: 560, deviceScaleFactor: 2 });
+  await sv.goto(`${srv.url}/songs.html?room=${cfg3.room}&key=${cfg3.secret}&sync=0`, { waitUntil: 'networkidle2' });
+  await sv.evaluate(() => { document.body.style.background = 'repeating-conic-gradient(#d8d8d8 0 25%, #f3f3f3 0 50%) 0 0 / 32px 32px'; });
+  await sv.waitForSelector('#card:not(.hidden)', { timeout: 15000 }); await sleep(4000);
+  // 說明書裡不放真的影片畫面（示範歌名跟影片對不上），換成佔位框
+  await sv.evaluate(() => { const v = document.querySelector('#video'); v.innerHTML = '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#ddd;font-size:18px;font-weight:700;background:repeating-linear-gradient(135deg,#222 0 14px,#2c2c2c 14px 28px)">這裡播放觀眾點的 YouTube 影片</div>'; });
+  await sv.screenshot({ path: path.join(OUT, 'obs-songs.png') });
+  console.log('shot obs-songs');
 
   await browser.close(); srv.server.close();
 })();

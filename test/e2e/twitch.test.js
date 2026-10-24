@@ -218,6 +218,49 @@ if (!H.chromePath()) {
     assert.deepEqual(page.errors, []);
   });
 
+  test('小奇點點歌：貼 YouTube 連結就排隊（不轉盤）、沒貼的照樣轉盤；播放器回報歌名、播完換下一首、播不了列進沒播的；封鎖', async (t) => {
+    const page = await open(t, { config: { ...READY, triggers: { bits: { on: true, per: 100 } }, songs: { on: true, minBits: 100 } } });
+    await waitFor(() => page.evaluate(() => window.__tw.subs.includes('channel.cheer')));
+    const v = { user_login: 'gabai', user_name: '嘎唄', user_id: '1001' };
+    await page.evaluate((u) => {
+      window.__tw.notify('channel.cheer', { ...u, bits: 200, message: 'Cheer200 https://youtu.be/AAAAAAAAAA1?si=x' }, 's1');
+      window.__tw.notify('channel.cheer', { user_login: 'bob', user_name: 'Bob', user_id: '2', bits: 100, message: 'Cheer100 https://www.youtube.com/watch?v=BBBBBBBBBB2' }, 's2');
+      window.__tw.notify('channel.cheer', { user_login: 'cat', user_name: 'Cat', user_id: '3', bits: 50, message: 'Cheer50 https://youtu.be/CCCCCCCCCC3' }, 's3');
+      window.__tw.notify('channel.cheer', { user_login: 'dan', user_name: 'Dan', user_id: '4', bits: 300, message: 'Cheer300 https://youtu.be/DDDDDDDDDD4' }, 's4');
+      window.__tw.notify('channel.cheer', { ...u, bits: 100, message: 'Cheer100 加油' }, 'c1'); // 沒貼連結：照步驟 7 轉盤
+    }, v);
+    await waitFor(() => page.$eval('#songCount', (e) => e.textContent === '2'));
+    assert.match(await page.$eval('#songNow', (e) => e.textContent), /youtu\.be\/AAAAAAAAAA1.*嘎唄.*200 小奇點/s);
+    assert.match(await page.$eval('#songMissed', (e) => e.textContent), /Cat.*小奇點不到 100/s);
+    await waitFor(async () => (await records(page)).some((r) => r.src === '' && r.id === 'ev-c1' && r.source === 'bits'));
+    assert.equal((await records(page)).length, 1); // 點歌的小奇點不轉盤
+    // 假裝 OBS 點歌播放器（同一個瀏覽器，用同一組頻道代碼和暗號）
+    const cfg = await H.readKey(page, 'tw.config');
+    const ov = await H.newPage(browser); t.after(() => ov.close());
+    await ov.goto(`${srv.url}/queue.html?room=${cfg.room}&key=${cfg.secret}&sync=0`, { waitUntil: 'networkidle0' });
+    const ev = (id, event, extra = {}) => ov.evaluate((m) => window.LW.Sync.send(m), { type: 'songEvent', id, event, ...extra });
+    await ev('song-s1', 'title', { title: '夜に駆ける（免版權翻唱）' });
+    await page.bringToFront();
+    await waitFor(() => page.$eval('#songNow', (e) => /夜に駆ける/.test(e.textContent)));
+    await ev('song-s2', 'ended'); await H.sleep(300); // 不是正在播的那首：不理
+    assert.match(await page.$eval('#songNow', (e) => e.textContent), /夜に駆ける/);
+    await ev('song-s1', 'ended');
+    await waitFor(() => page.$eval('#songNow', (e) => /BBBBBBBBBB2/.test(e.textContent)));
+    await ev('song-s2', 'error', { code: 150 });
+    await waitFor(() => page.$eval('#songMissed', (e) => /不允許在其他網站播放/.test(e.textContent)));
+    assert.match(await page.$eval('#songNow', (e) => e.textContent), /DDDDDDDDDD4/);
+    // 封鎖：跳過，之後再點同一首不播
+    await page.click('#songBlock'); await page.click('#confirmOk');
+    await waitFor(async () => (await H.readKey(page, 'tw.config')).songs.blocked.includes('DDDDDDDDDD4'));
+    await page.evaluate(() => window.__tw.notify('channel.cheer', { user_login: 'eve', user_name: 'Eve', user_id: '5', bits: 100, message: 'Cheer100 DDDDDDDDDD4' }, 's5'));
+    await waitFor(() => page.$eval('#songMissed', (e) => /Eve.*封鎖/s.test(e.textContent)));
+    // 沒播的點歌按「播」照樣排進去
+    await page.click('#songMissedBox summary');
+    await page.click('[data-song-play="song-s3"]');
+    await waitFor(() => page.$eval('#songNow', (e) => /CCCCCCCCCC3/.test(e.textContent)));
+    assert.deepEqual(page.errors, []);
+  });
+
   test('試算表連不上：紀錄留著、自動重試，恢復後補寫；單筆錯誤可按重試', async (t) => {
     const page = await open(t);
     await waitFor(() => page.evaluate(() => window.__tw.subscribed));
@@ -461,7 +504,7 @@ if (!H.chromePath()) {
     const pages = JSON.parse(require('node:fs').readFileSync(require('node:path').join(H.ROOT, 'docs/guide-pages.json'), 'utf8'));
     await waitFor(() => page.$eval('[data-guide="step3"]', (a) => a.getAttribute('href').includes('#page=')));
     const links = await page.$$eval('[data-guide]', (as) => as.map((a) => [a.dataset.guide, a.getAttribute('href')]));
-    assert.equal(links.length, 9);
+    assert.equal(links.length, 10);
     for (const [k, href] of links) assert.ok(href.endsWith(`#page=${pages[k]}`), `${k} ${href}`);
     for (const href of [links[0][1].split('#')[0], await page.$eval('#openGuide', (a) => a.getAttribute('href'))]) {
       const r = await page.evaluate((u) => fetch(u).then((x) => x.status + ' ' + x.headers.get('content-type')), href);

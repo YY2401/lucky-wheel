@@ -49,6 +49,7 @@
     wheel2: { name: '斗內轉盤', prizes: DEFAULT_PRIZES2 },
     bitsCarry: {}, // 每位觀眾還沒湊滿一次的小奇點：{ 觀眾編號: 點數 }
     party: null, // 排隊陪玩（見 DEFAULT_PARTY）
+    songs: null, // 小奇點點歌（見 DEFAULT_SONGS）
   };
 
   const clampInt = (v, lo, hi, fb) => { const n = Math.trunc(Number(v)); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : fb; };
@@ -89,6 +90,7 @@
     cfg.importedIds = Array.isArray(cfg.importedIds) ? cfg.importedIds.map(String).slice(-20) : [];
     cfg.triggers = normalizeTriggers(cfg.triggers);
     cfg.party = normalizeParty(cfg.party);
+    cfg.songs = normalizeSongs(cfg.songs);
     const w2 = cfg.wheel2 && typeof cfg.wheel2 === 'object' ? cfg.wheel2 : {};
     cfg.wheel2 = {
       name: String(w2.name || '').trim().slice(0, 20) || '斗內轉盤',
@@ -216,6 +218,50 @@
     return { type: 'party', title: rule.title, playing: state.playing.map(show), waiting: state.waiting.slice(0, rule.show).map(show), more: Math.max(0, state.waiting.length - rule.show), total: state.waiting.length };
   }
 
+  // ---------- 小奇點點歌 ----------
+  // 觀眾送小奇點時在訊息貼 YouTube 連結（或 11 碼影片編號），送到門檻就照時間排隊播放
+  const DEFAULT_SONGS = { on: false, minBits: 100, perUser: 3, maxMinutes: 6, show: 5, volume: 60, blocked: [] };
+  function normalizeSongs(p) {
+    p = { ...DEFAULT_SONGS, ...(p && typeof p === 'object' ? p : {}) };
+    return {
+      on: p.on === true,
+      minBits: clampInt(p.minBits, 1, 1000000, DEFAULT_SONGS.minBits),
+      perUser: clampInt(p.perUser, 1, 50, DEFAULT_SONGS.perUser), // 每人同時在隊伍裡最多幾首
+      maxMinutes: clampInt(p.maxMinutes, 0, 60, DEFAULT_SONGS.maxMinutes), // 0＝不限制；超過的播到時間就切下一首
+      show: clampInt(p.show, 1, 20, DEFAULT_SONGS.show),
+      volume: clampInt(p.volume, 0, 100, DEFAULT_SONGS.volume),
+      blocked: Array.isArray(p.blocked) ? [...new Set(p.blocked.map(String).filter((x) => /^[A-Za-z0-9_-]{11}$/.test(x)))].slice(-500) : [],
+    };
+  }
+  // 從文字裡找 YouTube 影片編號：youtube.com/watch?v=、youtu.be/、/shorts/、/live/、music.youtube.com，或單獨的 11 碼編號
+  function youtubeId(text) {
+    const t = String(text || '');
+    const m = t.match(/(?:youtube\.com\/(?:watch\?(?:[^\s#]*&)?v=|shorts\/|live\/|embed\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/i);
+    if (m) return m[1];
+    const bare = t.split(/\s+/).find((w) => /^[A-Za-z0-9_-]{11}$/.test(w) && /[0-9_-]/.test(w) && /[A-Za-z]/.test(w) && !/^cheer\d/i.test(w)); // 11 碼裡要同時有英文和數字／符號，免得把一般英文字當成編號
+    return bare || '';
+  }
+  // 點歌加入隊伍。回傳 { state, added } 或 { state, reason }（沒排進去的原因：小奇點不能退，列給實況主處理）
+  function admitSong(state, req, rule) {
+    const all = [...(state.now ? [state.now] : []), ...state.queue];
+    if (all.some((s) => s.id === req.id) || state.missed.some((s) => s.id === req.id)) return { state, dup: true };
+    const miss = (reason) => ({ state: { ...state, missed: [{ ...req, reason }, ...state.missed].slice(0, 50) }, reason });
+    if (!req.videoId) return miss('訊息裡沒有 YouTube 連結');
+    if (req.bits < rule.minBits) return miss(`小奇點不到 ${rule.minBits}`);
+    if (rule.blocked.includes(req.videoId)) return miss('這首被封鎖了');
+    if (all.some((s) => s.videoId === req.videoId)) return miss('同一首已經在隊伍裡');
+    const mine = (s) => (req.userId && s.userId === req.userId) || (req.login && s.login === req.login);
+    if (req.login && all.filter(mine).length >= rule.perUser) return miss(`每人同時最多點 ${rule.perUser} 首`);
+    return { state: { ...state, queue: [...state.queue, req] }, added: req };
+  }
+  // 播下一首：目前這首結束（或跳過），隊伍最前面的上來
+  const nextSong = (state) => ({ ...state, now: state.queue[0] || null, queue: state.queue.slice(1) });
+  // 送給 OBS 點歌播放器畫面的名單
+  function songView(state, rule) {
+    const show = (s) => ({ title: s.title || '（讀取歌名中…）', who: s.display || s.login || '匿名' });
+    return { type: 'songs', now: state.now ? { ...show(state.now), id: state.now.id, videoId: state.now.videoId } : null, next: state.queue.slice(0, rule.show).map(show), more: Math.max(0, state.queue.length - rule.show), volume: rule.volume, maxSec: rule.maxMinutes * 60 };
+  }
+
   // 更新某位觀眾的小奇點零頭（0 就刪掉）
   function setCarry(map, key, n) {
     const next = { ...map };
@@ -325,7 +371,7 @@
 
   // ---------- 搬到 OBS 面板：把設定和還在可退點期的紀錄包進網址（# 後面，不會送到伺服器） ----------
   // 不搬 Twitch 登入（在 OBS 面板裡重新連接一次）、不搬一般紀錄（留在原本的瀏覽器）
-  const MOVE_KEYS = ['clientId', 'rewardIds', 'scriptUrl', 'sheetKey', 'sheetOk', 'cutoffHour', 'prizes', 'spinDuration', 'turns', 'resultSeconds', 'sound', 'volume', 'theme', 'room', 'secret', 'sync', 'broker', 'setupDone', 'triggers', 'wheel2', 'bitsCarry', 'party'];
+  const MOVE_KEYS = ['clientId', 'rewardIds', 'scriptUrl', 'sheetKey', 'sheetOk', 'cutoffHour', 'prizes', 'spinDuration', 'turns', 'resultSeconds', 'sound', 'volume', 'theme', 'room', 'secret', 'sync', 'broker', 'setupDone', 'triggers', 'wheel2', 'bitsCarry', 'party', 'songs'];
   function buildMove(cfg, records, now = Date.now()) {
     const c = {};
     MOVE_KEYS.forEach((k) => { c[k] = cfg[k]; });
@@ -361,5 +407,5 @@
     return { cfg: next, add: payload.hold.filter((r) => !have.has(r.id)) };
   }
 
-  return { DEFAULT_PARTY, normalizeParty, partyEntry, admitParty, nextRound, removeParty, partyView, DEFAULT_TRIGGERS, DEFAULT_PRIZES2, normalizeTriggers, bitsSpins, triggerSpins, setCarry, proxyTarget, forMove, SHEET_COLUMNS, buildMove, encodeMove, decodeMove, applyMove, DEFAULT_PRIZES, DEFAULT_TW, HOLD_MS, normalizeTwPrize, normalizeTwConfig, parseViewer, dayKey, makeRecord, forSheet, viewerLabel, scriptWithKey, dueTwitchUpdates, nextHoldExpiry, missedRedemptions };
+  return { DEFAULT_SONGS, normalizeSongs, youtubeId, admitSong, nextSong, songView, DEFAULT_PARTY, normalizeParty, partyEntry, admitParty, nextRound, removeParty, partyView, DEFAULT_TRIGGERS, DEFAULT_PRIZES2, normalizeTriggers, bitsSpins, triggerSpins, setCarry, proxyTarget, forMove, SHEET_COLUMNS, buildMove, encodeMove, decodeMove, applyMove, DEFAULT_PRIZES, DEFAULT_TW, HOLD_MS, normalizeTwPrize, normalizeTwConfig, parseViewer, dayKey, makeRecord, forSheet, viewerLabel, scriptWithKey, dueTwitchUpdates, nextHoldExpiry, missedRedemptions };
 });

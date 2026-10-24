@@ -221,3 +221,6 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; }
 .tw-party .tw-party-now .tw-list { margin-top: 4px; }
 .tw-party .tw-party-label { display: block; margin: 10px 0 2px; }
 .tw-party .tw-no { font-weight: 900; color: var(--muted); margin-right: 6px; }
+.tw-song-missed { margin-top: 10px; }
+.tw-song-missed summary { cursor: pointer; font-weight: 700; }
+.tw-song-missed .tw-li-sub { color: var(--red); }
