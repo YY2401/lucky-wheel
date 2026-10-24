@@ -8,8 +8,8 @@
 <script>try { document.documentElement.dataset.theme = localStorage.getItem('tw.theme') || 'light'; } catch (e) { document.documentElement.dataset.theme = 'light'; }</script>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=68">
-<link rel="stylesheet" href="twitch.css?v=68">
+<link rel="stylesheet" href="style.css?v=69">
+<link rel="stylesheet" href="twitch.css?v=69">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.1/mqtt.min.js"></script>
 </head>
 <body class="tw">
@@ -200,8 +200,8 @@
           <div class="tw-grid">
             <label class="tw-field">新訂閱轉 <input type="number" id="subNew" min="0" max="100" step="1" class="tw-num"> 次</label>
             <label class="tw-field">續訂轉 <input type="number" id="subResub" min="0" max="100" step="1" class="tw-num"> 次</label>
-            <label class="tw-field">Tier 2 次數乘以 <input type="number" id="subT2" min="1" max="20" step="1" class="tw-num"></label>
-            <label class="tw-field">Tier 3 次數乘以 <input type="number" id="subT3" min="1" max="20" step="1" class="tw-num"></label>
+            <label class="tw-field">層級二次數乘以 <input type="number" id="subT2" min="1" max="20" step="1" class="tw-num"></label>
+            <label class="tw-field">層級三次數乘以 <input type="number" id="subT3" min="1" max="20" step="1" class="tw-num"></label>
           </div>
           <label class="tw-field">贈送訂閱 <select id="subGift"><option value="giver">記給送的人（送幾份就轉幾次）</option><option value="receiver">記給收到的人（每人各轉）</option><option value="none">不轉</option></select></label>
           <label class="tw-field">轉哪個轉盤 <select id="subWheel" data-wheel-select></select></label>
@@ -379,12 +379,12 @@
 </div>
 <div id="toast"></div>
 
-<script src="core.js?v=68"></script>
-<script src="twitch-core.js?v=68"></script>
-<script src="wheel.js?v=68"></script>
-<script src="ui.js?v=68"></script>
-<script src="store.js?v=68"></script>
-<script src="sync.js?v=68"></script>
-<script src="twitch.js?v=68"></script>
+<script src="core.js?v=69"></script>
+<script src="twitch-core.js?v=69"></script>
+<script src="wheel.js?v=69"></script>
+<script src="ui.js?v=69"></script>
+<script src="store.js?v=69"></script>
+<script src="sync.js?v=69"></script>
+<script src="twitch.js?v=69"></script>
 </body>
 </html>

@@ -69,12 +69,12 @@ const BASE = { clientId: 'cid', sync: false, spinDuration: 2600, resultSeconds: 
   const rec = (i, login, display, prize, status, extra = {}) => ({ id: `r${i}`, time: new Date(now - i * 240000).toISOString(), date: '2026-10-04', login, display, reward: '忠誠點轉盤', prizeId: { '1點': 'pt1', '3點': 'pt3', '5點': 'pt5' }[prize], prize, column: prize, color: { '1點': '#4d96ff', '3點': '#6bcb77', '5點': '#ffd93d' }[prize], status, cell: status === 'ok' ? `10月!${{ '1點': 'AA', '3點': 'AB', '5點': 'AC' }[prize]}${3 + i}` : '', error: '', attempts: 1, ...extra });
   const READY = { ...BASE, rewardIds: ['rw1'], scriptUrl: URL_OK, sheetOk: URL_OK, setupDone: true };
   await reset({ 'tw.config': READY, 'tw.auth': { token: 'tok', clientId: 'cid' }, 'tw.records': [
-    rec(1, 'gabai', '嘎唄', '3點', 'ok'), rec(2, 'newbie', '新朋友', '1點', 'ok', { isNew: true }), rec(3, 'haruneuka', 'HaruneUka', '5點', 'ok'),
+    rec(1, 'xiaomei', '小美', '3點', 'ok'), rec(2, 'newbie', '新朋友', '1點', 'ok', { isNew: true }), rec(3, 'azhe_tw', '阿哲', '5點', 'ok'),
   ] });
   await sleep(500);
   await page.evaluate(() => {
-    window.__tw.redeem({ id: 'live1', user_login: 'smallseafood', user_name: '小海鮮', reward: { id: 'rw1', title: '忠誠點轉盤' } });
-    window.__tw.redeem({ id: 'live2', user_login: 'toastiwa', user_name: '吐司瓦熊', reward: { id: 'rw1', title: '忠誠點轉盤' } });
+    window.__tw.redeem({ id: 'live1', user_login: 'ading_tw', user_name: '阿丁', reward: { id: 'rw1', title: '忠誠點轉盤' } });
+    window.__tw.redeem({ id: 'live2', user_login: 'xiaoju_tw', user_name: '小橘', reward: { id: 'rw1', title: '忠誠點轉盤' } });
   });
   await sleep(1300);
   await page.evaluate(() => window.scrollTo(0, 0));
@@ -86,7 +86,7 @@ const BASE = { clientId: 'cid', sync: false, spinDuration: 2600, resultSeconds: 
 
   // 5. 狀況：寫入失敗、單筆錯誤、Twitch 過期
   await reset({ 'tw.config': READY, 'tw.auth': { token: 'tok', clientId: 'cid' }, 'tw.records': [
-    rec(1, 'gabai', '嘎唄', '3點', 'error', { error: '找不到「11月」分頁' }), rec(2, 'haruneuka', 'HaruneUka', '5點', 'ok'),
+    rec(1, 'xiaomei', '小美', '3點', 'error', { error: '找不到「11月」分頁' }), rec(2, 'azhe_tw', '阿哲', '5點', 'ok'),
   ] });
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({ path: path.join(OUT, 'alert-row-error.png'), clip: { x: 0, y: 0, width: 1100, height: 120 } });
@@ -98,9 +98,9 @@ const BASE = { clientId: 'cid', sync: false, spinDuration: 2600, resultSeconds: 
 
   // 6. 手動補一筆、撤銷確認
   const hold = { rewardId: 'rw1', tw: 'hold', holdUntil: Date.now() + 20 * 3600e3 };
-  await reset({ 'tw.config': READY, 'tw.auth': { token: 'tok', clientId: 'cid' }, 'tw.records': [rec(1, 'gabai', '嘎唄', '3點', 'ok', hold)] });
+  await reset({ 'tw.config': READY, 'tw.auth': { token: 'tok', clientId: 'cid' }, 'tw.records': [rec(1, 'xiaomei', '小美', '3點', 'ok', hold)] });
   await page.click('#manualAdd'); await sleep(300);
-  await page.type('#confirmInput', '小于甜心 (xiaoyuthesweetheart_)');
+  await page.type('#confirmInput', '小美 (xiaomei)');
   await shot('manual-add', '#confirmModal .modal-box', 6);
   await page.click('#confirmCancel'); await sleep(300);
   await page.click('[data-undo="r1"]'); await sleep(300);
@@ -110,7 +110,7 @@ const BASE = { clientId: 'cid', sync: false, spinDuration: 2600, resultSeconds: 
   // 6-2. 補轉清單：網頁關著時的兌換
   const day = (d, h) => new Date(2026, 9, d, h, 12).toISOString();
   const un = (id, login, name, at) => ({ id, user_login: login, user_name: name, redeemed_at: at, status: 'UNFULFILLED', reward: { id: 'rw1', title: '忠誠點轉盤' } });
-  await page.evaluate((u) => localStorage.setItem('mock.unfulfilled', JSON.stringify(u)), [un('c1', 'smallseafood', '小海鮮', day(3, 22)), un('c2', 'toastiwa', '吐司瓦熊', day(3, 23)), un('c3', 'haruneuka', 'HaruneUka', day(4, 1))]);
+  await page.evaluate((u) => localStorage.setItem('mock.unfulfilled', JSON.stringify(u)), [un('c1', 'ading_tw', '阿丁', day(3, 22)), un('c2', 'xiaoju_tw', '小橘', day(3, 23)), un('c3', 'azhe_tw', '阿哲', day(4, 1))]);
   await reset({ 'tw.config': READY, 'tw.auth': { token: 'tok', clientId: 'cid' } });
   await page.waitForSelector('#catchupModal:not(.hidden)');
   await shot('catchup', '#catchupModal .modal-box', 6);
@@ -118,7 +118,7 @@ const BASE = { clientId: 'cid', sync: false, spinDuration: 2600, resultSeconds: 
   await page.evaluate(() => localStorage.removeItem('mock.unfulfilled'));
 
   // 6-3. 放進 OBS 面板：步驟 6、搬好後的瀏覽器、面板裡的樣子
-  await reset({ 'tw.config': READY, 'tw.auth': { token: 'tok', clientId: 'cid' }, 'tw.records': [rec(1, 'gabai', '嘎唄', '3點', 'ok', hold), rec(2, 'haruneuka', 'HaruneUka', '5點', 'ok', hold)] });
+  await reset({ 'tw.config': READY, 'tw.auth': { token: 'tok', clientId: 'cid' }, 'tw.records': [rec(1, 'xiaomei', '小美', '3點', 'ok', hold), rec(2, 'azhe_tw', '阿哲', '5點', 'ok', hold)] });
   await browser.defaultBrowserContext().overridePermissions(srv.url, ['clipboard-read', 'clipboard-write', 'clipboard-sanitized-write']);
   await page.click('#toSetup'); await sleep(300);
   await shot('step6', '#step6');
@@ -155,7 +155,7 @@ const BASE = { clientId: 'cid', sync: false, spinDuration: 2600, resultSeconds: 
   await ov.goto(`${srv.url}/index.html?overlay=1&room=${cfg.room}&key=${cfg.secret}&sync=0&bg=0`, { waitUntil: 'networkidle0' });
   await ov.evaluate(() => { document.body.style.background = 'repeating-conic-gradient(#d8d8d8 0 25%, #f3f3f3 0 50%) 0 0 / 32px 32px'; });
   await sleep(1200);
-  await page.evaluate(() => window.__tw.redeem({ id: 'obs1', user_login: 'gabai', user_name: '嘎唄', reward: { id: 'rw1', title: '忠誠點轉盤' } }));
+  await page.evaluate(() => window.__tw.redeem({ id: 'obs1', user_login: 'xiaomei', user_name: '小美', reward: { id: 'rw1', title: '忠誠點轉盤' } }));
   await ov.waitForSelector('#ovBanner:not(.hidden)', { timeout: 10000 }); await sleep(900); // 等名字出現、轉盤轉起來再拍
   await ov.screenshot({ path: path.join(OUT, 'obs-spin.png') });
   await sleep(3200);
@@ -166,7 +166,7 @@ const BASE = { clientId: 'cid', sync: false, spinDuration: 2600, resultSeconds: 
   await page.evaluate(() => localStorage.setItem('mock.party', '1'));
   const pe = (id, n, input) => ({ id, login: n.toLowerCase(), display: n, userId: '', input, rewardId: 'rwq', at: '2026-10-25T13:05:00Z' });
   await reset({ 'tw.config': { ...READY, party: { rewardId: 'rwq', batch: 1, show: 5 } }, 'tw.auth': { token: 'tok', clientId: 'cid' },
-    'tw.party': { playing: [pe('p1', '小明', 'Ming#1234')], waiting: [pe('w1', '嘎唄', 'Gabai#22'), pe('w2', 'HaruneUka', 'Uka#8'), pe('w3', '秋野貼鐵', 'AKN#7')] } });
+    'tw.party': { playing: [pe('p1', '小明', 'Ming#1234')], waiting: [pe('w1', '小美', 'Mei#22'), pe('w2', '阿哲', 'Zhe#8'), pe('w3', '路人甲', 'Lu#7')] } });
   await sleep(600);
   await shot('party-live', '#partyBox', 10);
   await page.click('#toSetup'); await sleep(400);
@@ -185,7 +185,7 @@ const BASE = { clientId: 'cid', sync: false, spinDuration: 2600, resultSeconds: 
   // 9. 小奇點點歌：設定步驟 9、直播畫面的點歌清單、OBS 點歌播放器
   const song = (id, videoId, who, bits, title) => ({ id, videoId, bits, login: who.toLowerCase(), display: who, userId: '', title, at: '2026-10-25T13:10:00Z' });
   await reset({ 'tw.config': { ...READY, songs: { on: true, minBits: 100 } }, 'tw.auth': { token: 'tok', clientId: 'cid' },
-    'tw.songs': { now: song('s1', 'jNQXAC9IVRw', '嘎唄', 200, '晨光散步（免版權鋼琴）'), queue: [song('s2', 'aqz-KE-bpKQ', 'HaruneUka', 100, '夏日海風 Lo-fi'), song('s3', 'YE7VzlLtp-4', '小明', 300, '雨天咖啡館 BGM')], missed: [{ ...song('s4', 'CCCCCCCCCC3', 'Cat', 50, ''), reason: '小奇點不到 100' }], paused: false } });
+    'tw.songs': { now: song('s1', 'jNQXAC9IVRw', '小美', 200, '晨光散步（免版權鋼琴）'), queue: [song('s2', 'aqz-KE-bpKQ', '阿哲', 100, '夏日海風 Lo-fi'), song('s3', 'YE7VzlLtp-4', '小明', 300, '雨天咖啡館 BGM')], missed: [{ ...song('s4', 'CCCCCCCCCC3', 'Cat', 50, ''), reason: '小奇點不到 100' }], paused: false } });
   await sleep(600);
   await shot('song-live', '#songBox', 10);
   await page.click('#toSetup'); await sleep(400);

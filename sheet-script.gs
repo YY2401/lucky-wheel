@@ -60,7 +60,7 @@ function json_(o) {
 }
 
 // ---------- 觀眾名稱 ----------
-// 「嘎唄(gabai)」「小于甜心 (xiaoyuthesweetheart_)」「安棉コットン (anmianatwork):」「shengwei_0509」都要認得
+// 「小美(xiaomei)」「小美 (xiaomei)」「棉花糖 (mianhuatang):」「viewer_0509」都要認得
 function parseViewer_(s) {
   s = String(s == null ? '' : s).trim().replace(/[:：\s]+$/, '');
   const m = s.match(/^(.*?)\s*[(（]\s*([^()（）]*?)\s*[)）]$/);

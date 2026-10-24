@@ -46,7 +46,7 @@ function installMocks() {
     if (url.startsWith('https://id.twitch.tv/oauth2/validate')) return M.validateStatus === 200 ? json({ login: 'streamer', user_id: '123', client_id: 'cid', scopes: M.scopes, expires_in: 9999 }) : json({ status: 401 }, 401);
     if (url.startsWith('https://api.twitch.tv/helix/search/channels')) { // 搜尋會回傳名字相近的好幾個頻道
       const qq = q.get('query');
-      const all = [{ broadcaster_login: 'akino_tieh', display_name: '秋野貼鐵', id: '555' }, { broadcaster_login: 'akino_tieh2', display_name: '秋野貼鐵鐵', id: '556' }, { broadcaster_login: 'twin_a', display_name: '雙胞胎', id: '601' }, { broadcaster_login: 'twin_b', display_name: '雙胞胎', id: '602' }];
+      const all = [{ broadcaster_login: 'lurenjia', display_name: '路人甲', id: '555' }, { broadcaster_login: 'lurenjia2', display_name: '路人甲乙', id: '556' }, { broadcaster_login: 'twin_a', display_name: '雙胞胎', id: '601' }, { broadcaster_login: 'twin_b', display_name: '雙胞胎', id: '602' }];
       return json({ data: all.filter((c) => c.display_name.includes(qq)) });
     }
     if (url.startsWith('https://api.twitch.tv/helix/users?login=')) { const l = q.get('login'); return json({ data: l === 'nobody' ? [] : [{ login: l, display_name: l.toUpperCase(), id: `9${l.length}` }] }); }
@@ -77,7 +77,7 @@ function installMocks() {
       const req = JSON.parse(opts.body);
       M.sheetCalls.push(req);
       if (M.failSheet > 0) { M.failSheet--; return Promise.reject(new TypeError('Failed to fetch')); }
-      if (req.action === 'ping') return json({ ok: true, title: '轉盤紀錄', viewers: 216, sheet: '10月', columns: { '1點': 'AA', '3點': 'AB', '5點': 'AC' }, heads: ['1點', '3點', '5點', 'Q版塗鴉', '新欄位'], noLogin: ['幽璃ゆうり'], problems: [] });
+      if (req.action === 'ping') return json({ ok: true, title: '轉盤紀錄', viewers: 216, sheet: '10月', columns: { '1點': 'AA', '3點': 'AB', '5點': 'AC' }, heads: ['1點', '3點', '5點', 'Q版塗鴉', '新欄位'], noLogin: ['夜貓子'], problems: [] });
       if (req.action === 'newYear') { M.newYear = req.year; M.rowErrors = {}; return json({ ok: true, year: req.year, created: Array.from({ length: 12 }, (_, i) => `${req.year}-${i + 1}月`), renamed: Array.from({ length: 12 }, (_, i) => `${req.year - 1}-${i + 1}月`), warnings: [], summaryCells: 98 }); }
       if (req.action === 'move') return json({ ok: true, results: req.records.map((r) => ({ id: r.id, ok: true, cell: `10月!AB${50}`, name: `${r.to.display}(${r.to.login})` })) });
       return json({ ok: true, results: req.records.map((r, i) => (M.rowErrors[r.login] ? { id: r.id, ok: false, error: M.rowErrors[r.login] } : { id: r.id, ok: true, cell: `${Number(r.date.slice(5, 7))}月!AB${3 + i}`, name: `${r.display}(${r.login})`, isNew: r.login === 'newbie' })) });

@@ -81,12 +81,12 @@ function loadScript(book, key = 'SECRET123') {
   return { ...api, post, props };
 }
 
-const NAMES = ['嘎唄(gabai)', 'HaruneUka(haruneuka)', '小于甜心 (xiaoyuthesweetheart_)', '安棉コットン (anmianatwork):', 'shengwei_0509', '幽璃ゆうり', 'FCerror'];
+const NAMES = ['小美(xiaomei)', '阿哲(azhe_tw)', '小美 (xiaomei)', '棉花糖 (mianhuatang):', 'viewer_0509', '夜貓子', 'FCerror'];
 
 test('解析觀眾名稱：網頁與 Apps Script 規則一致', () => {
   const { book } = makeBook({ names: NAMES });
   const gas = loadScript(book);
-  const cases = { '嘎唄(gabai)': ['嘎唄', 'gabai'], '小于甜心 (xiaoyuthesweetheart_)': ['小于甜心', 'xiaoyuthesweetheart_'], '安棉コットン (anmianatwork):': ['安棉コットン', 'anmianatwork'], 'shengwei_0509': ['shengwei_0509', ''], '全形（Abc）': ['全形', 'abc'], '': ['', ''] };
+  const cases = { '小美(xiaomei)': ['小美', 'xiaomei'], '小美 (xiaomei)': ['小美', 'xiaomei'], '棉花糖 (mianhuatang):': ['棉花糖', 'mianhuatang'], 'viewer_0509': ['viewer_0509', ''], '全形（Abc）': ['全形', 'abc'], '': ['', ''] };
   for (const [s, [display, login]] of Object.entries(cases)) {
     assert.deepEqual(tw.parseViewer(s), { display, login }, s);
     assert.deepEqual({ ...gas.parseViewer_(s) }, { display, login }, `gas ${s}`);
@@ -96,20 +96,20 @@ test('解析觀眾名稱：網頁與 Apps Script 規則一致', () => {
 test('比對觀眾：帳號優先，沒括號的用帳號或顯示名稱比，大小寫不分', () => {
   const { book } = makeBook({ names: NAMES });
   const { matchViewer_: m } = loadScript(book);
-  assert.equal(m(NAMES, 'gabai', '嘎唄'), 0);
-  assert.equal(m(NAMES, 'GABAI', '改名了'), 0); // 改顯示名稱也認得
-  assert.equal(m(NAMES, 'anmianatwork', 'x'), 3); // 結尾多了冒號
-  assert.equal(m(NAMES, 'shengwei_0509', 'Shengwei_0509'), 4);
-  assert.equal(m(NAMES, 'yuri123', '幽璃ゆうり'), 5); // 名單只有顯示名稱
+  assert.equal(m(NAMES, 'xiaomei', '小美'), 0);
+  assert.equal(m(NAMES, 'XIAOMEI', '改名了'), 0); // 改顯示名稱也認得
+  assert.equal(m(NAMES, 'mianhuatang', 'x'), 3); // 結尾多了冒號
+  assert.equal(m(NAMES, 'viewer_0509', 'Viewer_0509'), 4);
+  assert.equal(m(NAMES, 'yuri123', '夜貓子'), 5); // 名單只有顯示名稱
   assert.equal(m(NAMES, 'fcerror', 'FCerror'), 6);
   assert.equal(m(NAMES, 'nobody', 'Nobody'), -1);
-  assert.equal(m(NAMES, '', '嘎唄'), 0); // 手動輸入只有顯示名稱
+  assert.equal(m(NAMES, '', '小美'), 0); // 手動輸入只有顯示名稱
 });
 
 test('寫入：當月分頁「當天 × 獎項」那格 +1，總表不碰', () => {
   const { book, sheets } = makeBook({ names: NAMES });
   const gas = loadScript(book);
-  const rec = { id: 'r1', date: '2026-10-04', login: 'gabai', display: '嘎唄', column: '3點' };
+  const rec = { id: 'r1', date: '2026-10-04', login: 'xiaomei', display: '小美', column: '3點' };
   const res = gas.post({ action: 'add', records: [rec] });
   assert.equal(res.ok, true);
   const col = 3 + 3 * 8 + 1; // 10/4 那天的「3點」
@@ -123,7 +123,7 @@ test('寫入：當月分頁「當天 × 獎項」那格 +1，總表不碰', () =
 test('同一筆兌換重送不會加兩次；撤銷減回去、重複撤銷也只減一次', () => {
   const { book, sheets } = makeBook({ names: NAMES });
   const gas = loadScript(book);
-  const rec = { id: 'dup', date: '2026-10-31', login: 'haruneuka', display: 'HaruneUka', column: '5點' };
+  const rec = { id: 'dup', date: '2026-10-31', login: 'azhe_tw', display: '阿哲', column: '5點' };
   const col = 3 + 30 * 8 + 2;
   gas.post({ action: 'add', records: [rec] });
   const again = gas.post({ action: 'add', records: [rec] });
@@ -155,7 +155,7 @@ test('錯誤：暗號不符、沒有那個月份分頁、欄名找不到、格�
   const gas = loadScript(book);
   const bad = gas.doPost({ postData: { contents: JSON.stringify({ key: 'wrong', action: 'ping' }) } });
   assert.equal(bad.ok, false); assert.equal(bad.fatal, true);
-  const base = { date: '2026-10-04', login: 'gabai', display: '嘎唄', column: '1點' };
+  const base = { date: '2026-10-04', login: 'xiaomei', display: '小美', column: '1點' };
   const out = gas.post({ action: 'add', records: [
     { ...base, id: 'e1', date: '2026-11-01' },
     { ...base, id: 'e2', column: '7點' },
@@ -264,81 +264,81 @@ test('觀眾改了英文帳號：用 Twitch 永久編號找回同一列，括號
   const { book, sheets } = makeBook({ names: NAMES });
   const gas = loadScript(book);
   const base = { date: '2026-10-04', column: '1點' };
-  const first = gas.post({ action: 'add', records: [{ ...base, id: 'a1', login: 'gabai', display: '嘎唄', uid: '1001' }] }).results[0];
+  const first = gas.post({ action: 'add', records: [{ ...base, id: 'a1', login: 'xiaomei', display: '小美', uid: '1001' }] }).results[0];
   assert.equal(first.row, 3);
-  // 改了帳號 gabai → gabai_tw：還是第 3 列、名單更新、不新增一列
-  const second = gas.post({ action: 'add', records: [{ ...base, id: 'a2', login: 'gabai_tw', display: '嘎唄唄', uid: '1001' }] }).results[0];
-  assert.equal(second.row, 3); assert.equal(second.isNew, false); assert.equal(second.renamedFrom, 'gabai');
-  assert.equal(sheets['兌換紀錄'].cell(3, 2).v, '嘎唄(gabai_tw)'); // 前面的名字維持實況主原本寫的
+  // 改了帳號 xiaomei → xiaomei_tw：還是第 3 列、名單更新、不新增一列
+  const second = gas.post({ action: 'add', records: [{ ...base, id: 'a2', login: 'xiaomei_tw', display: '小美唄', uid: '1001' }] }).results[0];
+  assert.equal(second.row, 3); assert.equal(second.isNew, false); assert.equal(second.renamedFrom, 'xiaomei');
+  assert.equal(sheets['兌換紀錄'].cell(3, 2).v, '小美(xiaomei_tw)'); // 前面的名字維持實況主原本寫的
   assert.equal(sheets['10月'].cell(3, 3 + 3 * 8).v, 2);
   // 沒有編號（手動補登）用新帳號也找得到
-  assert.equal(gas.post({ action: 'add', records: [{ ...base, id: 'a3', login: 'gabai_tw', display: 'x' }] }).results[0].row, 3);
+  assert.equal(gas.post({ action: 'add', records: [{ ...base, id: 'a3', login: 'xiaomei_tw', display: 'x' }] }).results[0].row, 3);
 });
 
 test('名單被重新排序過：記住的列已經不是同一人，就不採用，改用帳號比對', () => {
   const { book, sheets } = makeBook({ names: NAMES });
   const gas = loadScript(book);
   const base = { date: '2026-10-04', column: '1點' };
-  gas.post({ action: 'add', records: [{ ...base, id: 'b1', login: 'haruneuka', display: 'HaruneUka', uid: '2002' }] }); // 記住第 4 列
-  sheets['兌換紀錄'].put(4, 2, '嘎唄(gabai)'); sheets['兌換紀錄'].put(3, 2, 'HaruneUka(haruneuka)'); // 兩列對調
-  const r = gas.post({ action: 'add', records: [{ ...base, id: 'b2', login: 'haruneuka', display: 'HaruneUka', uid: '2002' }] }).results[0];
+  gas.post({ action: 'add', records: [{ ...base, id: 'b1', login: 'azhe_tw', display: '阿哲', uid: '2002' }] }); // 記住第 4 列
+  sheets['兌換紀錄'].put(4, 2, '小美(xiaomei)'); sheets['兌換紀錄'].put(3, 2, '阿哲(azhe_tw)'); // 兩列對調
+  const r = gas.post({ action: 'add', records: [{ ...base, id: 'b2', login: 'azhe_tw', display: '阿哲', uid: '2002' }] }).results[0];
   assert.equal(r.row, 3); assert.equal(r.renamedFrom, '');
-  assert.equal(sheets['兌換紀錄'].cell(4, 2).v, '嘎唄(gabai)'); // 沒有被改掉
+  assert.equal(sheets['兌換紀錄'].cell(4, 2).v, '小美(xiaomei)'); // 沒有被改掉
 });
 
 test('測試連線列出名單裡只寫名字、沒寫帳號的人（只寫英文帳號的不算）', () => {
   const { book } = makeBook({ names: NAMES });
   const gas = loadScript(book);
   const res = gas.post({ action: 'ping', date: '2026-10-04', columns: [] });
-  assert.deepEqual([...res.noLogin], ['幽璃ゆうり']);
+  assert.deepEqual([...res.noLogin], ['夜貓子']);
 });
 
 test('送給試算表的資料帶著 Twitch 永久編號', () => {
-  const r = tw.makeRecord({ id: 'x', login: 'Gabai', display: '嘎唄', userId: '1001', prize: tw.DEFAULT_PRIZES[0] });
-  assert.deepEqual(tw.forSheet(r), { id: 'x', date: r.date, login: 'gabai', display: '嘎唄', uid: '1001', column: '1點' });
+  const r = tw.makeRecord({ id: 'x', login: 'Xiaomei', display: '小美', userId: '1001', prize: tw.DEFAULT_PRIZES[0] });
+  assert.deepEqual(tw.forSheet(r), { id: 'x', date: r.date, login: 'xiaomei', display: '小美', uid: '1001', column: '1點' });
   assert.equal(tw.missedRedemptions([{ id: 'm', user_login: 'a', user_name: 'A', user_id: '77', redeemed_at: '2026-10-01T00:00:00Z', reward: { id: 'r', title: 't' } }], [])[0].userId, '77');
 });
 
 test('代抽：@帳號、@中文名字都算；沒有 @ 的中文和留言不算', () => {
-  assert.deepEqual(tw.proxyTarget('@ToastIwa'), { login: 'toastiwa' });
-  assert.deepEqual(tw.proxyTarget('幫 @gabai 抽！'), { login: 'gabai' });
-  assert.deepEqual(tw.proxyTarget('  haruneuka '), { login: 'haruneuka' });
-  assert.deepEqual(tw.proxyTarget('@秋野貼鐵'), { name: '秋野貼鐵' });
-  assert.deepEqual(tw.proxyTarget('幫＠秋野貼鐵 抽一次'), { name: '秋野貼鐵' });
-  assert.deepEqual(tw.proxyTarget('@ 小于甜心！'), { name: '小于甜心' });
-  assert.equal(tw.proxyTarget('嘎唄'), null);
+  assert.deepEqual(tw.proxyTarget('@Xiaoju_tw'), { login: 'xiaoju_tw' });
+  assert.deepEqual(tw.proxyTarget('幫 @xiaomei 抽！'), { login: 'xiaomei' });
+  assert.deepEqual(tw.proxyTarget('  azhe_tw '), { login: 'azhe_tw' });
+  assert.deepEqual(tw.proxyTarget('@路人甲'), { name: '路人甲' });
+  assert.deepEqual(tw.proxyTarget('幫＠路人甲 抽一次'), { name: '路人甲' });
+  assert.deepEqual(tw.proxyTarget('@ 小美！'), { name: '小美' });
+  assert.equal(tw.proxyTarget('小美'), null);
   assert.equal(tw.proxyTarget('加油'), null);
   assert.equal(tw.proxyTarget('good luck everyone'), null);
   assert.equal(tw.proxyTarget(''), null);
-  const r = tw.makeRecord({ id: 'p', login: 'toastiwa', display: '吐司', by: { login: 'Gabai', display: '嘎唄' }, prize: tw.DEFAULT_PRIZES[0] });
-  assert.deepEqual(r.by, { login: 'gabai', display: '嘎唄' });
+  const r = tw.makeRecord({ id: 'p', login: 'xiaoju_tw', display: '小橘', by: { login: 'Xiaomei', display: '小美' }, prize: tw.DEFAULT_PRIZES[0] });
+  assert.deepEqual(r.by, { login: 'xiaomei', display: '小美' });
   r.moveTo = { login: 'newbie', display: '新人', userId: '5' };
-  assert.deepEqual(tw.forMove(r), { id: 'p', seq: 1, date: r.date, column: '1點', from: { login: 'toastiwa', display: '吐司', uid: '' }, to: { login: 'newbie', display: '新人', uid: '5' } });
+  assert.deepEqual(tw.forMove(r), { id: 'p', seq: 1, date: r.date, column: '1點', from: { login: 'xiaoju_tw', display: '小橘', uid: '' }, to: { login: 'newbie', display: '新人', uid: '5' } });
 });
 
 test('改記給別人：原本的人 -1、新的人 +1，重送不會重複，之後撤銷減的是新的人', () => {
   const { book, sheets } = makeBook({ names: NAMES });
   const gas = loadScript(book);
   const col = 3 + 3 * 8; // 10/4 的 1點
-  gas.post({ action: 'add', records: [{ id: 'm1', date: '2026-10-04', login: 'gabai', display: '嘎唄', column: '1點' }] });
-  const mv = { id: 'm1', seq: 1, date: '2026-10-04', column: '1點', from: { login: 'gabai', display: '嘎唄' }, to: { login: 'haruneuka', display: 'HaruneUka' } };
+  gas.post({ action: 'add', records: [{ id: 'm1', date: '2026-10-04', login: 'xiaomei', display: '小美', column: '1點' }] });
+  const mv = { id: 'm1', seq: 1, date: '2026-10-04', column: '1點', from: { login: 'xiaomei', display: '小美' }, to: { login: 'azhe_tw', display: '阿哲' } };
   const res = gas.post({ action: 'move', records: [mv] }).results[0];
   assert.equal(res.ok, true); assert.equal(res.row, 4);
   assert.equal(sheets['10月'].cell(3, col).v, ''); assert.equal(sheets['10月'].cell(4, col).v, 1);
   assert.equal(gas.post({ action: 'move', records: [mv] }).results[0].dup, true); // 重送
   assert.equal(sheets['10月'].cell(4, col).v, 1);
-  gas.post({ action: 'undo', records: [{ id: 'm1', date: '2026-10-04', login: 'haruneuka', display: 'HaruneUka', column: '1點' }] });
+  gas.post({ action: 'undo', records: [{ id: 'm1', date: '2026-10-04', login: 'azhe_tw', display: '阿哲', column: '1點' }] });
   assert.equal(sheets['10月'].cell(4, col).v, '');
   // 還沒寫進去的、移到新觀眾
   assert.match(gas.post({ action: 'move', records: [{ ...mv, id: 'never' }] }).results[0].error, /還沒寫進試算表/);
-  gas.post({ action: 'add', records: [{ id: 'm2', date: '2026-10-04', login: 'gabai', display: '嘎唄', column: '1點' }] });
+  gas.post({ action: 'add', records: [{ id: 'm2', date: '2026-10-04', login: 'xiaomei', display: '小美', column: '1點' }] });
   const n = gas.post({ action: 'move', records: [{ ...mv, id: 'm2', to: { login: 'brandnew', display: '新來的' } }] }).results[0];
   assert.equal(n.isNew, true); assert.equal(sheets['兌換紀錄'].cell(n.row, 2).v, '新來的(brandnew)');
 });
 
 // ---------- 開新年度：模擬一整年 12 個月份分頁＋總表公式（照實際試算表的寫法） ----------
 const L = (n) => { let s = ''; while (n > 0) { const k = (n - 1) % 26; s = String.fromCharCode(65 + k) + s; n = Math.floor((n - 1) / 26); } return s; };
-function makeYearBook(year = 2026, viewers = ['嘎唄(gabai)', 'HaruneUka(haruneuka)']) {
+function makeYearBook(year = 2026, viewers = ['小美(xiaomei)', '阿哲(azhe_tw)']) {
   const sheets = {};
   const book = {
     getSheetByName: (n) => sheets[n] || null,
@@ -394,16 +394,16 @@ Sheet.prototype.copyTo = function (book) { const c = new Sheet(`${this.name} 的
 test('跨年：還沒開新年度時，2027 的兌換不會寫進 2026 年的分頁', () => {
   const { book, sheets } = makeYearBook(2026);
   const gas = loadScript(book);
-  const r = gas.post({ action: 'add', records: [{ id: 'y1', date: '2027-01-05', login: 'gabai', display: '嘎唄', column: '1點' }] }).results[0];
+  const r = gas.post({ action: 'add', records: [{ id: 'y1', date: '2027-01-05', login: 'xiaomei', display: '小美', column: '1點' }] }).results[0];
   assert.equal(r.ok, false); assert.match(r.error, /還沒有 2027 年 1 月的分頁.*開新年度/);
   assert.equal(sheets['1月'].cell(3, 3 + 4 * 8).v, ''); // 2026/1/5 沒被動到
-  assert.equal(gas.post({ action: 'add', records: [{ id: 'y0', date: '2026-10-04', login: 'gabai', display: '嘎唄', column: '1點' }] }).results[0].ok, true);
+  assert.equal(gas.post({ action: 'add', records: [{ id: 'y0', date: '2026-10-04', login: 'xiaomei', display: '小美', column: '1點' }] }).results[0].ok, true);
 });
 
 test('開新年度：舊分頁改名、建新分頁（日期換新、數字清空）、總表改看今年且累積點數加上去年', () => {
   const { book, sheets } = makeYearBook(2026);
   const gas = loadScript(book);
-  gas.post({ action: 'add', records: [{ id: 'old', date: '2026-01-05', login: 'gabai', display: '嘎唄', column: '1點' }] });
+  gas.post({ action: 'add', records: [{ id: 'old', date: '2026-01-05', login: 'xiaomei', display: '小美', column: '1點' }] });
   const res = gas.post({ action: 'newYear', year: 2027 });
   assert.equal(res.ok, true, JSON.stringify(res));
   assert.equal(res.renamed.length, 12); assert.equal(res.created.length, 12);
@@ -419,8 +419,8 @@ test('開新年度：舊分頁改名、建新分頁（日期換新、數字清�
   assert.equal(sum.cell(3, 5).f, '=C3-D3'); // 不相干的公式不動
   assert.deepEqual(res.warnings, []);
   // 開完之後：2027 寫進新分頁；補抓到的 2026 年底兌換寫進舊分頁
-  assert.match(gas.post({ action: 'add', records: [{ id: 'n1', date: '2027-01-05', login: 'gabai', display: '嘎唄', column: '1點' }] }).results[0].cell, /^2027-1月!/);
-  assert.match(gas.post({ action: 'add', records: [{ id: 'n2', date: '2026-12-31', login: 'gabai', display: '嘎唄', column: '1點' }] }).results[0].cell, /^2026-12月!/);
+  assert.match(gas.post({ action: 'add', records: [{ id: 'n1', date: '2027-01-05', login: 'xiaomei', display: '小美', column: '1點' }] }).results[0].cell, /^2027-1月!/);
+  assert.match(gas.post({ action: 'add', records: [{ id: 'n2', date: '2026-12-31', login: 'xiaomei', display: '小美', column: '1點' }] }).results[0].cell, /^2026-12月!/);
   // 同一年不能開兩次
   const again = gas.post({ action: 'newYear', year: 2027 });
   assert.equal(again.ok, false); assert.match(again.error, /已經建立過/);
@@ -441,12 +441,12 @@ test('連續兩年開新年度：累積點數疊加兩個舊年度；閏年 2 �
 
 // ---------- 小奇點、訂閱觸發轉盤 ----------
 const trig = (over = {}) => tw.normalizeTriggers({ ...over, bits: { on: true, ...(over.bits || {}) }, sub: { on: true, ...(over.sub || {}) } });
-const viewer = { user_login: 'Gabai', user_name: '嘎唄', user_id: '42' };
+const viewer = { user_login: 'Xiaomei', user_name: '小美', user_id: '42' };
 
 test('小奇點：每滿 N 點轉一次，零頭幫觀眾累積', () => {
   const t = trig();
   let r = tw.triggerSpins('channel.cheer', { ...viewer, bits: 250 }, t, {});
-  assert.deepEqual([r.spins, r.carry, r.carryKey, r.source, r.who.login], [2, 50, '42', 'bits', 'gabai']);
+  assert.deepEqual([r.spins, r.carry, r.carryKey, r.source, r.who.login], [2, 50, '42', 'bits', 'xiaomei']);
   const carry = tw.setCarry({}, r.carryKey, r.carry);
   r = tw.triggerSpins('channel.cheer', { ...viewer, bits: 60 }, t, carry);
   assert.deepEqual([r.spins, r.carry], [1, 10]);
@@ -468,13 +468,13 @@ test('小奇點：分級門檻取達到的最高一級', () => {
   assert.equal(tw.triggerSpins('channel.cheer', { ...viewer, bits: 5000 }, t).spins, 6);
 });
 
-test('訂閱：新訂閱、續訂、Tier 倍數、一筆上限', () => {
+test('訂閱：新訂閱、續訂、層級倍數、一筆上限', () => {
   const t = trig({ sub: { newSpins: 2, resubSpins: 1, t2: 2, t3: 5 }, maxSpins: 8 });
   assert.equal(tw.triggerSpins('channel.subscribe', { ...viewer, tier: '1000' }, t).spins, 2);
   assert.equal(tw.triggerSpins('channel.subscribe', { ...viewer, tier: '2000' }, t).spins, 4);
   assert.equal(tw.triggerSpins('channel.subscribe', { ...viewer, tier: '3000' }, t).spins, 8); // 10 被上限 8 擋住
   const re = tw.triggerSpins('channel.subscription.message', { ...viewer, tier: '1000', cumulative_months: 7 }, t);
-  assert.deepEqual([re.spins, re.label, re.source], [1, '續訂 7 個月（Tier 1）', 'sub']);
+  assert.deepEqual([re.spins, re.label, re.source], [1, '續訂 7 個月（層級一）', 'sub']);
 });
 
 test('贈訂：記給送的人（送幾份轉幾次）或收到的人，不會重複算', () => {

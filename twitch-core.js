@@ -140,7 +140,7 @@
     const total = bits + (rule.carry ? Math.max(0, Math.trunc(Number(prevCarry) || 0)) : 0);
     return { spins: Math.floor(total / rule.per), carry: rule.carry ? total % rule.per : 0 };
   }
-  const TIER_NAME = { 1000: 'Tier 1', 2000: 'Tier 2', 3000: 'Tier 3' };
+  const TIER_NAME = { 1000: '層級一', 2000: '層級二', 3000: '層級三' }; // 跟 Twitch 中文介面同一套說法
   const tierMult = (tier, rule) => (String(tier) === '3000' ? rule.t3 : String(tier) === '2000' ? rule.t2 : 1);
 
   // Twitch EventSub 通知 → 要轉幾次、記給誰。不觸發回 null
@@ -153,7 +153,7 @@
       if (trig.anon === 'skip') return null;
       who = { login: '', display: trig.anonName, userId: '' };
     }
-    const tierName = TIER_NAME[ev.tier] || 'Tier 1';
+    const tierName = TIER_NAME[ev.tier] || '層級一';
     let out;
     if (type === 'channel.cheer') {
       if (!trig.bits.on) return null;
@@ -270,7 +270,7 @@
     return next;
   }
 
-  // 「嘎唄(gabai)」→ { display: '嘎唄', login: 'gabai' }；「gabai」→ { display: 'gabai', login: '' }
+  // 「小美(xiaomei)」→ { display: '小美', login: 'xiaomei' }；「xiaomei」→ { display: 'xiaomei', login: '' }
   // 與 sheet-script.gs 的 parseViewer_ 同一套規則
   function parseViewer(s) {
     s = String(s == null ? '' : s).trim().replace(/[:：\s]+$/, '');

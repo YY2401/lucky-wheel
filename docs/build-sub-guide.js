@@ -29,9 +29,9 @@ const OUT = path.join(__dirname, '忠誠點轉盤_續訂抽獎.png');
   const sub = await page.$('#subBox'); await sub.evaluate((e) => e.scrollIntoView({ block: 'center' })); await sleep(300);
   const shot1 = await sub.screenshot({ encoding: 'base64' });
 
-  // 2. 有人續訂（Tier 1，第 2 個月）→ 轉 3 次
+  // 2. 有人續訂（層級一，第 2 個月）→ 轉 3 次
   await page.click('#toLive'); await sleep(400);
-  await page.evaluate(() => window.__tw.notify('channel.subscription.message', { user_login: 'haruneuka', user_name: 'HaruneUka', user_id: '77', tier: '1000', cumulative_months: 2, message: '' }, 'r1'));
+  await page.evaluate(() => window.__tw.notify('channel.subscription.message', { user_login: 'azhe_tw', user_name: '阿哲', user_id: '77', tier: '1000', cumulative_months: 2, message: '' }, 'r1'));
   await page.waitForFunction(() => /續訂 2 個月/.test(document.querySelector('#nowBanner').textContent)); await sleep(2600);
   const stage = await page.$('.tw-stage');
   const shot2 = await stage.screenshot({ encoding: 'base64' });
@@ -55,9 +55,9 @@ const OUT = path.join(__dirname, '忠誠點轉盤_續訂抽獎.png');
   </style></head><body>
     <span class="badge">續訂也能抽獎</span>
     <p class="sub">觀眾在聊天室分享續訂（「已訂閱層級 1。這位使用者已經訂閱了 2 個月！」）時自動轉盤</p>
-    <div class="step"><span class="no">1</span><span>右上角「設定」→ 往下到「7 加碼：小奇點、訂閱也轉盤」，勾「訂閱」，在「續訂轉 __ 次」填要抽幾次。Tier 2、Tier 3 可以另外乘倍數（例：Tier 3 乘 5，續訂 3 次就變 15 次）。改了馬上生效。</span></div>
+    <div class="step"><span class="no">1</span><span>右上角「設定」→ 往下到「7 加碼：小奇點、訂閱也轉盤」，勾「訂閱」，在「續訂轉 __ 次」填要抽幾次。層級二、層級三可以另外乘倍數（例：層級三乘 5，續訂 3 次就變 15 次）。改了馬上生效。</span></div>
     <img src="data:image/png;base64,${shot1}" style="width:88%">
-    <div class="step"><span class="no">2</span><span>有人分享續訂，就照設定的次數轉盤，結果一樣寫進試算表；紀錄上會標「續訂 2 個月（Tier 1）」。</span></div>
+    <div class="step"><span class="no">2</span><span>有人分享續訂，就照設定的次數轉盤，結果一樣寫進試算表；紀錄上會標「續訂 2 個月（層級一）」。</span></div>
     <div class="two"><div><img src="data:image/png;base64,${shot2}"></div><div style="flex:.8"><img src="data:image/png;base64,${shot3}"></div></div>
     <div class="note"><b>注意</b>只有觀眾自己按「分享續訂」、聊天室出現那行字時，Twitch 才會通知；沒分享、自動續訂的收不到。網頁（或 OBS 面板）要開著；第一次打開訂閱要重新連接 Twitch 一次。</div>
   </body></html>`, { waitUntil: 'load' });

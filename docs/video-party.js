@@ -32,7 +32,7 @@ async function openPanel(browser, { config, party, mockParty = true }) {
   return page;
 }
 const pe = (id, n, input) => ({ id, login: n.toLowerCase(), display: n, userId: '', input, rewardId: 'rwq', at: new Date().toISOString() });
-const DEMO = { playing: [pe('p1', '小明', 'Ming#1234')], waiting: [pe('w1', '嘎唄', 'Gabai#22'), pe('w2', 'HaruneUka', 'Uka#8'), pe('w3', '秋野貼鐵', 'AKN#7')] };
+const DEMO = { playing: [pe('p1', '小明', 'Ming#1234')], waiting: [pe('w1', '小美', 'Mei#22'), pe('w2', '阿哲', 'Zhe#8'), pe('w3', '路人甲', 'Lu#7')] };
 
 // 字幕列＋標示框（跟 deliverable-kit 影片同一套樣式）
 async function caption(page, text, sel, no, total) {
@@ -56,7 +56,7 @@ async function card(page, file, title, sub) {
 
 // OBS 截圖：放大截圖本身就是螢幕上 crop 那塊；view（可省略）只顯示其中一塊放大；boxes 都用螢幕座標
 async function obsFrame(page, file, f, no, total) {
-  const img = `data:image/jpeg;base64,${fs.readFileSync(f.file).toString('base64')}`;
+  const img = f.dataUrl || `data:image/jpeg;base64,${fs.readFileSync(f.file).toString('base64')}`;
   const crop = f.crop; const view = f.view || f.crop;
   await page.setContent(`<html><body style="margin:0;width:${W}px;height:${HGT}px;background:#2b2e38;display:flex;align-items:flex-start;justify-content:center;overflow:hidden"><div id="wrap" style="position:relative;margin-top:24px;overflow:hidden;border-radius:8px;box-shadow:0 8px 30px rgba(0,0,0,.5)"><img id="im" src="${img}" style="display:block;position:absolute"></div></body></html>`);
   await page.waitForFunction(() => document.getElementById('im').complete);
@@ -102,6 +102,28 @@ async function obsFrame(page, file, f, no, total) {
   const cardPage = await browser.newPage(); await cardPage.setViewport({ width: W, height: HGT, deviceScaleFactor: DPR });
   const c0 = path.join(FRAMES, '00.png'); await card(cardPage, c0, '排隊陪玩 設定教學', '觀眾兌換忠誠點排隊，你按「下一輪」叫人。約 1 分半'); frames.push({ file: c0, cap: '排隊陪玩 設定教學', dur: 3.5 });
 
+  // OBS 截圖裡的排隊名單換成示範資料（patchQueue：名單來源在螢幕上的位置），不放真的觀眾名字。要在主控制面板開之前做：同一個瀏覽器只允許一個控制面板運作
+  for (const f of obs.filter((x) => x.patchQueue)) {
+    const host = await openPanel(browser, { config: { ...READY, sync: false, party: { rewardId: 'rwq', batch: 1, show: 5 } }, party: DEMO });
+    const cfgQ = await H.readKey(host, 'tw.config');
+    const qv = await browser.newPage(); await qv.setViewport({ width: 400, height: 600, deviceScaleFactor: 1 });
+    await qv.goto(`${H.srvUrl}/queue.html?room=${cfgQ.room}&key=${cfgQ.secret}&sync=0`, { waitUntil: 'networkidle0' });
+    await qv.waitForSelector('#card:not(.hidden)'); await sleep(800);
+    await qv.evaluate(() => { document.body.style.background = '#000'; });
+    const q = (await qv.screenshot({ encoding: 'base64' }));
+    await qv.close(); await host.close();
+    const [x0, y0, x1] = f.crop; const [a, b2, c, d] = f.patchQueue;
+    f.dataUrl = await cardPage.evaluate(async ({ src, q, x0, y0, x1, a, b2, c, d }) => {
+      const load = (u) => new Promise((r) => { const i = new Image(); i.onload = () => r(i); i.src = u; });
+      const base = await load(src); const top = await load(`data:image/png;base64,${q}`);
+      const k = base.width / (x1 - x0);
+      const cv = document.createElement('canvas'); cv.width = base.width; cv.height = base.height;
+      const g = cv.getContext('2d'); g.drawImage(base, 0, 0); g.drawImage(top, (a - x0) * k, (b2 - y0) * k, (c - a) * k, (d - b2) * k);
+      return cv.toDataURL('image/jpeg', 0.95);
+    }, { src: `data:image/jpeg;base64,${fs.readFileSync(f.file).toString('base64')}`, q, x0, y0, x1, a, b2, c, d });
+    fs.writeFileSync(f.file, Buffer.from(f.dataUrl.split(',')[1], 'base64')); // 存回原檔：專案裡只留示範名字
+  }
+
   // 1～4：設定步驟 8
   const page = await openPanel(browser, { config: { ...READY, sync: false }, party: null, mockParty: false });
   await page.bringToFront(); await page.click('#toSetup'); await sleep(400);
@@ -124,7 +146,7 @@ async function obsFrame(page, file, f, no, total) {
   await page.bringToFront();
   await page.click('#toLive'); await sleep(400);
   const rid = (await H.readKey(page, 'tw.config')).party.rewardId;
-  for (const [id, login, name, input] of [['v1', 'xiaoming', '小明', 'Ming#1234'], ['v2', 'gabai', '嘎唄', 'Gabai#22'], ['v3', 'haruneuka', 'HaruneUka', 'Uka#8']]) {
+  for (const [id, login, name, input] of [['v1', 'xiaoming', '小明', 'Ming#1234'], ['v2', 'xiaomei', '小美', 'Mei#22'], ['v3', 'azhe_tw', '阿哲', 'Zhe#8']]) {
     await page.evaluate((ev) => window.__tw.redeem(ev), { id, user_login: login, user_name: name, user_id: `u${login}`, user_input: input, reward: { id: rid, title: '排隊陪玩' } });
     await sleep(300);
   }

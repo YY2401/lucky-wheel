@@ -782,7 +782,7 @@
   });
   // 改記給別人：已寫進試算表的就從原本的人移到新的人；還沒寫的直接換人
   async function reassign(r) {
-    const name = await dialog({ title: '改記給哪位觀眾？', message: `「${r.prize}」目前記在 ${T.viewerLabel(r)}。輸入要改記的觀眾：英文帳號最準（例如 gabai），也可以是試算表裡的名稱。${r.by ? `\n點數是 ${r.by.display} 花的，退點會退給 ${r.by.display}。` : ''}`, input: '', okLabel: '改記' });
+    const name = await dialog({ title: '改記給哪位觀眾？', message: `「${r.prize}」目前記在 ${T.viewerLabel(r)}。輸入要改記的觀眾：英文帳號最準（例如 xiaomei），也可以是試算表裡的名稱。${r.by ? `\n點數是 ${r.by.display} 花的，退點會退給 ${r.by.display}。` : ''}`, input: '', okLabel: '改記' });
     if (!name || !name.trim()) return;
     const v = T.parseViewer(name.replace(/^@/, ''));
     let login = v.login || (/^[a-z0-9_]{3,25}$/i.test(v.display) ? v.display.toLowerCase() : '');
