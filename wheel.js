@@ -69,6 +69,7 @@
   class Wheel {
     constructor(canvas, opts = {}) {
       this.canvas = canvas;
+      this.visible = () => !document.hidden && canvas.isConnected && canvas.offsetParent !== null && !canvas.closest('.out, .hidden');
       this.ctx = canvas.getContext('2d');
       this.opts = Object.assign({ pointerAngle: -Math.PI / 2, hubText: 'GO', onTick: null }, opts);
       this.theme = { ring: '#1c1c1c', ringStroke: '#ffcf33', ledOn: '#ffcf33', ledOff: '#4a4a4a', hubBg: '#f4efe4', hubText: '#141414', hubStroke: '#ffcf33', pointer: '#e63b3b', pointerStroke: '#f4efe4', sliceStroke: '#141414', textFill: '#ffffff', textStroke: 'rgba(0,0,0,0.55)' };
@@ -84,7 +85,8 @@
       this.resize();
       this._ro = new ResizeObserver(() => { this.resize(); this.draw(); });
       this._ro.observe(canvas);
-      this._idle = setInterval(() => { if (!this.spinning) { this.ledPhase++; this.draw(); } }, 500);
+      // 跑馬燈每 0.5 秒重畫一次轉盤；看不到時（OBS 畫面隱藏中、切到別的畫面）就不畫，省電腦資源
+      this._idle = setInterval(() => { if (!this.spinning && this.visible()) { this.ledPhase++; this.draw(); } }, 500);
       // 中心「GO」可當按鈕：有給 onHubClick 才啟用（覆蓋層不給，純顯示）
       this.hubHover = false; this.hubPressed = false;
       if (this.opts.onHubClick) {

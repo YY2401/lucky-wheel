@@ -115,6 +115,8 @@ input[type=checkbox] { accent-color: var(--red); width: 17px; height: 17px; }
   animation: ringspin 40s linear infinite;
 }
 @keyframes ringspin { to { transform: rotate(360deg); } }
+/* 外圈旋轉會讓瀏覽器每一格畫面都重畫（漸層＋遮罩很吃效能）：忠誠點轉盤控制面板不轉；OBS 畫面隱藏時也停住 */
+body.tw .wheel-wrap::before, body.overlay .stage.out .wheel-wrap::before { animation: none; }
 .wheel-wrap canvas { width: 100%; height: 100%; display: block; }
 
 .controls {

@@ -107,10 +107,13 @@
   }
   const clock = new THREE.Clock();
   let running = !document.hidden;
-  document.addEventListener('visibilitychange', () => { running = !document.hidden; clock.getDelta(); });
+  // 關掉背景或分頁在背景時整個迴圈停下來（不空轉），打開時再啟動
+  let looping = false;
+  const wake = () => { if (!looping && running && enabled) { looping = true; clock.getDelta(); requestAnimationFrame(tick); } };
+  document.addEventListener('visibilitychange', () => { running = !document.hidden; wake(); });
   function tick() {
+    if (!running || !enabled) { looping = false; return; }
     requestAnimationFrame(tick);
-    if (!running || !enabled) return;
     const dt = Math.min(clock.getDelta(), 0.05);
     const t = clock.elapsedTime;
     const e = state.energy; const sp = prefersReduced ? 0.15 : 1 + e * 5;
@@ -140,7 +143,7 @@
     }
     renderer.render(scene, camera);
   }
-  tick();
+  wake();
 
   const tween = (target, props, opts) => {
     if (window.anime) { anime.remove(target); anime({ targets: target, ...props, ...opts }); }
@@ -166,7 +169,7 @@
   window.WheelBG = {
     burstAt,
     setTheme,
-    setEnabled(v) { enabled = v !== false; canvas.style.display = enabled ? '' : 'none'; if (enabled) clock.getDelta(); },
+    setEnabled(v) { enabled = v !== false; canvas.style.display = enabled ? '' : 'none'; wake(); },
     setSpinning(v) { tween(state, { energy: v ? 1 : 0 }, { duration: v ? 700 : 1600, easing: 'easeOutQuad' }); },
     burst() {
       tween(state, { energy: [2.2, 0] }, { duration: 2200, easing: 'easeOutExpo' });
