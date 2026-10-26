@@ -15,7 +15,7 @@ if (!H.chromePath()) {
 
   const READY = { clientId: 'cid', sync: false, spinDuration: 1000, resultSeconds: 1, sound: false, rewardIds: ['rw1'], scriptUrl: 'https://script.google.com/macros/s/X/exec', sheetOk: 'https://script.google.com/macros/s/X/exec', setupDone: true };
   async function open(t, { config = READY, auth = { token: 'tok', clientId: 'cid' }, before: setup } = {}) {
-    const page = await H.newPage(browser);
+    const page = H.autoTab(await H.newPage(browser));
     t.after(() => page.close());
     await page.evaluateOnNewDocument(installMocks);
     await page.goto(`${srv.url}/twitch.html`, { waitUntil: 'networkidle0' });

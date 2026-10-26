@@ -1203,11 +1203,34 @@
   $('#volume').oninput = () => { Sfx.volume = Number($('#volume').value) / 100; };
 
   // ---------- 切換畫面 ----------
+  // ---------- 設定頁籤：一次只顯示一步 ----------
+  const TAB_COUNT = $$('#setupTabs [data-tab]').length;
+  let curTab = 0;
+  function selectTab(n) {
+    curTab = Math.min(TAB_COUNT, Math.max(1, Number(n) || 1));
+    $$('.tw-step').forEach((sec) => sec.classList.toggle('tab-hidden', sec.id !== `step${curTab}`));
+    $$('#setupTabs [data-tab]').forEach((b) => { const on = Number(b.dataset.tab) === curTab; b.classList.toggle('on', on); b.setAttribute('aria-selected', on ? 'true' : 'false'); if (on) b.scrollIntoView({ block: 'nearest', inline: 'nearest' }); });
+    $('#tabPrev').disabled = curTab <= 1; $('#tabNext').disabled = curTab >= TAB_COUNT;
+    try { sessionStorage.setItem('tw.tab', String(curTab)); } catch { /* ignore */ }
+  }
+  // 頁籤上的 ✓ 跟著各步驟的「完成」狀態走（各步驟自己更新 .done，這裡跟著變）
+  const syncTabs = () => $$('#setupTabs [data-tab]').forEach((b) => { const sec = $(`#step${b.dataset.tab}`); b.classList.toggle('done', sec.classList.contains('done')); b.classList.toggle('optional', sec.classList.contains('optional')); });
+  new MutationObserver(syncTabs).observe($('#setupView'), { subtree: true, attributes: true, attributeFilter: ['class'] });
+  $('#setupTabs').addEventListener('click', (e) => { const b = e.target.closest('[data-tab]'); if (b) selectTab(b.dataset.tab); });
+  $('#tabPrev').onclick = () => { selectTab(curTab - 1); window.scrollTo({ top: 0 }); };
+  $('#tabNext').onclick = () => { selectTab(curTab + 1); window.scrollTo({ top: 0 }); };
+  // 沒指定哪一步：上次看的那一步；第一次打開就從第一個還沒完成的必要步驟開始
+  function defaultTab() {
+    let saved = 0; try { saved = Number(sessionStorage.getItem('tw.tab')) || 0; } catch { /* ignore */ }
+    if (saved) return saved;
+    const done = stepDone();
+    return [1, 2, 3].find((n) => !done[n]) || 1;
+  }
   function showSetup(step) {
     $('#setupView').classList.remove('hidden'); $('#liveView').classList.add('hidden');
     $('#toSetup').classList.add('hidden'); $('#toLive').classList.remove('hidden');
     renderSetup(); renderRewards(); renderPrizes(); renderTriggers(); renderPartySetup(); renderSongSetup();
-    if (step) setTimeout(() => $(`#step${step}`).scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+    selectTab(step || curTab || defaultTab()); syncTabs();
   }
   function showLive() {
     $('#setupView').classList.add('hidden'); $('#liveView').classList.remove('hidden');

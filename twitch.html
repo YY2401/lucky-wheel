@@ -8,8 +8,8 @@
 <script>try { document.documentElement.dataset.theme = localStorage.getItem('tw.theme') || 'light'; } catch (e) { document.documentElement.dataset.theme = 'light'; }</script>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=72">
-<link rel="stylesheet" href="twitch.css?v=72">
+<link rel="stylesheet" href="style.css?v=73">
+<link rel="stylesheet" href="twitch.css?v=73">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.1/mqtt.min.js"></script>
 </head>
 <body class="tw">
@@ -44,6 +44,18 @@
     <p class="hint">設定只要做一次，之後打開這個網頁就會自動連線。資料存在這台電腦的瀏覽器裡。</p>
     <p class="tw-guide-link">第一次用？先看 <a href="docs/onepager.html?doc=quickstart" target="_blank" rel="noopener">一頁快速上手</a>。看不懂哪一步？<a href="docs/%E5%BF%A0%E8%AA%A0%E9%BB%9E%E8%BD%89%E7%9B%A4%E4%BD%BF%E7%94%A8%E8%AA%AA%E6%98%8E.pdf" target="_blank" rel="noopener" id="openGuide">打開圖文說明書</a>（每一步都有截圖）。想知道有哪些功能？<a href="docs/onepager.html?doc=features" target="_blank" rel="noopener">功能總覽</a></p>
   </div>
+
+  <nav class="tw-tabs" id="setupTabs" role="tablist" aria-label="設定步驟">
+    <button type="button" role="tab" data-tab="1"><span class="tw-tab-no">1</span><span class="tw-tab-name">連接 Twitch</span></button>
+    <button type="button" role="tab" data-tab="2"><span class="tw-tab-no">2</span><span class="tw-tab-name">品項</span></button>
+    <button type="button" role="tab" data-tab="3"><span class="tw-tab-no">3</span><span class="tw-tab-name">試算表</span></button>
+    <button type="button" role="tab" data-tab="4"><span class="tw-tab-no">4</span><span class="tw-tab-name">轉盤內容</span><small>可略過</small></button>
+    <button type="button" role="tab" data-tab="5"><span class="tw-tab-no">5</span><span class="tw-tab-name">OBS 畫面</span><small>可略過</small></button>
+    <button type="button" role="tab" data-tab="6"><span class="tw-tab-no">6</span><span class="tw-tab-name">放進 OBS</span><small>建議</small></button>
+    <button type="button" role="tab" data-tab="7"><span class="tw-tab-no">7</span><span class="tw-tab-name">小奇點／訂閱</span><small>可略過</small></button>
+    <button type="button" role="tab" data-tab="8"><span class="tw-tab-no">8</span><span class="tw-tab-name">排隊陪玩</span><small>可略過</small></button>
+    <button type="button" role="tab" data-tab="9"><span class="tw-tab-no">9</span><span class="tw-tab-name">點歌</span><small>可略過</small></button>
+  </nav>
 
   <section class="tw-step" id="step1">
     <div class="tw-step-num">1</div>
@@ -276,6 +288,8 @@
     </div>
   </section>
 
+  <div class="tw-tab-nav"><button type="button" class="btn ghost" id="tabPrev">← 上一步</button><button type="button" class="btn" id="tabNext">下一步 →</button></div>
+
   <div class="tw-setup-foot">
     <button class="btn primary big" id="finishSetup">完成，開始直播 →</button>
     <p class="hint" id="finishHint"></p>
@@ -379,12 +393,12 @@
 </div>
 <div id="toast"></div>
 
-<script src="core.js?v=72"></script>
-<script src="twitch-core.js?v=72"></script>
-<script src="wheel.js?v=72"></script>
-<script src="ui.js?v=72"></script>
-<script src="store.js?v=72"></script>
-<script src="sync.js?v=72"></script>
-<script src="twitch.js?v=72"></script>
+<script src="core.js?v=73"></script>
+<script src="twitch-core.js?v=73"></script>
+<script src="wheel.js?v=73"></script>
+<script src="ui.js?v=73"></script>
+<script src="store.js?v=73"></script>
+<script src="sync.js?v=73"></script>
+<script src="twitch.js?v=73"></script>
 </body>
 </html>

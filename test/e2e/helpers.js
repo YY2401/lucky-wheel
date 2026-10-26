@@ -71,4 +71,20 @@ const closeResult = async (page) => {
   throw new Error('結果視窗關不掉');
 };
 
-module.exports = { ROOT, chromePath, serve, launch, newPage, seed, readKey, sleep, spinOnce, closeResult };
+// 忠誠點轉盤的設定頁是頁籤：元素在沒打開的頁籤裡時，先點那個頁籤（跟使用者實際操作一樣）
+async function showTab(page, sel) {
+  await page.evaluate((s) => {
+    const el = document.querySelector(s); const sec = el && el.closest('.tw-step.tab-hidden');
+    if (sec) { const b = document.querySelector(`#setupTabs [data-tab="${sec.id.replace('step', '')}"]`); if (b) b.click(); }
+  }, sel).catch(() => {});
+}
+// 讓 page.click／type／select 自動先切到元素所在的頁籤
+function autoTab(page) {
+  for (const m of ['click', 'type', 'select']) {
+    const orig = page[m].bind(page);
+    page[m] = async (sel, ...rest) => { await showTab(page, sel); return orig(sel, ...rest); };
+  }
+  return page;
+}
+
+module.exports = { showTab, autoTab, ROOT, chromePath, serve, launch, newPage, seed, readKey, sleep, spinOnce, closeResult };
