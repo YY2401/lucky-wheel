@@ -229,10 +229,13 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; }
 .tw-tabs { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 2px 10px; margin: 0 0 14px; scrollbar-width: thin; }
 .tw-tabs button { flex: none; display: flex; align-items: center; gap: 6px; padding: 6px 12px 6px 6px; border: var(--border-w) solid var(--ink); border-radius: 999px; background: var(--surface); color: var(--ink); font: inherit; font-weight: 700; font-size: 14px; cursor: pointer; white-space: nowrap; }
 .tw-tabs button small { font-weight: 500; font-size: 11px; color: var(--muted); }
-.tw-tabs .tw-tab-no { width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--ink); background: var(--yellow); color: #141414; display: flex; align-items: center; justify-content: center; font-family: "Bungee", sans-serif; font-size: 12px; }
+.tw-tabs .tw-tab-no { flex: none; width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--ink); background: var(--yellow); color: #141414; display: flex; align-items: center; justify-content: center; font-family: "Noto Sans TC", "Microsoft JhengHei", sans-serif; font-weight: 900; font-size: 16px; line-height: 1; }
 .tw-tabs button.optional .tw-tab-no { background: var(--surface2); color: var(--ink); }
 .tw-tabs button.done .tw-tab-no { background: var(--green); color: #fff; font-size: 0; }
-.tw-tabs button.done .tw-tab-no::after { content: "✓"; font-size: 14px; font-family: "Noto Sans TC", sans-serif; font-weight: 900; }
+.tw-tabs button.done .tw-tab-no::after { content: "✓"; font-size: 16px; font-family: "Noto Sans TC", sans-serif; font-weight: 900; }
+/* 選中的頁籤是黃底：數字圈改成黑底白字才分得出來 */
+.tw-tabs button.on .tw-tab-no { background: var(--ink); color: var(--yellow); border-color: var(--ink); }
+.tw-tabs button.on.done .tw-tab-no { background: var(--green); color: #fff; }
 .tw-tabs button.on { background: var(--yellow); color: #141414; box-shadow: 3px 3px 0 var(--shadow); }
 .tw-tabs button.on small { color: #3a3a3a; }
 .tw-tabs button:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
