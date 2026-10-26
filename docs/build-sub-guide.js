@@ -11,7 +11,7 @@ const OUT = path.join(__dirname, '忠誠點轉盤_續訂抽獎.png');
 (async () => {
   const srv = await H.serve();
   const browser = await H.launch();
-  const page = await browser.newPage();
+  const page = H.autoTab(await browser.newPage());
   await page.setViewport({ width: 1100, height: 900, deviceScaleFactor: 2 });
   await page.evaluateOnNewDocument(installMocks);
   await page.goto(`${srv.url}/twitch.html`, { waitUntil: 'networkidle0' });
@@ -26,6 +26,7 @@ const OUT = path.join(__dirname, '忠誠點轉盤_續訂抽獎.png');
   // 1. 設定步驟 7 的訂閱區塊，框出要填的地方
   await page.click('#toSetup'); await sleep(400);
   await page.evaluate(() => { ['#subOn', '#subResub', '#subT2', '#subT3'].forEach((s) => document.querySelector(s).closest('label').classList.add('mark')); });
+  await H.showTab(page, '#subBox');
   const sub = await page.$('#subBox'); await sub.evaluate((e) => e.scrollIntoView({ block: 'center' })); await sleep(300);
   const shot1 = await sub.screenshot({ encoding: 'base64' });
 
@@ -55,7 +56,7 @@ const OUT = path.join(__dirname, '忠誠點轉盤_續訂抽獎.png');
   </style></head><body>
     <span class="badge">續訂也能抽獎</span>
     <p class="sub">觀眾在聊天室分享續訂（「已訂閱層級 1。這位使用者已經訂閱了 2 個月！」）時自動轉盤</p>
-    <div class="step"><span class="no">1</span><span>右上角「設定」→ 往下到「7 加碼：小奇點、訂閱也轉盤」，勾「訂閱」，在「續訂轉 __ 次」填要抽幾次。層級二、層級三可以另外乘倍數（例：層級三乘 5，續訂 3 次就變 15 次）。改了馬上生效。</span></div>
+    <div class="step"><span class="no">1</span><span>右上角「設定」→ 點上方的「7 小奇點／訂閱」頁籤，勾「訂閱」，在「續訂轉 __ 次」填要抽幾次。層級二、層級三可以另外乘倍數（例：層級三乘 5，續訂 3 次就變 15 次）。改了馬上生效。</span></div>
     <img src="data:image/png;base64,${shot1}" style="width:88%">
     <div class="step"><span class="no">2</span><span>有人分享續訂，就照設定的次數轉盤，結果一樣寫進試算表；紀錄上會標「續訂 2 個月（層級一）」。</span></div>
     <div class="two"><div><img src="data:image/png;base64,${shot2}"></div><div style="flex:.8"><img src="data:image/png;base64,${shot3}"></div></div>

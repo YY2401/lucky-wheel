@@ -18,7 +18,7 @@ const READY = { clientId: 'cid', spinDuration: 2600, resultSeconds: 3, sound: fa
 const FONT = '"Noto Sans TC","Microsoft JhengHei",sans-serif';
 
 async function openPanel(browser, { config, party, mockParty = true }) {
-  const page = await browser.newPage();
+  const page = H.autoTab(await browser.newPage());
   await page.setViewport({ width: W, height: HGT, deviceScaleFactor: DPR });
   await page.evaluateOnNewDocument(() => { window.__RealWS = window.WebSocket; });
   await page.evaluateOnNewDocument(installMocks);
@@ -36,7 +36,7 @@ const DEMO = { playing: [pe('p1', '小明', 'Ming#1234')], waiting: [pe('w1', '�
 
 // 字幕列＋標示框（跟 deliverable-kit 影片同一套樣式）
 async function caption(page, text, sel, no, total) {
-  if (sel) { await page.$eval(sel, (e) => e.scrollIntoView({ block: 'center' })); await sleep(300); }
+  if (sel) { await H.showTab(page, sel); await page.$eval(sel, (e) => e.scrollIntoView({ block: 'center' })); await sleep(300); }
   const box = sel ? await page.$eval(sel, (e) => { const r = e.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; }) : null;
   await page.evaluate(({ text, box, no, total, FONT }) => {
     const o = document.createElement('div'); o.id = '__cap'; o.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:2147483647';
@@ -127,7 +127,8 @@ async function obsFrame(page, file, f, no, total) {
   // 1～4：設定步驟 8
   const page = await openPanel(browser, { config: { ...READY, sync: false }, party: null, mockParty: false });
   await page.bringToFront(); await page.click('#toSetup'); await sleep(400);
-  await shotTo(page, '打開忠誠點轉盤，按右上角「設定」，往下捲到「8 排隊陪玩」', '#step8 h2');
+  await shotTo(page, '打開忠誠點轉盤，按右上角「設定」，點上方的「8 排隊陪玩」頁籤', '#setupTabs [data-tab="8"]');
+  await page.click('#setupTabs [data-tab="8"]'); await sleep(300);
   await page.$eval('#partyRewardTitle', (e) => { e.value = '排隊陪玩'; }); await page.$eval('#partyRewardCost', (e) => { e.value = '1000'; });
   await shotTo(page, '品項名稱、要花多少忠誠點照自己的需要填，按「建立品項」', '#createPartyReward');
   await page.click('#createPartyReward'); await page.waitForFunction(() => document.querySelector('#partyReward').value !== ''); await sleep(800);
