@@ -328,13 +328,14 @@ body.overlay .chip { font-size: 16px; padding: 7px 14px 7px 8px; }
 .result-card.single .flip-back .q { font-size: 110px; width: 180px; height: 180px; }
 .ov-status { position: fixed; right: 12px; bottom: 12px; width: 12px; height: 12px; border-radius: 50%; background: #666; z-index: 5; border: 2px solid var(--ink); transition: transform .2s; }
 .ov-status.ok { background: var(--green); }
-/* 連線正常時不顯示（會被錄進直播畫面）；有問題（黃、紅）或按「測試」時才出現 */
+/* 直播畫面上平常一律不顯示（會被錄進直播）：連線狀態看控制面板右上角的「OBS」燈。
+   只有按「測試 OBS」閃一下、收到驗證不過的訊息、網址缺暗號（設定錯誤）時才出現 */
 .ov-status { transition: transform .2s, opacity .4s; }
-.ov-status.ok:not(.flash):not(.reject) { opacity: 0; }
+.ov-status:not(.ping):not(.reject):not(.nokey) { opacity: 0; }
 .ov-wrong { position: fixed; left: 12px; right: 12px; top: 12px; z-index: 6; padding: 12px 14px; border-radius: 10px; border: var(--border-w) solid var(--ink); background: var(--yellow); color: #141414; font-size: 14px; line-height: 1.6; box-shadow: 3px 3px 0 var(--ink); }
 .ov-status.wait { background: var(--yellow); }
 .ov-status.bad { background: var(--red); }
-.ov-status.flash { transform: scale(2.2); background: #fff; }
+.ov-status.ping { transform: scale(2.2); background: #fff; }
 
 /* ---------- 頁內確認視窗 ---------- */
 #confirmModal { z-index: 80; }

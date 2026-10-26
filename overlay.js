@@ -99,7 +99,7 @@
 
     Sync.onStatus = (state) => {
       const dot = $('#ovStatus');
-      if (!secret) { dot.className = 'ov-status bad'; dot.title = '網址缺少金鑰，收不到控制台訊息：請到控制台重新複製 OBS 畫面網址'; return; }
+      if (!secret) { dot.className = 'ov-status bad nokey'; dot.title = '網址缺少金鑰，收不到控制台訊息：請到控制台重新複製 OBS 畫面網址'; return; }
       dot.className = `ov-status ${state === 'online' || state === 'local' ? 'ok' : state === 'connecting' ? 'wait' : 'bad'}`;
       dot.title = { local: '同瀏覽器同步', online: '跨瀏覽器同步中', connecting: '連線中', offline: '中繼離線', off: '關閉' }[state];
     };
@@ -107,7 +107,7 @@
     Sync.on((msg) => {
       if (msg.type === 'config') applyConfig(msg.config);
       else if (msg.type === 'spin') { queue.push(msg); pump(); }
-      else if (msg.type === 'ping') { Sync.send({ type: 'pong' }); const d = $('#ovStatus'); d.classList.add('flash'); setTimeout(() => d.classList.remove('flash'), 1200); }
+      else if (msg.type === 'ping') { Sync.send({ type: 'pong' }); const d = $('#ovStatus'); d.classList.add('ping'); setTimeout(() => d.classList.remove('ping'), 1500); /* 不能叫 flash：跟全螢幕閃光效果的 .flash 撞名 */ }
     });
     // 沒金鑰時用一個不可能簽出的假金鑰，讓所有訊息都驗不過（拒收），狀態點會顯示原因
     Sync.start(room, { sync: params.get('sync') !== '0', broker: params.get('broker') || config.broker, secret: secret || '\u0000no-key' });

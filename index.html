@@ -8,7 +8,7 @@
 <script>try { document.documentElement.dataset.theme = localStorage.getItem('lw.theme') || 'light'; } catch (e) { document.documentElement.dataset.theme = 'light'; }</script>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=57">
+<link rel="stylesheet" href="style.css?v=58">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.1/mqtt.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
@@ -215,7 +215,7 @@
         <label>結果顯示幾秒後自動消失 <input type="number" id="s-overlayResultSeconds" min="1" max="120"></label>
         <div class="switch-row"><label class="switch"><input type="checkbox" id="s-overlaySpinOnly"><span class="track"></span><span class="switch-label">平常把轉盤藏起來，抽獎時才出現</span></label></div>
         <div class="switch-row"><label class="switch"><input type="checkbox" id="s-overlayMute"><span class="track"></span><span class="switch-label">OBS 畫面不要出聲音（只有控制台有聲音）</span></label></div>
-        <div class="switch-row"><label class="switch"><input type="checkbox" id="s-overlayHideStatus"><span class="track"></span><span class="switch-label">完全隱藏 OBS 畫面右下角的連線小圓點（連線正常時本來就不顯示，只有連不上才會亮）</span></label></div>
+        <div class="switch-row"><label class="switch"><input type="checkbox" id="s-overlayHideStatus"><span class="track"></span><span class="switch-label">完全隱藏 OBS 畫面右下角的連線小圓點（平常本來就不顯示，只有按測試時才閃一下）</span></label></div>
         <div class="switch-row"><label class="switch"><input type="checkbox" id="s-overlayList"><span class="track"></span><span class="switch-label">OBS 畫面左上角顯示獎項一覽</span></label></div>
         <div class="switch-row" style="padding-left:24px">
           <label class="switch"><input type="checkbox" id="s-overlayListProb"><span class="track"></span><span class="switch-label">一覽裡顯示機率</span></label>
@@ -407,15 +407,15 @@
 <canvas id="confetti"></canvas>
 <div id="toast"></div>
 
-<script src="core.js?v=57"></script>
-<script src="wheel.js?v=57"></script>
-<script src="ui.js?v=57"></script>
-<script src="store.js?v=57"></script>
-<script src="sync.js?v=57"></script>
-<script src="excel.js?v=57"></script>
-<script src="overlay.js?v=57"></script>
-<script src="control.js?v=57"></script>
-<script src="app.js?v=57"></script>
-<script src="bg.js?v=57"></script>
+<script src="core.js?v=58"></script>
+<script src="wheel.js?v=58"></script>
+<script src="ui.js?v=58"></script>
+<script src="store.js?v=58"></script>
+<script src="sync.js?v=58"></script>
+<script src="excel.js?v=58"></script>
+<script src="overlay.js?v=58"></script>
+<script src="control.js?v=58"></script>
+<script src="app.js?v=58"></script>
+<script src="bg.js?v=58"></script>
 </body>
 </html>
