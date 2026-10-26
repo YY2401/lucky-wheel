@@ -104,6 +104,19 @@
       dot.title = { local: '同瀏覽器同步', online: '跨瀏覽器同步中', connecting: '連線中', offline: '中繼離線', off: '關閉' }[state];
     };
     Sync.onReject = () => { const dot = $('#ovStatus'); dot.classList.add('reject'); setTimeout(() => dot.classList.remove('reject'), 1500); };
+    // 除錯模式（網址加 &debug=1）：直接在畫面上顯示每台中繼伺服器的連線狀態和收到的訊息，OBS 裡看不到主控台時用
+    if (params.get('debug') === '1') {
+      const box = document.createElement('pre');
+      box.style.cssText = 'position:fixed;left:8px;top:8px;z-index:99;margin:0;padding:8px 10px;background:rgba(0,0,0,.8);color:#7f7;font:14px/1.5 monospace;border-radius:8px;white-space:pre';
+      document.body.appendChild(box);
+      const log = []; let n = 0; let bad = 0;
+      Sync.on((m) => { n += 1; log.unshift(`${new Date().toLocaleTimeString()} ${m.type}`); log.length = Math.min(log.length, 5); });
+      const prevReject = Sync.onReject; Sync.onReject = (m) => { bad += 1; if (prevReject) prevReject(m); };
+      setInterval(() => {
+        const cs = (Sync.clients || []).map((c, i) => `中繼${i + 1}：${c.connected ? '已連上' : c.reconnecting ? '重連中' : '未連上'}`).join('　');
+        box.textContent = [`狀態：${Sync.state}　頻道：${room}　暗號：${secret ? '有' : '沒有'}`, cs, `收到 ${n} 則、驗證不過 ${bad} 則`, ...log].join('\n');
+      }, 500);
+    }
     Sync.on((msg) => {
       if (msg.type === 'config') applyConfig(msg.config);
       else if (msg.type === 'spin') { queue.push(msg); pump(); }
