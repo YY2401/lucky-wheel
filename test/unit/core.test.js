@@ -266,6 +266,15 @@ test('normalizeConfig：音量與限抽欄位範圍', () => {
   assert.equal(core.normalizeConfig({}).volume, 70);
 });
 
+test('normalizeConfig：OBS 背景透明度預設 0、限制在 0～100 的整數', () => {
+  assert.equal(core.DEFAULT_CONFIG.obsBgOpacity, 0);
+  assert.equal(core.normalizeConfig({}).obsBgOpacity, 0);
+  const op = (v) => core.normalizeConfig({ obsBgOpacity: v }).obsBgOpacity;
+  assert.equal(op(0), 0); assert.equal(op(100), 100); assert.equal(op(65), 65);
+  assert.equal(op(-5), 0); assert.equal(op(150), 100);
+  assert.equal(op('abc'), 0); assert.equal(op(null), 0); assert.equal(op('50.7'), 50);
+});
+
 test('特效等級：自動判定（機率 < 5% 或保底＝大獎、名字像銘謝惠顧＝落空）、手動指定優先；整批反應', () => {
   assert.equal(core.tierOf({ name: '特獎', pity: true }, 30), 'big');
   assert.equal(core.tierOf({ name: '頭獎' }, 4.9), 'big');

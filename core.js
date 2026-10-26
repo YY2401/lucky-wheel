@@ -15,7 +15,7 @@
     title: '幸運轉盤', segmentMode: 'weight', spinDuration: 5000, multiSpinDuration: 1500, turns: 6, sound: true, volume: 70, countdown: 3,
     limitPerPlayer: 0, limitPeriod: 'all',
     overlayResultSeconds: 8, multiMode: 'flip', minSlice: 4, bg3d: true, theme: 'light', themeChosen: false,
-    overlaySize: 520, overlaySpinOnly: false, overlayMute: false, overlayHideStatus: false,
+    overlaySize: 520, obsBgOpacity: 0, overlaySpinOnly: false, overlayMute: false, overlayHideStatus: false,
     overlayList: false, overlayListProb: true, overlayListStock: true, overlayListPos: 'tl',
     pityAccum: false, pityAccumN: 30, pityBatch: false, pityBatchK: 10, pityScope: 'player', room: '', secret: '', sync: false, broker: 'wss://broker.emqx.io:8084/mqtt',
     prizes: [1, 2, 3, 4, 5, 6].map((n) => ({ id: `p${n}`, name: `獎項 ${n}`, weight: 10, quantity: -1, remaining: -1, image: '', color: PALETTE[(n - 1) % PALETTE.length] })),
@@ -56,6 +56,7 @@
     cfg.bg3d = cfg.bg3d !== false;
     cfg.themeChosen = cfg.themeChosen === true;
     cfg.overlaySize = Math.min(2000, Math.max(200, Math.trunc(Number(cfg.overlaySize)) || 520));
+    cfg.obsBgOpacity = Math.min(100, Math.max(0, Math.trunc(Number(cfg.obsBgOpacity)) || 0)); // OBS 畫面背景透明度（%）：0＝完全透明
     cfg.overlaySpinOnly = cfg.overlaySpinOnly === true; cfg.overlayMute = cfg.overlayMute === true; cfg.overlayHideStatus = cfg.overlayHideStatus === true;
     cfg.overlayList = cfg.overlayList === true; cfg.overlayListProb = cfg.overlayListProb !== false; cfg.overlayListStock = cfg.overlayListStock !== false;
     cfg.overlayListPos = ['tl', 'tr', 'c'].includes(cfg.overlayListPos) ? cfg.overlayListPos : 'tl';

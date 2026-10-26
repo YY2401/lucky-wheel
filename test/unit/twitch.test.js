@@ -506,6 +506,18 @@ test('搬到 OBS 面板會帶上小奇點、訂閱設定與零頭', () => {
   assert.deepEqual([res.cfg.triggers.bits.on, res.cfg.triggers.bits.per, res.cfg.bitsCarry[42], res.cfg.wheel2.name], [true, 300, 120, '加碼']);
 });
 
+test('OBS 背景透明度：預設 0、限制在 0～100 的整數、會跟著搬家碼搬', () => {
+  assert.equal(tw.DEFAULT_TW.obsBgOpacity, 0);
+  assert.equal(tw.normalizeTwConfig({}).obsBgOpacity, 0);
+  const op = (v) => tw.normalizeTwConfig({ obsBgOpacity: v }).obsBgOpacity;
+  assert.equal(op(0), 0); assert.equal(op(100), 100);
+  assert.equal(op(-5), 0); assert.equal(op(150), 100);
+  assert.equal(op('abc'), 0); assert.equal(op(null), 0); assert.equal(op('50.7'), 50);
+  const cfg = tw.normalizeTwConfig({ obsBgOpacity: 40 });
+  const res = tw.applyMove(tw.normalizeTwConfig({}), [], tw.decodeMove(tw.encodeMove(tw.buildMove(cfg, []))));
+  assert.equal(res.cfg.obsBgOpacity, 40);
+});
+
 // ---------- 排隊陪玩 ----------
 const pe = (id, login, extra = {}) => tw.partyEntry({ id, user_login: login, user_name: login.toUpperCase(), user_id: `u${login}`, reward: { id: 'rq' }, ...extra });
 
