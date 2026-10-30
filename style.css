@@ -300,7 +300,7 @@ code, .code { background: var(--surface2); border: 1px solid var(--ink-soft); pa
 #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
 /* ---------- OBS 覆蓋層 ---------- */
-body.overlay { background: transparent; overflow: hidden; }
+body.overlay { background: color-mix(in srgb, var(--bg) calc(var(--ov-bg-alpha, 0) * 100%), transparent); overflow: hidden; } /* --ov-bg-alpha 0＝完全透明（預設）、1＝主題底色不透明 */
 body.overlay #bg { background: transparent; }
 body.overlay .stage { position: fixed; inset: 0; z-index: 1; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 14px; transition: opacity .5s, transform .5s; }
 body.overlay .stage.out { opacity: 0; transform: scale(.9); pointer-events: none; }

@@ -37,6 +37,7 @@
       Sfx.enabled = soundParam === '0' ? false : !!config.sound; Sfx.volume = config.volume / 100;
       try { localStorage.setItem('lw.bg3d', config.bg3d ? '1' : '0'); } catch { /* ignore */ }
       applyTheme(params.get('theme') || config.theme, wheel);
+      document.body.style.setProperty('--ov-bg-alpha', String(config.obsBgOpacity / 100)); // 背景透明度：只影響 body 底色
       wheel.setPrizes(config.prizes, config.segmentMode, config.minSlice / 100);
       renderList();
       if (window.WheelBG && params.get('bg') !== '0') WheelBG.setEnabled(config.bg3d);

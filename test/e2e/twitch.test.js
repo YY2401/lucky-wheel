@@ -439,6 +439,41 @@ if (!H.chromePath()) {
     assert.deepEqual(ov.errors, []);
   });
 
+  test('OBS 背景透明度：拉桿設 40 重新整理後還在；拉動時覆蓋層背景即時跟著變（不重新整理）、轉盤本身不變淡', async (t) => {
+    const page = await open(t);
+    const slide = (v) => page.$eval('#obsBgOpacity', (e, v) => { e.value = String(v); e.dispatchEvent(new Event('input', { bubbles: true })); }, v);
+    const shown = () => page.$eval('#obsBgOpacity', (e) => [e.value, document.querySelector('#obsBgOpacityVal').textContent]);
+    await H.showTab(page, '#obsBgOpacity');
+    await slide(40);
+    assert.deepEqual(await shown(), ['40', '40%']);
+    await waitFor(async () => (await H.readKey(page, 'tw.config')).obsBgOpacity === 40);
+    await page.reload({ waitUntil: 'networkidle0' }); await H.sleep(300);
+    assert.deepEqual(await shown(), ['40', '40%']);
+
+    // 覆蓋層：同一個瀏覽器、同一組頻道代碼和暗號（sync=0 只走 BroadcastChannel，不連外部伺服器）
+    const cfg = await H.readKey(page, 'tw.config');
+    const ov = await H.newPage(browser, { width: 1280, height: 720 }); t.after(() => ov.close());
+    await ov.goto(`${srv.url}/index.html?overlay=1&room=${cfg.room}&key=${cfg.secret}&sync=0`, { waitUntil: 'networkidle0' });
+    await H.sleep(500);
+    await ov.evaluate(() => { window.__noReload = true; });
+    const alpha = () => ov.$eval('body', (b) => {
+      const c = getComputedStyle(b).backgroundColor;
+      if (c === 'transparent') return 0;
+      const m = c.match(/\/\s*([\d.]+)\s*\)$/) || c.match(/^rgba\(.*,\s*([\d.]+)\)$/);
+      return m ? Number(m[1]) : 1;
+    });
+    const wheelOpacity = () => ov.$eval('#ovWheel', (e) => { let o = 1; for (let n = e; n; n = n.parentElement) o *= Number(getComputedStyle(n).opacity); return o; });
+    const before = await wheelOpacity();
+    for (const [v, want] of [[40, 0.4], [0, 0], [100, 1], [40, 0.4]]) {
+      await slide(v);
+      await waitFor(async () => Math.abs((await alpha()) - want) < 0.02, 5000).catch(async () => assert.fail(`拉到 ${v}：覆蓋層背景 alpha 應約 ${want}，實際 ${await alpha()}`));
+      assert.equal(await wheelOpacity(), before, `拉到 ${v}：轉盤的 opacity 不能被改`);
+    }
+    assert.equal(await ov.evaluate(() => window.__noReload), true, '覆蓋層不能重新整理');
+    assert.deepEqual(page.errors, []);
+    assert.deepEqual(ov.errors, []);
+  });
+
   test('瀏覽器動畫被暫停（視窗縮小）時，排隊還是會一個一個轉完', async (t) => {
     const page = await open(t);
     await waitFor(() => page.evaluate(() => window.__tw.subscribed));

@@ -95,7 +95,7 @@
   function overlayConfig() {
     return normalizeConfig({
       title: '忠誠點轉盤', prizes: corePrizes(), spinDuration: cfg.spinDuration, turns: cfg.turns, sound: cfg.sound, volume: cfg.volume,
-      overlayResultSeconds: cfg.resultSeconds, countdown: 0, theme: cfg.theme, themeChosen: true, bg3d: false,
+      overlayResultSeconds: cfg.resultSeconds, countdown: 0, theme: cfg.theme, themeChosen: true, bg3d: false, obsBgOpacity: cfg.obsBgOpacity,
       room: cfg.room, secret: cfg.secret, sync: cfg.sync, broker: cfg.broker,
     });
   }
@@ -1201,6 +1201,14 @@
   };
   ['#spinSeconds', '#resultSeconds', '#sound', '#volume'].forEach((s) => { $(s).onchange = obsSettings; });
   $('#volume').oninput = () => { Sfx.volume = Number($('#volume').value) / 100; };
+  // OBS 背景透明度：拉動時就即時套到 OBS 畫面（只掛 oninput，放開時不會再多送一次）
+  const showBgOpacity = () => { $('#obsBgOpacity').value = cfg.obsBgOpacity; $('#obsBgOpacityVal').textContent = `${cfg.obsBgOpacity}%`; };
+  showBgOpacity();
+  $('#obsBgOpacity').oninput = () => {
+    cfg = T.normalizeTwConfig({ ...cfg, obsBgOpacity: $('#obsBgOpacity').value });
+    $('#obsBgOpacityVal').textContent = `${cfg.obsBgOpacity}%`;
+    saveCfg(); sendConfig();
+  };
 
   // ---------- 切換畫面 ----------
   // ---------- 設定頁籤：一次只顯示一步 ----------

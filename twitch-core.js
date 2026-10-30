@@ -41,6 +41,7 @@
     cutoffHour: 0, // 凌晨幾點以前算前一天（跨夜直播用）
     prizes: DEFAULT_PRIZES,
     spinDuration: 5000, turns: 6, resultSeconds: 6, sound: true, volume: 70, theme: 'light',
+    obsBgOpacity: 0, // OBS 畫面背景透明度（%）：0＝完全透明，100＝不透明
     room: '', secret: '', sync: true, broker: 'wss://broker.emqx.io:8084/mqtt',
     setupDone: false,
     movedToObs: false, // 設定已搬到 OBS 面板：這裡不再接收兌換（避免兩邊同時轉）
@@ -80,6 +81,7 @@
     cfg.sound = cfg.sound !== false;
     cfg.volume = clampInt(cfg.volume, 0, 100, 70);
     cfg.theme = cfg.theme === 'dark' ? 'dark' : 'light';
+    cfg.obsBgOpacity = clampInt(cfg.obsBgOpacity, 0, 100, 0);
     cfg.room = String(cfg.room || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 24) || `tw${randId(6)}`;
     cfg.secret = String(cfg.secret || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 40) || randId(20);
     cfg.sync = cfg.sync !== false;
@@ -371,7 +373,7 @@
 
   // ---------- 搬到 OBS 面板：把設定和還在可退點期的紀錄包進網址（# 後面，不會送到伺服器） ----------
   // 不搬 Twitch 登入（在 OBS 面板裡重新連接一次）、不搬一般紀錄（留在原本的瀏覽器）
-  const MOVE_KEYS = ['clientId', 'rewardIds', 'scriptUrl', 'sheetKey', 'sheetOk', 'cutoffHour', 'prizes', 'spinDuration', 'turns', 'resultSeconds', 'sound', 'volume', 'theme', 'room', 'secret', 'sync', 'broker', 'setupDone', 'triggers', 'wheel2', 'bitsCarry', 'party', 'songs'];
+  const MOVE_KEYS = ['clientId', 'rewardIds', 'scriptUrl', 'sheetKey', 'sheetOk', 'cutoffHour', 'prizes', 'spinDuration', 'turns', 'resultSeconds', 'sound', 'volume', 'theme', 'obsBgOpacity', 'room', 'secret', 'sync', 'broker', 'setupDone', 'triggers', 'wheel2', 'bitsCarry', 'party', 'songs'];
   function buildMove(cfg, records, now = Date.now()) {
     const c = {};
     MOVE_KEYS.forEach((k) => { c[k] = cfg[k]; });
