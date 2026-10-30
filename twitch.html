@@ -8,8 +8,8 @@
 <script>try { document.documentElement.dataset.theme = localStorage.getItem('tw.theme') || 'light'; } catch (e) { document.documentElement.dataset.theme = 'light'; }</script>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=74">
-<link rel="stylesheet" href="twitch.css?v=74">
+<link rel="stylesheet" href="style.css?v=75">
+<link rel="stylesheet" href="twitch.css?v=75">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.1/mqtt.min.js"></script>
 </head>
 <body class="tw">
@@ -221,8 +221,8 @@
       </div>
       <div class="tw-grid">
         <label class="tw-field">匿名送的 <select id="anonMode"><option value="name">記在這個名字底下</option><option value="skip">不轉</option></select> <input id="anonName" maxlength="25" class="tw-short"></label>
-        <label class="tw-field">一次要轉好幾次時 <select id="multiMode"><option value="flip">轉一次，翻牌揭曉全部結果</option><option value="each">每一次都轉</option></select></label>
-        <label class="tw-field">一筆最多轉 <input type="number" id="maxSpins" min="1" max="200" step="1" class="tw-num"> 次</label>
+        <label class="tw-field">要抽好幾次時，轉盤怎麼轉 <select id="multiMode"><option value="flip">只轉一圈，一次翻牌揭曉全部結果</option><option value="each">抽幾次就轉幾圈</option></select></label>
+        <label class="tw-field">一位觀眾一次最多抽 <input type="number" id="maxSpins" min="1" max="200" step="1" class="tw-num"> 次 <small class="hint">（例：一次贈送 50 份訂閱，最多也只抽這麼多次）</small></label>
       </div>
       <div id="wheel2Box" class="hidden">
         <h3 class="tw-sub">第二個轉盤：<input id="wheel2Name" maxlength="20" class="tw-short"></h3>
@@ -393,12 +393,12 @@
 </div>
 <div id="toast"></div>
 
-<script src="core.js?v=74"></script>
-<script src="twitch-core.js?v=74"></script>
-<script src="wheel.js?v=74"></script>
-<script src="ui.js?v=74"></script>
-<script src="store.js?v=74"></script>
-<script src="sync.js?v=74"></script>
-<script src="twitch.js?v=74"></script>
+<script src="core.js?v=75"></script>
+<script src="twitch-core.js?v=75"></script>
+<script src="wheel.js?v=75"></script>
+<script src="ui.js?v=75"></script>
+<script src="store.js?v=75"></script>
+<script src="sync.js?v=75"></script>
+<script src="twitch.js?v=75"></script>
 </body>
 </html>
